@@ -1,0 +1,746 @@
+<title>Coin Radarı</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Düzen: tarayıcı enstrüman paneli — solda radar listesi, sağda seçili coinin "kartı"; telefonda tek sütun */
+:root{
+  --bg:#eef1f5; --panel:#fbfcfd; --ink:#14203a; --ink2:#46526b; --mute:#7a859b; --line:#d6dce6; --line2:#e6eaf0;
+  --accent:#2c56c9; --accent-soft:#e2e9fb;
+  --good:#17845a; --good-soft:#dcf1e7; --bad:#c23b2b; --bad-soft:#f8e1dd; --warn:#a86a06; --warn-soft:#f6ead2;
+  --hatch:#9aa6bb;
+  --f-disp:"Schibsted Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Schibsted Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1422; --panel:#151d2f; --ink:#e7ecf6; --ink2:#aab4c8; --mute:#7c879d; --line:#28334a; --line2:#1e283c;
+  --accent:#86a4ff; --accent-soft:#1f2b4d; --good:#3fc58b; --good-soft:#163428; --bad:#f07563; --bad-soft:#3a1d1a; --warn:#e2a93f; --warn-soft:#3a2c12; --hatch:#5b6780; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1422; --panel:#151d2f; --ink:#e7ecf6; --ink2:#aab4c8; --mute:#7c879d; --line:#28334a; --line2:#1e283c;
+  --accent:#86a4ff; --accent-soft:#1f2b4d; --good:#3fc58b; --good-soft:#163428; --bad:#f07563; --bad-soft:#3a1d1a; --warn:#e2a93f; --warn-soft:#3a2c12; --hatch:#5b6780; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45}
+.wrap{max-width:1280px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 48px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+h1{font-family:var(--f-disp);font-weight:800;font-size:26px;letter-spacing:-.02em;margin:0;line-height:1.1}
+h2{font-family:var(--f-disp);font-weight:700;font-size:17px;margin:0;text-wrap:balance}
+h3{font-family:var(--f-disp);font-weight:700;font-size:13px;margin:0;text-transform:uppercase;letter-spacing:.06em;color:var(--ink2)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:600}
+
+/* Üst bar */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 20px;justify-content:space-between;margin-bottom:12px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.scope{width:40px;height:40px;flex:none}
+.status{font-size:12px;color:var(--ink2);margin-top:3px}
+.status b{font-weight:600;color:var(--ink)}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mute);margin-right:5px;vertical-align:1px}
+.dot.live{background:var(--good)} .dot.demo{background:var(--warn)} .dot.file{background:var(--accent)}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;font-weight:600;font-size:13px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn:disabled{opacity:.5;cursor:default}
+
+.notice{border:1px solid var(--warn);background:var(--warn-soft);border-radius:var(--r);padding:10px 12px;margin-bottom:12px;font-size:13px;color:var(--ink)}
+.notice b{font-weight:700}
+.notice code{font-family:var(--f-num);font-size:12px}
+
+/* BTC rejimi */
+.regime{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin-bottom:12px}
+.regime .k{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.regime .v{font-weight:700}
+.regime .cell{display:flex;flex-direction:column;gap:1px;min-width:0}
+
+/* Sekmeler */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:12px;overflow-x:auto}
+.tab{background:none;border:0;border-bottom:2px solid transparent;padding:9px 12px;font-weight:600;color:var(--ink2);white-space:nowrap}
+.tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* Kontroller */
+.controls{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px}
+.ctl{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--ink2)}
+.ctl input[type=range]{width:110px;accent-color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+.seg button{border:0;background:none;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink)}
+.chipf{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 10px;font-size:12.5px;font-weight:600;color:var(--ink2)}
+.chipf[aria-pressed="true"]{border-color:var(--accent);color:var(--ink);background:var(--accent-soft)}
+.search{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 10px;width:130px}
+select.search{width:auto}
+
+/* Ana ızgara */
+.grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:960px){.grid{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr)}.detail-col{position:sticky;top:12px;align-self:start;max-height:calc(100vh - 24px);overflow:auto}}
+
+/* Radar listesi */
+.list{display:flex;flex-direction:column;gap:6px;min-width:0}
+.row{display:grid;grid-template-columns:28px 54px minmax(0,1fr) auto;gap:10px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;text-align:left;width:100%}
+.row:hover{border-color:var(--accent)}
+.row[aria-current="true"]{border-color:var(--accent);box-shadow:inset 3px 0 0 var(--accent)}
+.rank{font-family:var(--f-num);color:var(--mute);font-size:12px;text-align:right}
+.ring{width:54px;height:54px;position:relative}
+.ring svg{display:block}
+.ring .n{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--f-num);font-weight:600;font-size:16px}
+.rmain{min-width:0;display:flex;flex-direction:column;gap:4px}
+.rhead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.sym{font-weight:800;font-size:15px;letter-spacing:-.01em}
+.sym small{font-weight:500;color:var(--mute);font-size:11px}
+.chg{font-family:var(--f-num);font-size:12px}
+.up{color:var(--good)} .dn{color:var(--bad)}
+.reasons{font-size:12px;color:var(--ink2);overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.kz{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--mute)}
+.mini{width:52px;height:5px;background:var(--line2);border-radius:3px;position:relative;overflow:hidden}
+.mini i{position:absolute;inset:0 auto 0 0;border-radius:3px}
+.mini.k i{background:var(--ink2)}
+.mini.s i{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 5px)}
+.rside{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.spark{width:72px;height:26px;display:block}
+
+/* Etiketler */
+.pill{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.pill.gp{background:var(--good);color:var(--panel)} .pill.p{background:var(--good-soft);color:var(--good)}
+.pill.n{background:var(--line2);color:var(--ink2)} .pill.z{background:var(--warn-soft);color:var(--warn)} .pill.k{background:var(--bad-soft);color:var(--bad)}
+.badges{display:flex;gap:4px;flex-wrap:wrap}
+.badge{font-size:10.5px;font-weight:700;border-radius:4px;padding:1px 6px;border:1px solid var(--line);color:var(--ink2);white-space:nowrap}
+.badge.akum{border-color:var(--good);color:var(--good)} .badge.sik{border-color:var(--accent);color:var(--accent)}
+/* Dip sıkışması */
+.dipstrip{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.dipstrip .ttl{font-weight:800;font-size:13px;margin-right:6px}
+.dipstrip .help{flex:1 1 260px;min-width:0}
+.stg{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:600;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
+.stg b{font-family:var(--f-num)}
+.stg[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+.dippanel{border:1.5px solid var(--accent);border-radius:var(--r);padding:12px;margin:10px 0;background:linear-gradient(var(--accent-soft),var(--accent-soft)) top/100% 3px no-repeat}
+.dippanel.neg{border-color:var(--bad)}
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:10px 0}
+.step{font-size:11px;font-weight:700;color:var(--mute);border-top:4px solid var(--line2);padding-top:5px;text-transform:uppercase;letter-spacing:.04em}
+.step.done{border-top-color:var(--accent);color:var(--ink2)}
+.step.now{border-top-color:var(--accent);color:var(--ink)}
+.comp{display:grid;grid-template-columns:minmax(0,1fr) 90px 44px;gap:8px;align-items:center;font-size:12.5px;padding:3px 0}
+.comp .bar i{background:var(--accent)}
+.quote{font-size:12px;color:var(--ink2);border-left:2px solid var(--accent);padding-left:8px;margin-top:8px} .badge.kar,.badge.red,.badge.kirilim{border-color:var(--bad);color:var(--bad)} .badge.fake{border-color:var(--warn);color:var(--warn)} .badge.mfi10{border-color:var(--accent);color:var(--accent)}
+.tier{display:inline-grid;place-items:center;width:20px;height:18px;border-radius:4px;font-size:10.5px;font-weight:800;flex:none}
+.tier.K{background:var(--ink);color:var(--panel)}
+.tier.S{border:1.5px dashed var(--hatch);color:var(--ink2)}
+
+/* Detay */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;min-width:0}
+.dhead{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.dtitle{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.dtitle .px{font-family:var(--f-num);font-size:15px}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.trio .t{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.trio .t .v{font-family:var(--f-num);font-size:22px;font-weight:600;line-height:1.1}
+.trio .t .k{font-size:11px;color:var(--mute);font-weight:600;text-transform:uppercase;letter-spacing:.05em}
+.trio .t.S{border-style:dashed;border-color:var(--hatch)}
+.chartbox{position:relative;margin:6px 0 4px}
+canvas.chart{width:100%;height:260px;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11.5px;color:var(--ink2);margin-bottom:4px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:3px;margin-right:4px}
+.readout{font-family:var(--f-num);font-size:11.5px;color:var(--ink2);min-height:16px}
+.mods{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.mod{display:grid;grid-template-columns:minmax(0,1fr) 120px 36px;gap:10px;align-items:center;font-size:13px}
+.bar2{display:flex;flex-direction:column;gap:3px}
+.bar{height:6px;background:var(--line2);border-radius:3px;position:relative;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--ink2)}
+.bar.s i{background:repeating-linear-gradient(135deg,var(--hatch) 0 3px,transparent 3px 5px)}
+.bar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--mute);opacity:.5}
+.gates{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.gate{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;border-left:3px solid var(--bad);padding:4px 8px;background:var(--bad-soft);border-radius:0 6px 6px 0}
+.levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin:8px 0}
+.lv{border:1px solid var(--line2);border-radius:6px;padding:6px 8px;font-size:12px}
+.lv .k{color:var(--mute);font-size:11px}
+.lv .v{font-family:var(--f-num);font-weight:600}
+.rules{display:flex;flex-direction:column;margin-top:6px}
+.rgroup{margin-top:12px}
+.rr{display:grid;grid-template-columns:20px minmax(0,1fr) 64px;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line2);font-size:12.5px}
+.rr .lab{font-weight:600}
+.rr .note{color:var(--ink2);font-size:12px}
+.rr .pg{color:var(--mute);font-size:11px}
+.pts{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.pts .num{font-size:12px;font-weight:600}
+.pbar{width:60px;height:5px;background:var(--line2);position:relative;border-radius:3px}
+.pbar i{position:absolute;top:0;bottom:0;border-radius:3px}
+.pbar .mid{position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--mute)}
+details summary{cursor:pointer;color:var(--ink2);font-size:12.5px;font-weight:600;padding:6px 0}
+.empty{color:var(--mute);padding:30px 10px;text-align:center}
+
+/* Tablolar */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--line2);white-space:nowrap}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);font-weight:700;position:sticky;top:0;background:var(--panel);cursor:pointer}
+td.tw{white-space:normal;min-width:200px}
+td.r,th.r{text-align:right}
+.verd{font-weight:700;font-size:11.5px;border-radius:4px;padding:1px 6px}
+.verd.destek{background:var(--good-soft);color:var(--good)} .verd.zayif{background:var(--accent-soft);color:var(--accent)} .verd.yok{background:var(--line2);color:var(--mute)} .verd.ters{background:var(--bad-soft);color:var(--bad)}
+
+.bt-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin-bottom:14px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.stat .k{font-size:11px;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.stat .v{font-family:var(--f-num);font-size:22px;font-weight:600}
+.stat.S{border-style:dashed;border-color:var(--hatch)}
+.multiples{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin-bottom:14px}
+.prog{height:4px;background:var(--line2);border-radius:2px;overflow:hidden;margin:8px 0}
+.prog i{display:block;height:100%;background:var(--accent);width:0}
+.help{font-size:12.5px;color:var(--ink2);max-width:72ch}
+.section{margin-bottom:16px}
+.legend-tier{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--ink2);align-items:center;margin-bottom:10px}
+.legend-tier span{display:inline-flex;gap:6px;align-items:center}
+@media (max-width:520px){.row{grid-template-columns:22px 48px minmax(0,1fr);}.rside{grid-column:3;flex-direction:row;align-items:center;justify-content:space-between}.ring{width:48px;height:48px}.mod{grid-template-columns:minmax(0,1fr) 90px 32px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="scope" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="var(--line)" stroke-width="1.5"/><circle cx="20" cy="20" r="11" fill="none" stroke="var(--line)" stroke-width="1.5"/><path d="M20 20 L34 9" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/><circle cx="28" cy="13" r="2.6" fill="var(--good)"/><circle cx="12" cy="25" r="2" fill="var(--bad)"/></svg>
+      <div>
+        <h1>Coin Radarı</h1>
+        <div class="status" id="status"><span class="dot"></span>Hazırlanıyor…</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn primary" id="btnRefresh" type="button">Canlı veriyi çek</button>
+      <label class="btn" for="fileIn" style="display:inline-flex;align-items:center">Dosya yükle</label>
+      <input id="fileIn" type="file" accept=".json,application/json" multiple hidden>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" hidden></div>
+  <section class="regime" id="regime" aria-label="Piyasa rejimi"></section>
+
+  <nav class="tabs" role="tablist">
+    <button class="tab" role="tab" data-view="radar" id="tab-radar" type="button">Radar</button>
+    <button class="tab" role="tab" data-view="kurallar" id="tab-kurallar" type="button">Kural kataloğu</button>
+    <button class="tab" role="tab" data-view="geri-test" id="tab-geri-test" type="button">Geri test</button>
+  </nav>
+
+  <!-- RADAR -->
+  <section id="view-radar">
+    <div class="controls">
+      <div class="ctl">Sırala
+        <div class="seg" id="sortSeg">
+          <button type="button" data-k="score" aria-pressed="true">Birleşik</button>
+          <button type="button" data-k="kesin" aria-pressed="false">Kesin</button>
+          <button type="button" data-k="sezgisel" aria-pressed="false">Sezgisel</button>
+          <button type="button" data-k="dip" aria-pressed="false">Dip sıkışması</button>
+        </div>
+      </div>
+      <label class="ctl" for="wS">Sezgisel ağırlık <input type="range" id="wS" min="0" max="1" step="0.1" value="0.6"><span class="num" id="wSv">0.6</span></label>
+      <button class="chipf" type="button" id="fGates" aria-pressed="true">Kapılar açık</button>
+      <button class="chipf" type="button" id="fWeights" aria-pressed="false" disabled title="Önce geri test çalıştırın">Geri test ağırlıkları</button>
+      <button class="chipf" type="button" id="f200" aria-pressed="false">MA200 üstü</button>
+      <button class="chipf" type="button" id="fPos" aria-pressed="false">Pozitif+</button>
+      <input class="search" id="q" type="search" placeholder="Coin ara" aria-label="Coin ara">
+    </div>
+    <div class="dipstrip" id="dipstrip"></div>
+    <div class="grid">
+      <div class="list" id="list"></div>
+      <div class="detail-col"><div class="card" id="detail"><div class="empty">Ayrıntı için listeden bir coin seçin.</div></div></div>
+    </div>
+  </section>
+
+  <!-- KURALLAR -->
+  <section id="view-kurallar" hidden>
+    <p class="help">PDF'teki her kural aşağıda mekanik karşılığıyla listeli. <b>Kesin</b> kurallar tanımı net, standart teknik analiz kurallarıdır. <b>Sezgisel</b> kurallar kursa özgü iddialar ya da yoruma açık çizim kurallarıdır; kanıtı yoktur ama skora girer, ağırlığını yukarıdaki kaydırıcı belirler. Geri test çalıştırıldıysa her kuralın kanıt durumu da görünür.</p>
+    <div class="legend-tier"><span><i class="tier K">K</i>Kesin</span><span><i class="tier S">S</i>Sezgisel</span><span>Sayfa = PDF sayfa numarası</span></div>
+    <div class="tbl-wrap"><table id="ruleTable"></table></div>
+    <h3 style="margin:18px 0 8px">Kapılar (skor tavanı)</h3>
+    <div class="tbl-wrap"><table id="gateTable"></table></div>
+  </section>
+
+  <!-- GERİ TEST -->
+  <section id="view-geri-test" hidden>
+    <div class="section">
+      <p class="help">Her coinin her günü için skor, o güne kadarki veriyle (ileriye bakmadan) hesaplanır; ardından 3, 7 ve 14 günlük getiriye bakılır. Bir kuralın "farkı", ateşlendiği günlerdeki ortalama 7 günlük getirinin tüm günlerin ortalamasından sapmasıdır. t değeri örtüşen pencereler için düzeltilmiştir; 2 üstü beklenen yönde anlamlı sayılır.</p>
+      <div class="controls" style="margin-top:10px">
+        <button class="btn primary" id="btnBT" type="button">Geri testi çalıştır</button>
+        <span class="help" id="btInfo"></span>
+      </div>
+      <div class="prog" id="btProg" hidden><i></i></div>
+    </div>
+    <div id="btOut"></div>
+  </section>
+</div>
+
+<script>
+/*ENGINE*/
+</script>
+<script>
+(function(){
+'use strict';
+const CR = window.CoinRadar;
+const $ = s => document.querySelector(s);
+const fmt = CR.fmt;
+const pc = (x, d = 1) => (x >= 0 ? '+' : '') + (x * 100).toFixed(d) + '%';
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ───────── Durum ─────────
+const store = { get(k, d) { try { const v = localStorage.getItem('cr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('cr_' + k, JSON.stringify(v)); } catch {} } };
+const S = {
+  coins: [],             // {sym, d, d4, I, J, res}
+  source: 'none',        // live | demo | file
+  sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true),
+  useW: false, f200: false, dipF: 0, fPos: false, q: '', sel: null,
+  bt: null, top: store.get('top', 50), btc: null,
+};
+
+// ───────── Veri ─────────
+const HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com'];
+const STABLE = /^(USDC|FDUSD|TUSD|DAI|USDP|BUSD|EUR|AEUR|EURI|USDE|PAXG|XUSD|USD1|BFUSD|RLUSD|TRY|BRL|GBP|JPY)$/;
+async function get(path) {
+  let last;
+  for (const h of HOSTS) { try { const r = await fetch(h + path); if (r.ok) return await r.json(); last = new Error(r.status); } catch (e) { last = e; } }
+  throw last;
+}
+const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[7]) });
+
+async function loadLive() {
+  setStatus('Binance\'ten veri çekiliyor…', '');
+  const t = await get('/api/v3/ticker/24hr');
+  const syms = t.filter(x => x.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol) && !STABLE.test(x.symbol.replace(/USDT$/, '')))
+    .sort((a, b) => +b.quoteVolume - +a.quoteVolume).slice(0, S.top).map(x => x.symbol);
+  if (!syms.includes('BTCUSDT')) syms.unshift('BTCUSDT');
+  const coins = []; let done = 0, k = 0;
+  await Promise.all(Array.from({ length: 6 }, async () => {
+    while (k < syms.length) {
+      const sym = syms[k++];
+      try {
+        const [a, b] = await Promise.all([get(`/api/v3/klines?symbol=${sym}&interval=1d&limit=1000`), get(`/api/v3/klines?symbol=${sym}&interval=4h&limit=400`)]);
+        coins.push({ sym, d: toSeries(a), d4: toSeries(b) });
+      } catch (e) { /* atla */ }
+      setStatus(`Binance: ${++done}/${syms.length} parite`, '');
+    }
+  }));
+  if (!coins.length) throw new Error('veri yok');
+  return coins;
+}
+
+// Örnek veri: deterministik sentetik seriler (canlı veri yoksa)
+function demoCoins() {
+  const names = ['ÖRNEK-A', 'ÖRNEK-B', 'ÖRNEK-C', 'ÖRNEK-D', 'ÖRNEK-E', 'ÖRNEK-F', 'ÖRNEK-G', 'ÖRNEK-H', 'ÖRNEK-I', 'ÖRNEK-J', 'ÖRNEK-K', 'ÖRNEK-L'];
+  return names.map((sym, k) => {
+    let s = 9301 + k * 49297; const rnd = () => (s = (s * 233280 + 49297 + k) % 2147483647) / 2147483647;
+    const g = () => { let u = 0; for (let q = 0; q < 6; q++) u += rnd(); return u - 3; };
+    const n = 900, d = { t: [], o: [], h: [], l: [], c: [], v: [] }; let p = 10 + k * 7.3;
+    const t0 = Date.UTC(2024, 3, 22); const ph = k * 0.7, per = 70 + k * 9, amp = 0.0025 + (k % 4) * 0.0012, vol = 0.022 + (k % 3) * 0.008;
+    for (let i = 0; i < n; i++) {
+      const drift = Math.sin(i / per + ph) * amp + (i > n - 60 ? (k % 3 - 1) * 0.004 : 0);
+      const o = p, c = o * Math.exp(drift + vol * g() * 0.55);
+      const h = Math.max(o, c) * (1 + Math.abs(vol * 0.4 * g())), l = Math.min(o, c) * (1 - Math.abs(vol * 0.4 * g()));
+      d.t.push(t0 + i * 864e5); d.o.push(o); d.h.push(h); d.l.push(l); d.c.push(c); d.v.push(5e7 * (0.6 + rnd()) * (1 + Math.abs(c / o - 1) * 25)); p = c;
+    }
+    return { sym, d, d4: null };
+  }).concat(['ÖRNEK-M', 'ÖRNEK-N', 'ÖRNEK-O'].map((sym, k) => {
+    // Dip sıkışması kalıbı: yükseliş → uzun düşüş → ortalamaların iç içe geçtiği yatay → (N, O) çıkış
+    let s = 7 + k * 101; const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647; const g = () => { let u = 0; for (let q = 0; q < 6; q++) u += rnd(); return u - 3; };
+    const n = 900, d = { t: [], o: [], h: [], l: [], c: [], v: [] }; let p = 3 + k * 2; const t0 = Date.UTC(2024, 3, 22);
+    const brk = [n + 10, n - 12, n - 34][k];
+    for (let i = 0; i < n; i++) {
+      const dr = i < 300 ? 0.002 : i < 600 ? -0.0042 : i < brk ? (k === 0 ? -0.0002 : 0.00005) : 0.007, vol = i >= 600 && i < brk ? 0.011 : 0.026;
+      const o = p, c = o * Math.exp(dr + vol * g() * 0.6), h = Math.max(o, c) * (1 + Math.abs(vol * 0.3 * g())), l = Math.min(o, c) * (1 - Math.abs(vol * 0.3 * g()));
+      d.t.push(t0 + i * 864e5); d.o.push(o); d.h.push(h); d.l.push(l); d.c.push(c); d.v.push(3e7 * (0.6 + rnd()) * (i >= brk && i < brk + 4 ? 3 : 1)); p = c;
+    }
+    return { sym, d, d4: null };
+  }));
+}
+
+function prepare(coins) {
+  for (const x of coins) { x.I = CR.indicators(x.d); x.J = x.d4 && x.d4.c.length > 220 ? CR.indicators(x.d4) : null; }
+  S.coins = coins; S.bt = null; S.useW = false; rescore();
+}
+
+function opts() { return { sezgiselW: S.wS, gates: S.gates, ruleWeights: S.useW && S.bt ? S.bt.suggestedWeights : null }; }
+function evalCoin(x) {
+  const d = x.d, i = d.c.length - 2; if (i < 210) return null;
+  const w = new CR.Walker(d, x.I, opts());
+  let tf4 = null;
+  if (x.J) { const tEnd = d.t[i] + 864e5; let k = x.d4.c.length - 2; while (k > 0 && x.d4.t[k] + 4 * 36e5 > tEnd) k--; tf4 = { I: x.J, d: x.d4, i: k }; }
+  return w.evaluate(i, tf4);
+}
+function rescore() {
+  for (const x of S.coins) x.res = evalCoin(x);
+  S.btc = S.coins.find(x => /^BTC/.test(x.sym)) || null;
+  render();
+}
+
+// ───────── Arayüz: genel ─────────
+function setStatus(txt, cls) { $('#status').innerHTML = `<span class="dot ${cls}"></span>${txt}`; }
+function srcStatus() {
+  const last = S.coins[0] && S.coins[0].d.t[S.coins[0].d.c.length - 2];
+  const dt = last ? new Date(last).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) : '';
+  const n = S.coins.filter(x => x.res).length;
+  if (S.source === 'live') setStatus(`<b>Canlı</b> · Binance · ${n} parite · son kapanmış günlük mum ${dt}`, 'live');
+  else if (S.source === 'file') setStatus(`<b>Dosyadan</b> · ${n} parite · son kapanmış günlük mum ${dt}`, 'file');
+  else setStatus(`<b>Örnek veri</b> · ${n} sentetik seri · gerçek coin değildir`, 'demo');
+}
+
+function ring(score, size = 54) {
+  const r = size / 2 - 5, c = 2 * Math.PI * r, f = Math.max(0, Math.min(1, score / 100));
+  const col = score >= 60 ? 'var(--good)' : score >= 45 ? 'var(--ink2)' : score >= 30 ? 'var(--warn)' : 'var(--bad)';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" aria-hidden="true"><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="var(--line2)" stroke-width="5"/><circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${col}" stroke-width="5" stroke-linecap="round" stroke-dasharray="${(c * f).toFixed(1)} ${c.toFixed(1)}" transform="rotate(-90 ${size / 2} ${size / 2})"/></svg>`;
+}
+function spark(a, up) {
+  const w = 72, h = 26, mn = Math.min(...a), mx = Math.max(...a), sx = w / (a.length - 1), sy = mx > mn ? (h - 4) / (mx - mn) : 0;
+  const pts = a.map((v, i) => `${(i * sx).toFixed(1)},${(h - 2 - (v - mn) * sy).toFixed(1)}`).join(' ');
+  const col = up ? 'var(--good)' : 'var(--bad)'; const last = pts.split(' ').pop().split(',');
+  return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.5" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="2.2" fill="${col}"/></svg>`;
+}
+
+function render() {
+  srcStatus(); renderRegime(); renderDipStrip(); renderList(); renderDetail(); renderRules();
+  if (S.bt) renderBT();
+  const fw = $('#fWeights'); fw.disabled = !S.bt; fw.title = S.bt ? 'Geri testin önerdiği kural çarpanlarını uygula' : 'Önce geri test çalıştırın';
+}
+
+function renderRegime() {
+  const el = $('#regime'), b = S.btc && S.btc.res;
+  if (!b) { el.innerHTML = `<div class="cell"><span class="k">Piyasa rejimi</span><span class="v">${S.source === 'demo' ? 'Örnek veride BTC yok' : 'BTC verisi yok'}</span></div>`; return; }
+  const I = S.btc.I, i = b.i, c = b.close, m200 = I.sma200[i];
+  const up = c > m200, ema = b.ctx.emaUp;
+  const n = S.coins.filter(x => x.res), above = n.filter(x => x.res.close > x.I.sma200[x.res.i]).length;
+  el.innerHTML = `
+    <div class="cell"><span class="k">BTC skoru</span><span class="v num">${b.score.toFixed(0)} · ${b.label.t}</span></div>
+    <div class="cell"><span class="k">BTC / MA200</span><span class="v ${up ? 'up' : 'dn'}">${up ? 'Üstünde' : 'Altında'} <span class="num">${pc(c / m200 - 1)}</span></span></div>
+    <div class="cell"><span class="k">Günlük EMA5/10</span><span class="v ${ema ? 'up' : 'dn'}">${ema ? 'Yukarı' : 'Aşağı'}</span></div>
+    <div class="cell"><span class="k">MA200 üstü parite</span><span class="v num">${above}/${n.length}</span></div>
+    <div class="cell" style="flex:1 1 220px;min-width:0"><span class="k">Okuma</span><span class="help">${up && ema ? 'BTC trendi destekliyor; altcoin sinyalleri daha güvenilir.' : !up ? 'BTC MA200 altında: altcoin long sinyallerinde temkinli olun.' : 'BTC kısa vadede zayıf: yeni girişlerde acele etmeyin.'}</span></div>`;
+}
+
+function filtered() {
+  const key = S.sort;
+  return S.coins.filter(x => x.res)
+    .filter(x => !S.q || x.sym.toLowerCase().includes(S.q.toLowerCase()))
+    .filter(x => !S.f200 || x.res.close > x.I.sma200[x.res.i])
+    .filter(x => !S.dipF || x.res.dipStage === S.dipF)
+    .filter(x => !S.fPos || x.res.score >= 60)
+    .sort((a, b) => key === 'dip' ? (dipRank(b.res) - dipRank(a.res)) : b.res[key] - a.res[key]);
+}
+
+function dipRank(r) { return r.dipStage === 0 ? -1 : r.dipStage === -1 ? -0.5 : r.dip + (r.dipStage === 2 || r.dipStage === 3 ? 5 : 0); }
+const STAGE = { 1: 'Maliyetlenme', 2: 'Eşikte', 3: 'Kırılım', 4: 'Gecikmiş', '-1': 'Aşağı kırıldı' };
+function renderDipStrip() {
+  const el = $('#dipstrip'), rs = S.coins.filter(x => x.res).map(x => x.res);
+  const cnt = k => rs.filter(r => r.dipStage === k).length;
+  el.innerHTML = `<span class="ttl">Dip sıkışması</span>
+    ${[1, 2, 3, 4, -1].map(k => `<button type="button" class="stg" data-st="${k}" aria-pressed="${S.dipF === k}">${STAGE[k]} <b>${cnt(k)}</b></button>`).join('')}
+    <span class="help">Sert düşüşten sonra 20/50/100/200 ortalamaların iç içe geçtiği coinler. "Kırılım" ve "Eşikte" en kritik aşamalar; MA200 kapısı yüzünden birleşik skorda düşük görünebilirler, bu yüzden ayrı izlenir.</span>`;
+}
+function topReasons(res, n = 3) {
+  return [...res.rules].filter(r => Math.abs(r.p) >= 0.9).sort((a, b) => Math.abs(b.p) * (b.tier === 'K' ? 1 : S.wS) - Math.abs(a.p) * (a.tier === 'K' ? 1 : S.wS)).slice(0, n)
+    .map(r => `${r.p > 0 ? '▲' : '▼'} ${(r.note && r.note.length < 60 ? r.note : CR.RULE[r.id].label.replace(/ \(.*\)$/, '')).replace(/"/g, '')}`).join(' · ');
+}
+
+function renderList() {
+  const el = $('#list'), rows = filtered();
+  if (!S.coins.length) { el.innerHTML = '<div class="empty">Veri yükleniyor…</div>'; return; }
+  if (!rows.length) { el.innerHTML = '<div class="empty">Filtrelere uyan coin yok. Filtreleri gevşetin.</div>'; return; }
+  if (!S.sel || !rows.some(x => x.sym === S.sel)) S.sel = rows[0].sym;
+  el.innerHTML = rows.map((x, k) => {
+    const r = x.res, d = x.d, i = r.i, chg = d.c[i] / d.c[i - 1] - 1, val = r[S.sort] || 0;
+    const base = x.sym.replace(/USDT$/, ''), quote = x.sym.endsWith('USDT') ? '/USDT' : '';
+    return `<button class="row" type="button" data-sym="${esc(x.sym)}" aria-current="${x.sym === S.sel}">
+      <span class="rank">${k + 1}</span>
+      <span class="ring">${ring(val)}<span class="n">${S.sort === 'dip' && !r.dipStage ? '—' : val.toFixed(0)}</span></span>
+      <span class="rmain">
+        <span class="rhead"><span class="sym">${esc(base)}<small>${quote}</small></span><span class="pill ${r.label.k}">${r.label.t}</span><span class="chg ${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></span>
+        <span class="reasons">${S.sort === 'dip' ? (r.dipStage ? `<b>${STAGE[r.dipStage]}</b> · ${esc(r.ctx.dip.stageText)}` : 'Dip sıkışması kurulumu yok') : (esc(topReasons(r)) || 'Belirgin sinyal yok')}</span>
+        <span class="kz"><span class="tier K">K</span><span class="mini k"><i style="width:${r.kesin.toFixed(0)}%"></i></span><span class="num">${r.kesin.toFixed(0)}</span>
+          <span class="tier S">S</span><span class="mini s"><i style="width:${r.sezgisel.toFixed(0)}%"></i></span><span class="num">${r.sezgisel.toFixed(0)}</span></span>
+        ${r.badges.length ? `<span class="badges">${r.badges.map(b => `<span class="badge ${b.k}">${b.t}</span>`).join('')}</span>` : ''}
+      </span>
+      <span class="rside">${spark(d.c.slice(i - 59, i + 1), d.c[i] >= d.c[i - 59])}${r.gates.length && S.gates ? `<span class="badge" title="Skor tavanı">Tavan ${r.cap}</span>` : ''}</span>
+    </button>`;
+  }).join('');
+}
+
+// ───────── Detay ─────────
+function renderDetail() {
+  const el = $('#detail'), x = S.coins.find(c => c.sym === S.sel);
+  if (!x || !x.res) { el.innerHTML = '<div class="empty">Ayrıntı için listeden bir coin seçin.</div>'; return; }
+  const r = x.res, ctx = r.ctx, i = r.i, I = x.I;
+  const modsHtml = Object.entries(CR.MODULES).map(([m, M]) => `
+    <div class="mod"><span>${M.label} <span class="num" style="color:var(--mute);font-size:11px">%${M.w}</span></span>
+      <span class="bar2"><span class="bar" title="Kesin"><i style="width:${r.modsK[m].toFixed(0)}%"></i><span class="mid"></span></span><span class="bar s" title="Sezgisel"><i style="width:${r.modsS[m].toFixed(0)}%"></i><span class="mid"></span></span></span>
+      <span class="num" style="text-align:right;font-weight:600">${r.mods[m].toFixed(0)}</span></div>`).join('');
+  const gatesHtml = r.gates.length ? `<div class="gates">${r.gates.map(g => { const G = CR.GATES.find(z => z.id === g); return `<div class="gate"><span class="tier S">S</span><span><b>${G.label}</b>${S.gates ? '' : ' (kapalı)'} — ${esc(G.src)} · s.${G.p}</span></div>`; }).join('')}</div>` : '';
+  const dp = ctx.dip, dipHtml = dp && dp.stage !== 0 ? (() => {
+    const order = [1, 2, 3, 4], cur = dp.stage;
+    const comps = [
+      ['Zirveden düşüş', `%${(dp.drop * 100).toFixed(0)}`, Math.min(1, Math.max(0, (dp.drop - 0.25) / 0.45))],
+      ['Ortalama bandı (20/50/100/200)', `%${(dp.avgDisp * 100).toFixed(1)}`, Math.min(1, Math.max(0, (0.12 - dp.avgDisp) / 0.09))],
+      ['Maliyetlenme süresi', `${dp.dur} gün`, Math.min(1, dp.dur / 90)],
+      ['MA200 eğimi (20 gün)', `${(dp.slope200 * 100).toFixed(1)}%`, Math.abs(dp.slope200) < 0.015 ? 1 : Math.abs(dp.slope200) < 0.03 ? 0.5 : 0],
+      ['Kutu genişliği', `%${((dp.boxH / dp.boxL - 1) * 100).toFixed(0)}`, Math.min(1, Math.max(0, (0.6 - (dp.boxH - dp.boxL) / ((dp.boxH + dp.boxL) / 2)) / 0.45))],
+    ];
+    return `<div class="dippanel ${cur === -1 ? 'neg' : ''}">
+      <div class="dhead" style="margin:0"><h2 style="font-size:15px">Dip sıkışması · ${STAGE[cur]}</h2><span class="num" style="font-weight:600">${dp.score.toFixed(0)}/100</span></div>
+      ${cur > 0 ? `<div class="steps">${order.map(k => `<div class="step ${k < cur ? 'done' : k === cur ? 'now' : ''}">${STAGE[k]}</div>`).join('')}</div>` : ''}
+      <div class="help" style="margin-bottom:6px">${esc(dp.stageText)}</div>
+      ${comps.map(([k, v, f]) => `<div class="comp"><span>${k}</span><span class="bar"><i style="width:${(f * 100).toFixed(0)}%"></i></span><span class="num" style="text-align:right">${v}</span></div>`).join('')}
+      <div class="levels"><div class="lv"><div class="k">Kutu tavanı (kapanış)</div><div class="v">${fmt(dp.boxH)}</div></div><div class="lv"><div class="k">Kutu dibi</div><div class="v">${fmt(dp.boxL)}</div></div><div class="lv"><div class="k">Önceki zirve</div><div class="v">${fmt(dp.peak)}</div></div><div class="lv"><div class="k">Şu anki bant</div><div class="v">%${(dp.dispNow * 100).toFixed(1)}</div></div></div>
+      <div class="quote">"Her mal aşırı düştükten sonra akümüle yaşaması lazım. Maliyetler iç içe geçince zamanı geliyor demelisin." · s.27–30. Tetik: fiyatın tüm ortalamaların ve kutu tavanının üstüne hacimli kapanışı.</div>
+    </div>`;
+  })() : '';
+  const lv = [];
+  if (ctx.support) lv.push(['Yakın destek', `${fmt(ctx.support[0])} – ${fmt(ctx.support[1])}`]);
+  if (ctx.resistance) lv.push(['Yakın direnç', `${fmt(ctx.resistance[0])} – ${fmt(ctx.resistance[1])}`]);
+  for (const p of [20, 50, 200]) if (isFinite(I['sma' + p][i])) lv.push([`MA${p}`, fmt(I['sma' + p][i])]);
+  if (ctx.weekMa9) lv.push(['Haftalık MA9', fmt(ctx.weekMa9)]);
+  if (ctx.fib) { const f = ctx.fib; lv.push([`Fib (${f.dir === 'up' ? 'yükseliş swingi' : 'düşüş swingi'})`, `r = ${f.r.toFixed(3)}`]); for (const k of (f.dir === 'up' ? [0.382, 0.618, 0.786, 1.618] : [0.786, 1.114, 1.272, 1.618])) { const L = f.levels.find(z => z.r === k); lv.push([`Fib ${k}`, fmt(L.price)]); } }
+  if (ctx.tfib && ctx.tfib.valid) lv.push(['Trend temelli fib hedefleri', ctx.tfib.targets.map(t => `${t.k}: ${fmt(t.price)}`).join(' · ')]);
+  if (ctx.dirgen) lv.push(['Schiff dirgeni medyan', fmt(ctx.dirgen.median)]);
+  if (ctx.fan) lv.push(['Hız fanı 0.786 hattı', fmt(ctx.fan.f786)]);
+  const fired = new Set(r.rules.map(z => z.id));
+  const groups = Object.entries(CR.MODULES).map(([m, M]) => {
+    const rs = r.rules.filter(z => z.mod === m).sort((a, b) => Math.abs(b.p) - Math.abs(a.p));
+    const quiet = CR.RULES.filter(R => R.mod === m && !fired.has(R.id));
+    return `<div class="rgroup"><h3>${M.label}</h3><div class="rules">${rs.map(z => ruleRow(z)).join('') || '<div class="rr"><span></span><span class="note">Bu modülde ateşlenen kural yok.</span><span></span></div>'}</div>
+      ${quiet.length ? `<details><summary>Ateşlenmeyen ${quiet.length} kural</summary>${quiet.map(R => `<div class="rr"><span class="tier ${R.tier}">${R.tier}</span><span><span class="lab">${esc(R.label)}</span> <span class="pg">s.${R.p}</span></span><span></span></div>`).join('')}</details>` : ''}</div>`;
+  }).join('');
+  el.innerHTML = `
+    <div class="dhead"><div class="dtitle"><h2>${esc(x.sym)}</h2><span class="px">${fmt(r.close)}</span><span class="pill ${r.label.k}">${r.label.t}</span></div>
+      <span class="eyebrow">${new Date(r.t).toLocaleDateString('tr-TR')} kapanışı</span></div>
+    ${r.badges.length ? `<div class="badges">${r.badges.map(b => `<span class="badge ${b.k}">${b.t}</span>`).join('')}</div>` : ''}
+    <div class="trio">
+      <div class="t"><div class="k">Birleşik</div><div class="v">${r.score.toFixed(0)}</div><div class="help" style="font-size:11px">${S.gates && r.cap < 100 ? `ham ${r.raw.toFixed(0)}, tavan ${r.cap}` : 'kesin + sezgisel×' + S.wS}</div></div>
+      <div class="t"><div class="k"><span class="tier K">K</span> Kesin</div><div class="v">${r.kesin.toFixed(0)}</div></div>
+      <div class="t S"><div class="k"><span class="tier S">S</span> Sezgisel</div><div class="v">${r.sezgisel.toFixed(0)}</div></div>
+    </div>
+    ${dipHtml}
+    ${gatesHtml}
+    ${r.veto ? '<div class="help" style="margin:4px 0">MACD boğa: "Her şeyin sat dediği yerde MACD satmıyorsa satmam" kuralıyla negatif momentum puanları yarıya indirildi (s.51).</div>' : ''}
+    <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink);height:2px"></i>MA200</span><span><i style="background:var(--good-soft);height:8px"></i>Destek</span><span><i style="background:var(--bad-soft);height:8px"></i>Direnç</span><span><i style="background:var(--mute);height:1px"></i>Fib</span>${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
+    <div class="chartbox"><canvas class="chart" id="chart" aria-label="Son 120 günlük mum grafiği"></canvas></div>
+    <div class="readout" id="readout">Grafiğin üzerinde gezinerek mum değerlerini görün.</div>
+    <h3 style="margin-top:12px">Modüller <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--mute)">· üst çubuk kesin, alt çubuk sezgisel</span></h3>
+    <div class="mods">${modsHtml}</div>
+    <h3>Seviyeler</h3>
+    <div class="levels">${lv.map(([k, v]) => `<div class="lv"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join('')}</div>
+    <h3 style="margin-top:12px">Kurallar <span style="text-transform:none;letter-spacing:0;font-weight:500;color:var(--mute)">· ${r.rules.length} kural ateşlendi</span></h3>
+    ${groups}`;
+  drawChart(x);
+}
+function ruleRow(z) {
+  const R = CR.RULE[z.id], w = R.w * (z.tier === 'S' ? S.wS : 1), frac = Math.max(-1, Math.min(1, z.p / R.w)), wid = Math.abs(frac) * 50;
+  const col = z.p >= 0 ? 'var(--good)' : 'var(--bad)';
+  return `<div class="rr"><span class="tier ${z.tier}" title="${z.tier === 'K' ? 'Kesin' : 'Sezgisel'}">${z.tier}</span>
+    <span><span class="lab">${esc(R.label)}</span> <span class="pg">s.${R.p}</span><br><span class="note">${esc(z.note)}</span></span>
+    <span class="pts"><span class="num" style="color:${col}">${(z.p * (z.tier === 'S' ? S.wS : 1)) >= 0 ? '+' : ''}${(z.p * (z.tier === 'S' ? S.wS : 1)).toFixed(1)}</span><span class="pbar"><span class="mid"></span><i style="background:${col};${frac >= 0 ? 'left:50%' : 'right:50%'};width:${wid}%"></i></span></span></div>`;
+}
+
+// ───────── Grafik ─────────
+function drawChart(x) {
+  const cv = $('#chart'); if (!cv) return;
+  const r = x.res, d = x.d, I = x.I, end = r.i, beg = Math.max(0, Math.min(end - 119, r.ctx.dip && r.ctx.dip.stage !== 0 ? r.ctx.dip.start - 30 : end, end - 119), end - 259);
+  const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr;
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const padR = 62, padT = 8, padB = 18, pw = W - padR, ph = H - padT - padB;
+  let lo = Infinity, hi = -Infinity;
+  for (let i = beg; i <= end; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
+  for (const k of ['sma20', 'sma50', 'sma200']) for (let i = beg; i <= end; i++) { const v = I[k][i]; if (isFinite(v) && v > lo * 0.85 && v < hi * 1.15) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+  const padY = (hi - lo) * 0.06; lo -= padY; hi += padY;
+  const n = end - beg + 1, bw = pw / n, X = i => (i - beg + 0.5) * bw, Y = v => padT + (hi - v) / (hi - lo) * ph;
+  const C = { ink: css('--ink'), ink2: css('--ink2'), mute: css('--mute'), line: css('--line2'), good: css('--good'), bad: css('--bad'), goodS: css('--good-soft'), badS: css('--bad-soft'), acc: css('--accent'), warn: css('--warn'), panel: css('--panel') };
+  g.font = '10.5px "IBM Plex Mono", ui-monospace, monospace'; g.textBaseline = 'middle';
+  // ızgara
+  g.strokeStyle = C.line; g.lineWidth = 1; g.fillStyle = C.mute;
+  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = Y(v); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); }
+  // bölgeler
+  const zone = (z, col) => { const y1 = Y(z[1]), y0 = Y(z[0]); if (y0 < padT || y1 > padT + ph) return; g.fillStyle = col; g.fillRect(0, y1, pw, Math.max(2, y0 - y1)); };
+  (r.ctx.supports || []).forEach(z => zone(z.zone, C.goodS)); (r.ctx.resists || []).forEach(z => zone(z.zone, C.badS));
+  // fib
+  if (r.ctx.fib) {
+    g.setLineDash([3, 3]); g.lineWidth = 1;
+    for (const L of r.ctx.fib.levels) { if (![0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.114, 1.272, 1.618, -0.272].includes(L.r)) continue; const y = Y(L.price); if (y < padT || y > padT + ph) continue; g.strokeStyle = C.mute; g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); g.fillStyle = C.mute; g.textAlign = 'left'; g.fillText(String(L.r), 3, y - 6); }
+    g.setLineDash([]);
+  }
+  // mumlar
+  const cw = Math.max(1, bw * 0.62);
+  for (let i = beg; i <= end; i++) {
+    const up = d.c[i] >= d.o[i], col = up ? C.good : C.bad, x0 = X(i);
+    g.strokeStyle = col; g.lineWidth = 1; g.beginPath(); g.moveTo(x0, Y(d.h[i])); g.lineTo(x0, Y(d.l[i])); g.stroke();
+    const yo = Y(d.o[i]), yc = Y(d.c[i]); g.fillStyle = col; g.fillRect(x0 - cw / 2, Math.min(yo, yc), cw, Math.max(1, Math.abs(yc - yo)));
+  }
+  // ortalamalar
+  const line = (a, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; for (let i = beg; i <= end; i++) { const v = a[i]; if (!isFinite(v)) continue; const y = Y(v); if (!st) { g.moveTo(X(i), y); st = true; } else g.lineTo(X(i), y); } g.stroke(); g.setLineDash([]); };
+  line(I.sma100, C.mute, 1.4); line(I.sma20, C.acc, 1.6); line(I.sma50, C.warn, 1.6); line(I.sma200, C.ink, 1.8, [6, 3]);
+  const dp = r.ctx.dip;
+  if (dp && dp.stage !== 0) {
+    const x0 = X(Math.max(beg, dp.start)) - bw / 2, x1 = X(Math.min(end, dp.end)) + bw / 2, y0 = Y(dp.boxH), y1 = Y(dp.boxL);
+    if (x1 > 0) { g.strokeStyle = C.acc; g.lineWidth = 1.5; g.setLineDash([5, 4]); g.strokeRect(x0, y0, x1 - x0, y1 - y0); g.setLineDash([]);
+      g.fillStyle = C.acc; g.textAlign = 'left'; g.fillText('maliyetlenme', Math.max(2, x0 + 3), y0 - 7);
+      if (dp.brk > 0 && dp.brk >= beg) { g.beginPath(); g.arc(X(dp.brk), Y(d.c[dp.brk]), 4, 0, 7); g.fill(); } }
+  }
+  // eksen etiketleri
+  g.textAlign = 'left'; g.fillStyle = C.ink2;
+  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; g.fillText(fmt(v), pw + 6, Y(v)); }
+  // son fiyat
+  const yl = Y(d.c[end]); g.fillStyle = C.ink; g.fillRect(pw + 2, yl - 8, padR - 4, 16); g.fillStyle = C.panel; g.fillText(fmt(d.c[end]), pw + 6, yl);
+  // tarih
+  g.fillStyle = C.mute; g.textAlign = 'left'; g.fillText(new Date(d.t[beg]).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), 2, H - 7);
+  g.textAlign = 'right'; g.fillText(new Date(d.t[end]).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }), pw - 2, H - 7);
+  cv.onpointermove = e => { const rc = cv.getBoundingClientRect(); const i = Math.min(end, Math.max(beg, beg + Math.floor((e.clientX - rc.left) / bw))); const ch = d.c[i] / d.c[i - 1] - 1; $('#readout').textContent = `${new Date(d.t[i]).toLocaleDateString('tr-TR')}  A ${fmt(d.o[i])}  Y ${fmt(d.h[i])}  D ${fmt(d.l[i])}  K ${fmt(d.c[i])}  ${pc(ch)}  RSI ${I.rsi[i].toFixed(0)}  MFI ${I.mfi[i].toFixed(0)}  CMF ${I.cmf[i].toFixed(2)}`; };
+}
+
+// ───────── Kural kataloğu ─────────
+let ruleSort = { k: 'mod', dir: 1 };
+function renderRules() {
+  const bt = S.bt, ver = {};
+  if (bt) for (const r of bt.rules) (ver[r.id] = ver[r.id] || []).push(r);
+  const V = { destek: 'Destekleniyor', zayif: 'Zayıf', yok: 'Etkisiz', ters: 'Ters' };
+  const modOrder = Object.keys(CR.MODULES);
+  let rows = CR.RULES.map(R => ({ R, v: ver[R.id] || [] }));
+  const key = { mod: x => modOrder.indexOf(x.R.mod) * 1000 + (x.R.tier === 'K' ? 0 : 500) - x.R.w, tier: x => x.R.tier, w: x => -x.R.w, p: x => x.R.p, ev: x => -(x.v.length ? Math.max(...x.v.map(z => z.dirT)) : -99) }[ruleSort.k];
+  rows.sort((a, b) => (key(a) > key(b) ? 1 : key(a) < key(b) ? -1 : 0) * ruleSort.dir);
+  $('#ruleTable').innerHTML = `<thead><tr><th data-k="tier">Kademe</th><th data-k="mod">Kural</th><th data-k="mod">Modül</th><th data-k="w" class="r">Ağırlık</th><th data-k="p" class="r">Sayfa</th><th data-k="ev">Geri test</th>${S.useW ? '<th class="r">Çarpan</th>' : ''}</tr></thead><tbody>${rows.map(({ R, v }) => `<tr>
+    <td><span class="tier ${R.tier}">${R.tier}</span></td><td class="tw">${esc(R.label)}</td><td>${CR.MODULES[R.mod].label.split(' (')[0]}</td><td class="r num">${R.w}</td><td class="r num">${R.p}</td>
+    <td>${v.length ? v.map(z => `<span class="verd ${z.verdict}" title="n=${z.n}, fark ${pc(z.edge, 2)}, t=${z.t.toFixed(1)}">${z.side > 0 ? '+' : '−'} ${V[z.verdict]}</span>`).join(' ') : `<span style="color:var(--mute)">${bt ? 'yetersiz örnek' : '—'}</span>`}</td>
+    ${S.useW ? `<td class="r num">×${(bt.suggestedWeights[R.id] ?? 1).toFixed(2)}</td>` : ''}</tr>`).join('')}</tbody>`;
+  $('#ruleTable thead').onclick = e => { const k = e.target.dataset.k; if (!k) return; ruleSort = { k, dir: ruleSort.k === k ? -ruleSort.dir : 1 }; renderRules(); };
+  $('#gateTable').innerHTML = `<thead><tr><th>Kademe</th><th>Kapı</th><th>PDF dayanağı</th><th class="r">Sayfa</th>${bt ? `<th class="r">Kapı varken ${bt.hMain}g</th><th class="r">Yokken</th>` : ''}</tr></thead><tbody>${CR.GATES.map(G => { const gs = bt && bt.gates.find(z => z.id === G.id); return `<tr><td><span class="tier ${G.tier}">${G.tier}</span></td><td class="tw">${esc(G.label)}</td><td class="tw">${esc(G.src)}</td><td class="r num">${G.p}</td>${gs ? `<td class="r num">${pc(gs.mean, 2)}</td><td class="r num">${pc(gs.restMean, 2)}</td>` : ''}</tr>`; }).join('')}</tbody>`;
+}
+
+// ───────── Geri test ─────────
+async function runBT() {
+  const coins = S.coins.filter(x => x.d.c.length >= 260);
+  if (!coins.length) return;
+  const btn = $('#btnBT'), prog = $('#btProg'), bar = prog.querySelector('i');
+  btn.disabled = true; prog.hidden = false; const recs = []; const o = { sezgiselW: S.wS, gates: S.gates };
+  for (let k = 0; k < coins.length; k++) {
+    $('#btInfo').textContent = `${coins[k].sym} hesaplanıyor (${k + 1}/${coins.length})`;
+    await new Promise(r => setTimeout(r, 0));
+    CR.collect({ sym: coins[k].sym, d: coins[k].d }, o, recs);
+    bar.style.width = ((k + 1) / coins.length * 100) + '%';
+  }
+  S.bt = CR.summarize(recs, [3, 7, 14]); S.bt.source = S.source;
+  btn.disabled = false; prog.hidden = true; btn.textContent = 'Geri testi yeniden çalıştır';
+  render();
+}
+function bucketChart(title, b, h, dashed) {
+  const W = 260, H = 150, pl = 34, pb = 26, pt = 18, vals = b.map(x => x.n ? x.mean[h].m : 0);
+  const m = Math.max(0.01, ...vals.map(Math.abs)); const lim = Math.ceil(m * 100) / 100;
+  const bw = (W - pl - 8) / b.length, Y = v => pt + (lim - v) / (2 * lim) * (H - pt - pb);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}">`;
+  s += `<text x="${pl}" y="11" font-size="11" font-weight="700" fill="var(--ink2)" font-family="Schibsted Grotesk,sans-serif">${esc(title)}</text>`;
+  for (const v of [lim, 0, -lim]) s += `<line x1="${pl}" x2="${W - 4}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line2)" ${v === 0 ? 'stroke-width="1.2" stroke="var(--mute)"' : ''}/><text x="${pl - 4}" y="${Y(v) + 3}" font-size="9.5" text-anchor="end" fill="var(--mute)" font-family="IBM Plex Mono,monospace">${(v * 100).toFixed(0)}%</text>`;
+  b.forEach((x, k) => {
+    const v = vals[k], x0 = pl + k * bw + 4, w = bw - 8, y = Y(Math.max(v, 0)), hh = Math.abs(Y(v) - Y(0));
+    const col = v >= 0 ? 'var(--good)' : 'var(--bad)';
+    s += `<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(1, hh)}" rx="2" fill="${col}" ${dashed ? 'fill-opacity=".55"' : ''}><title>${x.a}–${Math.min(100, x.b)}: n=${x.n}, ${h}g ort. ${pc(v, 2)}, kazanma ${(x.win * 100).toFixed(0)}%</title></rect>`;
+    s += `<text x="${x0 + w / 2}" y="${H - 12}" font-size="9.5" text-anchor="middle" fill="var(--ink2)" font-family="IBM Plex Mono,monospace">${x.a}–${Math.min(100, x.b)}</text><text x="${x0 + w / 2}" y="${H - 2}" font-size="8.5" text-anchor="middle" fill="var(--mute)" font-family="IBM Plex Mono,monospace">n${x.n}</text>`;
+  });
+  return s + '</svg>';
+}
+function dipBT(bt) {
+  const D = bt.dip; if (!D) return '';
+  const tot = D.stages.reduce((s, x) => s + x.events, 0);
+  const cell = (v, base) => !isFinite(v) ? '<td class="r">—</td>' : `<td class="r num ${v >= (base ?? 0) ? 'up' : 'dn'}">${pc(v, 1)}</td>`;
+  const ev = D.stages.flatMap(x => x.list).sort((a, b) => b.t - a.t).slice(0, 15);
+  return `<div class="dippanel" style="margin:16px 0">
+    <div class="dhead" style="margin:0"><h2 style="font-size:15px">Dip sıkışması olay testi</h2><span class="help">${tot} olay · taban 30g ${pc(D.base30, 1)} · 60g ${pc(D.base60, 1)}</span></div>
+    <p class="help" style="margin:6px 0 10px">Her olay, coinin o aşamaya ilk girdiği gündür (aynı coinde 40 gün içinde tekrar sayılmaz). Getiriler o günün kapanışından ölçülür. "En iyi" 60 gün içindeki en yüksek fiyat, "en kötü" en düşük fiyattır.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Aşama</th><th class="r">Olay</th><th class="r">14g</th><th class="r">30g</th><th class="r">30g medyan</th><th class="r">60g</th><th class="r">30g kazanma</th><th class="r">En iyi (60g)</th><th class="r">En kötü (60g)</th><th class="r">Aşamadaki gün</th></tr></thead><tbody>
+    ${D.stages.map(x => `<tr><td><b>${STAGE[x.stage]}</b></td><td class="r num">${x.events}</td>${cell(x.f14)}${cell(x.f30, D.base30)}${cell(x.f30med, D.base30)}${cell(x.f60, D.base60)}<td class="r num">${x.events ? (x.win30 * 100).toFixed(0) + '%' : '—'}</td>${cell(x.mfe)}${cell(x.mae)}<td class="r num">${x.daysIn}</td></tr>`).join('')}
+    <tr><td>Aşağı kırıldı</td><td class="r">—</td><td class="r">—</td>${cell(D.breakdown.in30, D.base30)}<td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r">—</td><td class="r num">${D.breakdown.days}</td></tr>
+    </tbody></table></div>
+    ${ev.length ? `<details style="margin-top:8px"><summary>Son ${ev.length} olay</summary><div class="tbl-wrap"><table><thead><tr><th>Coin</th><th>Tarih</th><th>Aşama</th><th class="r">30g</th><th class="r">60g</th><th class="r">En iyi</th></tr></thead><tbody>${ev.map(e => `<tr><td>${esc(e.sym)}</td><td>${new Date(e.t).toLocaleDateString('tr-TR')}</td><td>${STAGE[e.stage]}</td>${cell(e.f30)}${cell(e.f60)}${cell(e.mfe)}</tr>`).join('')}</tbody></table></div></details>` : ''}
+    <p class="help" style="margin-top:8px">Olay sayısı azsa (20'nin altı) sonuçlar tesadüf olabilir; 50+ coinle ve 2–3 yıllık veriyle çalıştırın.</p>
+  </div>`;
+}
+let btSort = { k: 'dirT', dir: -1 };
+function renderBT() {
+  const bt = S.bt, h = bt.hMain, el = $('#btOut');
+  $('#btInfo').textContent = `${bt.symbols.length} parite · ${bt.n.toLocaleString('tr-TR')} gözlem${bt.source === 'demo' ? ' · ÖRNEK VERİ: sonuçlar yalnızca motorun çalıştığını gösterir' : ''}`;
+  const V = { destek: 'Destekleniyor', zayif: 'Zayıf', yok: 'Etkisiz', ters: 'Ters' };
+  const cnt = k => bt.rules.filter(r => r.verdict === k).length;
+  const rows = [...bt.rules].sort((a, b) => { const g = r => btSort.k === 'label' ? r.label : btSort.k === 'tier' ? r.tier : r[btSort.k]; return (g(a) > g(b) ? 1 : g(a) < g(b) ? -1 : 0) * btSort.dir; });
+  el.innerHTML = `
+    <div class="bt-summary">
+      <div class="stat"><div class="k">Birleşik skor ↔ ${h}g getiri</div><div class="v">${bt.corr.score.toFixed(3)}</div><div class="help">sıra korelasyonu</div></div>
+      <div class="stat"><div class="k"><span class="tier K">K</span> Kesin skor</div><div class="v">${bt.corr.kesin.toFixed(3)}</div></div>
+      <div class="stat S"><div class="k"><span class="tier S">S</span> Sezgisel skor</div><div class="v">${bt.corr.sezgisel.toFixed(3)}</div></div>
+      <div class="stat"><div class="k">Taban ${h}g getiri</div><div class="v">${pc(bt.base[h].m, 2)}</div><div class="help">kazanma oranı ${(bt.baseWin * 100).toFixed(0)}%</div></div>
+      <div class="stat"><div class="k">Kural kararları</div><div class="v" style="font-size:15px;line-height:1.5"><span class="verd destek">${cnt('destek')}</span> <span class="verd zayif">${cnt('zayif')}</span> <span class="verd yok">${cnt('yok')}</span> <span class="verd ters">${cnt('ters')}</span></div><div class="help">destek · zayıf · etkisiz · ters</div></div>
+    </div>
+    <h3 style="margin-bottom:8px">Skor kovasına göre ortalama ${h} günlük getiri</h3>
+    <div class="multiples">
+      <div class="card">${bucketChart('Birleşik skor', bt.buckets.score, h)}</div>
+      <div class="card">${bucketChart('Kesin skor', bt.buckets.kesin, h)}</div>
+      <div class="card" style="border-style:dashed;border-color:var(--hatch)">${bucketChart('Sezgisel skor', bt.buckets.sezgisel, h, true)}</div>
+    </div>
+    <p class="help" style="margin-bottom:10px">İyi bir skorda çubuklar soldan sağa yükselir. Kesin ve sezgisel skoru karşılaştırarak sezgisel kuralların gerçekten katkı verip vermediğini görün; vermiyorsa sezgisel ağırlığı düşürün ya da "Geri test ağırlıkları"nı açın.</p>
+    ${dipBT(bt)}
+    <h3 style="margin:14px 0 8px">Kural kanıtı</h3>
+    <div class="tbl-wrap"><table id="btTable"><thead><tr><th data-k="tier">K/S</th><th data-k="label">Kural</th><th data-k="side">Yön</th><th data-k="n" class="r">n</th><th data-k="edge" class="r">Fark (${h}g)</th><th data-k="win" class="r">Kazanma</th><th data-k="t" class="r">t</th><th data-k="dirT">Karar</th></tr></thead>
+    <tbody>${rows.map(r => `<tr><td><span class="tier ${r.tier}">${r.tier}</span></td><td class="tw">${esc(r.label)}</td><td>${r.side > 0 ? '▲ olumlu' : '▼ olumsuz'}</td><td class="r num">${r.n}</td><td class="r num ${r.edge >= 0 ? 'up' : 'dn'}">${pc(r.edge, 2)}</td><td class="r num">${(r.win * 100).toFixed(0)}%</td><td class="r num">${r.t.toFixed(1)}</td><td><span class="verd ${r.verdict}">${V[r.verdict]}</span></td></tr>`).join('')}</tbody></table></div>
+    <p class="help" style="margin-top:10px">"Olumsuz" bir kuralın doğru çalışması, ateşlendiği günlerde getirinin ortalamanın altında kalması demektir; karar sütunu bunu hesaba katar. Geçmiş sonuç geleceği garanti etmez; özellikle 30'dan az gözlemli satırlar güvenilmezdir.</p>`;
+  $('#btTable thead').onclick = e => { const k = e.target.dataset.k; if (!k) return; btSort = { k, dir: btSort.k === k ? -btSort.dir : -1 }; renderBT(); };
+}
+
+// ───────── Dosya yükleme ─────────
+$('#fileIn').addEventListener('change', async e => {
+  for (const f of e.target.files) {
+    try {
+      const j = JSON.parse(await f.text());
+      if (j.kind === 'coin-radar-candles') { S.source = 'file'; $('#notice').hidden = true; prepare(j.coins); }
+      else if (j.kind === 'coin-radar-backtest') { S.bt = j; S.bt.source = 'file'; render(); }
+      else if (j.kind === 'coin-radar-scan') { showNotice('<b>radar.json yalnızca özet içerir.</b> Sayfada her şeyin hesaplanması için <code>node radar.mjs --export</code> ile üretilen <code>candles.json</code> dosyasını yükleyin.'); }
+      else showNotice('<b>Dosya tanınmadı.</b> <code>candles.json</code> ya da <code>backtest.json</code> bekleniyor.');
+    } catch (err) { showNotice('<b>Dosya okunamadı.</b> Geçerli bir JSON dosyası seçin.'); }
+  }
+  e.target.value = '';
+});
+function showNotice(h) { const n = $('#notice'); n.innerHTML = h; n.hidden = false; }
+
+// ───────── Kontroller ─────────
+$('#list').addEventListener('click', e => { const b = e.target.closest('.row'); if (!b) return; S.sel = b.dataset.sym; document.querySelectorAll('.row').forEach(r => r.setAttribute('aria-current', r.dataset.sym === S.sel)); renderDetail(); if (window.innerWidth < 960) $('#detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+$('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if (!k) return; S.sort = k; store.set('sort', k); document.querySelectorAll('#sortSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === k)); renderList(); });
+document.querySelectorAll('#sortSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.sort));
+$('#wS').value = S.wS; $('#wSv').textContent = S.wS;
+let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 120); });
+const tog = (id, key, labOn, labOff, re = true) => { const b = $(id); const upd = () => { b.setAttribute('aria-pressed', !!S[key]); if (labOn) b.textContent = S[key] ? labOn : labOff; }; upd(); b.addEventListener('click', () => { S[key] = !S[key]; if (key === 'gates') store.set('gates', S.gates); upd(); re ? rescore() : renderList(); }); };
+tog('#fGates', 'gates', 'Kapılar açık', 'Kapılar kapalı'); tog('#fWeights', 'useW', null, null);
+tog('#f200', 'f200', null, null, false); tog('#fPos', 'fPos', null, null, false);
+$('#dipstrip').addEventListener('click', e => { const b = e.target.closest('.stg'); if (!b) return; const k = +b.dataset.st; S.dipF = S.dipF === k ? 0 : k; if (S.dipF) { S.sort = 'dip'; document.querySelectorAll('#sortSeg button').forEach(z => z.setAttribute('aria-pressed', z.dataset.k === 'dip')); } renderDipStrip(); renderList(); renderDetail(); });
+$('#q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
+$('#btnBT').addEventListener('click', runBT);
+$('#btnRefresh').addEventListener('click', () => start(true));
+window.addEventListener('resize', () => { const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) drawChart(x); });
+if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => { const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) drawChart(x); });
+
+// Sekmeler (hash)
+const VIEWS = ['radar', 'kurallar', 'geri-test'];
+function route() { const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'radar'; for (const k of VIEWS) { $('#view-' + k).hidden = k !== v; $('#tab-' + k).setAttribute('aria-selected', k === v); } if (v === 'radar') { const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) drawChart(x); } }
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { location.hash = t.dataset.view; }));
+window.addEventListener('hashchange', route); route();
+
+// ───────── Başlat ─────────
+async function start(userAsked) {
+  const btn = $('#btnRefresh'); btn.disabled = true;
+  try {
+    const coins = await loadLive(); S.source = 'live'; $('#notice').hidden = true; prepare(coins);
+  } catch (e) {
+    // Aynı sitede GitHub Actions'ın ürettiği veri varsa onu kullan (data/candles.json, data/backtest.json)
+    try {
+      const r = await fetch('data/candles.json', { cache: 'no-store' });
+      if (r.ok) { const j = await r.json(); if (j.kind === 'coin-radar-candles') { S.source = 'file'; prepare(j.coins);
+        try { const b = await fetch('data/backtest.json', { cache: 'no-store' }); if (b.ok) { S.bt = await b.json(); S.bt.source = 'file'; render(); } } catch {}
+        showNotice(`<b>Canlı veri alınamadı;</b> sitedeki ${new Date(j.generated).toLocaleString('tr-TR')} tarihli veri gösteriliyor.`); btn.disabled = false; return; } }
+    } catch {}
+    if (!S.coins.length || S.source === 'demo') { S.source = 'demo'; prepare(demoCoins()); }
+    showNotice(`<b>Canlı veri alınamadı.</b> Claude içinde yayınlanan sayfalar dış sitelere bağlanamadığı için Binance'e ulaşılamıyor; ${S.source === 'demo' ? 'aşağıda <b>sentetik örnek veri</b> var, gerçek coin değildir.' : 'yüklenen veri gösterilmeye devam ediyor.'} Canlı kullanım için <code>index.html</code> dosyasını kendi sitenize (Netlify, GitHub Pages) koyun ya da bilgisayarınızda <code>node radar.mjs --export</code> çalıştırıp <code>candles.json</code> dosyasını "Dosya yükle" ile seçin.`);
+  }
+  btn.disabled = false;
+}
+start(false);
+})();
+</script>
