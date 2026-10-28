@@ -128,7 +128,7 @@ input[type=range]{accent-color:var(--accent);width:140px}
 .say .ic{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;margin-top:1px}
 .ic.p{background:var(--good-soft);color:var(--good)} .ic.n{background:var(--bad-soft);color:var(--bad)} .ic.w{background:var(--warn-soft);color:var(--warn)}
 .sect{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);margin:4px 0 8px}
-canvas.chart{width:100%;height:240px;display:block}
+canvas.chart{width:100%;height:280px;display:block}
 .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink2);margin-bottom:6px}
 .legend i{display:inline-block;width:14px;height:2px;vertical-align:3px;margin-right:4px}
 .readout{font-family:var(--f-num);font-size:11.5px;color:var(--ink2);min-height:16px;margin-top:4px}
@@ -295,6 +295,8 @@ td.r,th.r{text-align:right}
     ['fiyat_9_20',   'trend','K',1.5,'Fiyat MA9 ve MA20 üstünde', 19],
     ['yapi_hhhl',    'trend','K',3,'Yükselen tepe/dip (uzun bacak yönü)', 9],
     ['trend_kirilim','trend','K',3,'Önceki dibin altına sarkma = trend kırılımı', 9],
+    ['trend_cizgi',  'trend','K',2,'Trend çizgisi (pinlerden, gövdeye değmeden) korunuyor', 12],
+    ['cizgi_kirilim','trend','K',3,'Trend çizgisi kırıldı (hacimli mi?)', 10],
     ['ma920_birles', 'trend','S',1.5,'9 ve 20 birleşip yukarı açıldı ("zor durdurulur")', 18],
     ['ma_kavga',     'trend','S',1.5,'Ortalamalarda sık kesişim ("kavga başlar")', 17],
     ['duzeltme',     'trend','S',1,'9/20 aşağı ama MA200 kırılmadı → düzeltme', 19],
@@ -609,6 +611,7 @@ td.r,th.r{text-align:right}
     this.zz = [];      // zigzag swing listesi {j, type, price}
     this.zones = [];   // onaylı fraktal bölgeleri
     this.rsiPiv = [];
+    this.pLo = []; this.pHi = [];  // trend çizgisi için onaylı fraktal dip/tepeler
     this.wkCloses = []; this.wkCur = null; this.wkIdx = 0;
     this.lastI = -1;
   }
@@ -627,6 +630,7 @@ td.r,th.r{text-align:right}
       while (this.pi < I.piv.length && I.piv[this.pi].conf <= k) {
         const p = I.piv[this.pi++];
         this.zones.push(p); if (this.zones.length > 60) this.zones.shift();
+        const pl = p.type === 'L' ? this.pLo : this.pHi; pl.push(p); if (pl.length > 40) pl.shift();
         const thr = 2 * (I.atr[p.j] || 0);
         const zz = this.zz, last = zz[zz.length - 1];
         if (!last) zz.push({ j: p.j, type: p.type, price: p.price });
@@ -778,9 +782,31 @@ td.r,th.r{text-align:right}
       if (C < z.zone[0] && c[i - 1] >= z.zone[0]) { fire('destek_kirildi', volOK ? -1 : -0.4, `Destek ${fmt(z.zone[0])} kırıldı${volOK ? ' (hacimli)' : ' (hacimsiz, fake olabilir)'}`); break; }
     }
 
-    // Fibonacci (son onaylı swing)
-    if (zz.length >= 2) {
-      const A = zz[zz.length - 2], B = zz[zz.length - 1];
+    // Trend çizgileri
+    const TL = this.trendLines(i);
+    ctx.trend = { up: TL.up && { a: TL.up.a, b: TL.up.b, slope: TL.up.slope, now: TL.up.now, brk: TL.up.brk, volBreak: TL.up.volBreak },
+                  down: TL.down && { a: TL.down.a, b: TL.down.b, slope: TL.down.slope, now: TL.down.now, brk: TL.down.brk, volBreak: TL.down.volBreak } };
+    {
+      const u = TL.up, dn = TL.down, recent = t => t && t.brk > 0 && i - t.brk <= 5;
+      if (u && u.brk < 0) fire('trend_cizgi', 1, `Yükselen trend çizgisi korunuyor (çizgi ${fmt(u.now)})`);
+      else if (dn && dn.brk < 0) fire('trend_cizgi', -1, `Düşen trend çizgisi altında (çizgi ${fmt(dn.now)})`);
+      if (recent(dn)) fire('cizgi_kirilim', dn.volBreak ? 1 : 0.35, `Düşen trend çizgisi ${i - dn.brk ? (i - dn.brk) + ' gün önce' : 'bugün'} yukarı kırıldı${dn.volBreak ? ' (hacimli)' : ' (hacimsiz, fake olabilir)'}`);
+      if (recent(u)) fire('cizgi_kirilim', u.volBreak ? -1 : -0.4, `Yükselen trend çizgisi ${i - u.brk ? (i - u.brk) + ' gün önce' : 'bugün'} aşağı kırıldı${u.volBreak ? ' (hacimli)' : ' (hacimsiz)'}`);
+    }
+    // Fibonacci: yalnızca trend kırıldıktan sonra çekilir (s.57, 68–69). Çapa = kırılan trendin başlangıcı ve uç noktası.
+    let A = null, B = null;
+    {
+      const cands = [TL.up, TL.down].filter(t => t && t.brk > 0 && i - t.brk <= 120).sort((x, y) => y.brk - x.brk);
+      const t = cands[0];
+      if (t) {
+        let ex = t.up ? -Infinity : Infinity, exJ = t.a.j;
+        for (let q = t.a.j; q <= t.brk; q++) { if (t.up ? h[q] > ex : l[q] < ex) { ex = t.up ? h[q] : l[q]; exJ = q; } }
+        A = { j: t.a.j, price: t.a.price }; B = { j: exJ, price: ex, type: t.up ? 'H' : 'L' };
+        ctx.fibFrom = { kind: t.up ? 'Yükselen trend kırıldı' : 'Düşen trend kırıldı', brk: t.brk, volBreak: t.volBreak };
+        if (Math.abs(B.price - A.price) < 2 * atr) A = null; // yatay/çok küçük hareket: fib anlamsız
+      } else ctx.fibNote = 'Trend kırılmadı: kurala göre fib çekilmez.';
+    }
+    if (A && B && B.j > A.j) {
       const start = A.price, end = B.price, span = start - end; // level(r) = end + r*span
       const lvl = r => end + r * span;
       const up = B.type === 'H';
@@ -790,7 +816,7 @@ td.r,th.r{text-align:right}
         const rh = (h[q] - end) / span, rl = (l[q] - end) / span;
         rMinSince = Math.min(rMinSince, rh, rl); rMaxSince = Math.max(rMaxSince, rh, rl);
       }
-      ctx.fib = { dir: up ? 'up' : 'down', start, end, startJ: A.j, endJ: B.j, r: rNow, levels: FIB.map(r => ({ r, price: lvl(r) })) };
+      ctx.fib = { dir: up ? 'up' : 'down', start, end, startJ: A.j, endJ: B.j, r: rNow, levels: FIB.map(r => ({ r, price: lvl(r) })), from: ctx.fibFrom };
       const rPrev = (c[i - 1] - end) / span;
       if (up) {
         if (rNow >= 0 && rNow < 0.382) fire('fib_sig', 1, `Geri çekilme ${rNow.toFixed(3)}: 0.382 üstünde`);
@@ -976,6 +1002,35 @@ td.r,th.r{text-align:right}
     }
 
     return this.score(out, ctx, i);
+  };
+
+  // ───── Trend çizgisi (s.2, 9–12): en yakın iki dip/tepe pininden çizilir, aradaki mum gövdelerine değmez ─────
+  // Yükselen: son yükselen dip + en yakın geçerli önceki dip. Düşen: son alçalan tepe + en yakın geçerli önceki tepe.
+  Walker.prototype.trendLines = function (i) {
+    const { o, c, h, l, v } = this.d, I = this.I;
+    const body = (q, up) => up ? Math.min(o[q], c[q]) : Math.max(o[q], c[q]);
+    const build = (pivs, up) => {
+      const P = pivs.filter(p => p.j >= i - 160 && p.j <= i - 2);
+      for (let bi = P.length - 1; bi >= Math.max(1, P.length - 3); bi--) {
+        const b = P[bi];
+        for (let ai = bi - 1; ai >= Math.max(0, bi - 6); ai--) {
+          const a = P[ai];
+          if (b.j - a.j < 3) continue;
+          if (up ? !(b.price > a.price) : !(b.price < a.price)) continue;
+          const slope = (b.price - a.price) / (b.j - a.j), at = q => a.price + slope * (q - a.j);
+          let ok = true;
+          for (let q = a.j + 1; q < b.j; q++) { const bd = body(q, up); if (up ? bd < at(q) : bd > at(q)) { ok = false; break; } }
+          if (!ok) continue;
+          // b'den sonra ilk kapanış kırılımı
+          let brk = -1;
+          for (let q = b.j + 1; q <= i; q++) if (up ? c[q] < at(q) : c[q] > at(q)) { brk = q; break; }
+          const volBreak = brk > 0 && I.volSma20[brk - 1] > 0 && v[brk] / I.volSma20[brk - 1] >= 1.5;
+          return { up, a: { j: a.j, price: a.price }, b: { j: b.j, price: b.price }, slope, now: at(i), brk, volBreak, at };
+        }
+      }
+      return null;
+    };
+    return { up: build(this.pLo, true), down: build(this.pHi, false) };
   };
 
   Walker.prototype.divergence = function (osc, i, name) {
@@ -1251,6 +1306,8 @@ const PLAIN = {
   tf4_bozulma: [null, '4 saatlik grafik bozuluyor'],
   tf4_erken: ['4 saatlik grafikte erken dönüş', null],
   vortex: ['Trend gücü alıcılarda (Vortex)', 'Trend gücü satıcılarda (Vortex)'],
+  trend_cizgi: ['Yükselen trend çizgisi korunuyor', 'Düşen trend çizgisinin altında'],
+  cizgi_kirilim: ['Düşen trend çizgisi yukarı kırıldı', 'Yükselen trend çizgisi aşağı kırıldı'],
   vortex_agiz: ['Yükseliş hızlanıyor (Vortex)', 'Düşüş hızlanıyor (Vortex)'],
   fib_382_hacimsiz: ['Satış baskısı zayıf (0.382 hacimsiz kırıldı)', 'Yükselişin hacmi zayıf (0.382 hacimsiz geçildi)'],
   wt: ['Dipten dönüş sinyali (WaveTrend)', 'Tepeden dönüş sinyali (WaveTrend)'],
@@ -1458,7 +1515,7 @@ function renderDetail() {
   shownSym = x.sym;
   const r = x.res, ctx = r.ctx, I = x.I, i = r.i, d = x.d, chg = d.c[i] / d.c[i - 1] - 1;
   const pos = bullets(r, 1, 4), neg = bullets(r, -1, 4);
-  const warn = [...(S.gates ? r.gates.map(g => GATE_TXT[g]) : []), ...(r.badges.some(b => b.k === 'kar') ? ['Yükseliş yorgunluk gösteriyor: kâr almayı düşünün.'] : []), ...(r.badges.some(b => b.k === 'fake') ? ['Son kırılım zayıf hacimli, sahte çıkabilir.'] : [])];
+  const warn = [...(S.gates ? r.gates.map(g => GATE_TXT[g]) : []), ...(r.badges.some(b => b.k === 'kar') ? ['Yükseliş yorgunluk gösteriyor: kâr almayı düşünün.'] : [])];
   const dp = ctx.dip;
   const dipCard = dp && dp.stage !== 0 ? `<div class="card">
       <div class="sect">Dipten dönüş kurulumu</div>
@@ -1488,9 +1545,10 @@ function renderDetail() {
       ${warn.length ? `<ul>${warn.map(t => `<li><span class="ic w">!</span>${esc(t)}</li>`).join('')}</ul>` : ''}
     </div>
     ${dipCard}
+    ${trendCard(r, x)}
     <div class="card">
       <div class="sect">Grafik</div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span>${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:3px"></i>Yükselen trend</span><span><i style="background:var(--bad);height:3px"></i>Düşen trend</span>${ctx.fib ? '<span><i style="border-top:1.5px dashed var(--warn);height:0;background:none"></i>Fib</span>' : ''}${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
       <canvas class="chart" id="chart" aria-label="Günlük mum grafiği"></canvas>
       <div class="readout" id="readout">Grafiğe dokunarak gün değerlerini görün.</div>
     </div>
@@ -1507,11 +1565,32 @@ function renderDetail() {
 function openSheet() { $('#detail').classList.add('open'); document.body.style.overflow = 'hidden'; const x = S.coins.find(c => c.sym === S.sel); if (x) requestAnimationFrame(() => drawChart(x)); }
 function closeSheet() { $('#detail').classList.remove('open'); document.body.style.overflow = ''; }
 
+function trendCard(r, x) {
+  const t = r.ctx.trend || {}, f = r.ctx.fib, i = r.i, lines = [];
+  const ago = k => i - k === 0 ? 'bugün' : `${i - k} gün önce`;
+  if (t.up) lines.push(t.up.brk > 0 ? `<li><span class="ic n">↘</span>Yükselen trend çizgisi ${ago(t.up.brk)} aşağı kırıldı${t.up.volBreak ? ', yüksek hacimle' : ', ama hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic p">↗</span>Yükselen trend çizgisi sağlam. Çizgi şu an ${fmt(t.up.now)} seviyesinde; altında kapanış trendi bozar.</li>`);
+  if (t.down) lines.push(t.down.brk > 0 ? `<li><span class="ic p">↗</span>Düşen trend çizgisi ${ago(t.down.brk)} yukarı kırıldı${t.down.volBreak ? ', yüksek hacimle' : ', ama hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic n">↘</span>Düşen trend çizgisi devam ediyor. Çizgi şu an ${fmt(t.down.now)}; üstünde kapanış kırılım olur.</li>`);
+  if (!lines.length) lines.push('<li><span class="ic w">·</span>Şu an çizilebilecek net bir trend çizgisi yok (pinlerden geçen ve gövdelere değmeyen iki nokta bulunamadı).</li>');
+  let fibHtml = '';
+  if (f) {
+    const keys = f.dir === 'up' ? [0.382, 0.618, 0.786, 1.618] : [0.382, 0.618, 0.786, 1.114, 1.618];
+    const L = k => f.levels.find(z => z.r === k).price;
+    const near = [...f.levels].filter(z => [0, 0.236, 0.382, 0.5, 0.618, 0.707, 0.786, 0.886, 1, 1.114, 1.272, 1.414, 1.618].includes(z.r));
+    const below = near.filter(z => z.price < r.close).sort((a, b) => b.price - a.price)[0], above = near.filter(z => z.price > r.close).sort((a, b) => a.price - b.price)[0];
+    fibHtml = `<p class="help" style="margin:10px 0 8px"><b>Fib çekildi:</b> ${f.from ? f.from.kind.toLowerCase() : 'trend kırıldı'}, fib ${f.dir === 'up' ? 'trendin dibinden tepesine' : 'trendin tepesinden dibine'} çekildi. ${f.dir === 'up' ? 'Geri çekilmede destekler' : 'Toparlanmada hedefler'} aşağıda.</p>
+      <div class="tiles">${below ? `<div class="tile"><div class="k">Alttaki fib (${below.r})</div><div class="v">${fmt(below.price)}</div><div class="d">${pc(below.price / r.close - 1)}</div></div>` : ''}${above ? `<div class="tile"><div class="k">Üstteki fib (${above.r})</div><div class="v">${fmt(above.price)}</div><div class="d">${pc(above.price / r.close - 1)}</div></div>` : ''}
+      ${keys.map(k => `<div class="tile"><div class="k">Fib ${k}</div><div class="v">${fmt(L(k))}</div></div>`).join('')}</div>`;
+  } else fibHtml = `<p class="help" style="margin:10px 0 0">${esc(r.ctx.fibNote || 'Fib için uygun hareket yok.')}</p>`;
+  return `<div class="card say"><div class="sect">Trend çizgisi ve fib</div><ul>${lines.join('')}</ul>${fibHtml}</div>`;
+}
+
 // ───────── Grafik ─────────
 function drawChart(x) {
   const cv = $('#chart'); if (!cv || !cv.clientWidth) return;
   const r = x.res, d = x.d, I = x.I, end = r.i, dpw = r.ctx.dip && r.ctx.dip.stage !== 0;
-  const beg = Math.max(0, Math.min(end - 119, dpw ? r.ctx.dip.start - 30 : end), end - 259);
+  const tr = r.ctx.trend || {}, fb = r.ctx.fib;
+  const want = Math.min(dpw ? r.ctx.dip.start - 30 : end, tr.up ? tr.up.a.j - 5 : end, tr.down ? tr.down.a.j - 5 : end, fb ? fb.startJ - 5 : end);
+  const beg = Math.max(0, Math.min(end - 119, want), end - 259);
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -1535,6 +1614,28 @@ function drawChart(x) {
   }
   const line = (a, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; for (let i = beg; i <= end; i++) { const v = a[i]; if (!isFinite(v)) continue; const y = Y(v); if (!st) { g.moveTo(X(i), y); st = true; } else g.lineTo(X(i), y); } g.stroke(); g.setLineDash([]); };
   line(I.sma100, C.mute, 1.4); line(I.sma20, C.acc, 1.6); line(I.sma50, C.warn, 1.6); line(I.sma200, C.ink, 1.8, [6, 3]);
+  // Fib (kırılan trendden): seviyeler + çapa çizgisi
+  if (fb) {
+    g.font = '10px "IBM Plex Mono", ui-monospace, monospace';
+    const show = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1, 1.114, 1.272, 1.618, -0.272];
+    for (const L of fb.levels) { if (!show.includes(L.r)) continue; const y = Y(L.price); if (y < padT || y > padT + ph) continue;
+      const key = L.r === 0.382 || L.r === 0.618 || L.r === 1.114;
+      g.strokeStyle = key ? C.warn : C.mute; g.globalAlpha = key ? 0.9 : 0.55; g.lineWidth = 1; g.setLineDash([4, 3]);
+      g.beginPath(); g.moveTo(Math.max(0, X(fb.startJ)), y); g.lineTo(pw, y); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      g.fillStyle = key ? C.warn : C.mute; g.textAlign = 'left'; g.fillText(String(L.r), Math.max(2, X(fb.startJ) + 3), y - 6); }
+    if (fb.startJ >= beg) { g.strokeStyle = C.mute; g.lineWidth = 1; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(X(fb.startJ), Y(fb.start)); g.lineTo(X(fb.endJ), Y(fb.end)); g.stroke(); g.setLineDash([]); }
+    g.font = '10.5px "IBM Plex Mono", ui-monospace, monospace';
+  }
+  // Trend çizgileri: pinlerden geçer, kırılım noktası işaretli
+  for (const t of [tr.up, tr.down]) {
+    if (!t) continue;
+    const col = t.slope >= 0 && t === tr.up ? C.good : C.bad, stop = t.brk > 0 ? Math.min(end, t.brk + 8) : end;
+    const at = q => t.a.price + t.slope * (q - t.a.j);
+    const x0 = Math.max(beg, t.a.j);
+    g.strokeStyle = col; g.lineWidth = 2; g.beginPath(); g.moveTo(X(x0), Y(at(x0))); g.lineTo(X(stop), Y(at(stop))); g.stroke();
+    for (const pt of [t.a, t.b]) if (pt.j >= beg) { g.fillStyle = col; g.beginPath(); g.arc(X(pt.j), Y(pt.price), 3, 0, 7); g.fill(); }
+    if (t.brk > 0 && t.brk >= beg) { const yb = Y(d.c[t.brk]); g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.arc(X(t.brk), yb, 6, 0, 7); g.stroke(); g.fillStyle = C.ink; g.textAlign = 'center'; g.fillText('kırılım', X(t.brk), yb + (t === tr.up ? 14 : -14)); }
+  }
   const dp = r.ctx.dip;
   if (dpw) {
     const x0 = X(Math.max(beg, dp.start)) - bw / 2, x1 = X(Math.min(end, dp.end)) + bw / 2, y0 = Y(dp.boxH), y1 = Y(dp.boxL);

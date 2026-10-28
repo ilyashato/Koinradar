@@ -40,6 +40,8 @@
     ['fiyat_9_20',   'trend','K',1.5,'Fiyat MA9 ve MA20 üstünde', 19],
     ['yapi_hhhl',    'trend','K',3,'Yükselen tepe/dip (uzun bacak yönü)', 9],
     ['trend_kirilim','trend','K',3,'Önceki dibin altına sarkma = trend kırılımı', 9],
+    ['trend_cizgi',  'trend','K',2,'Trend çizgisi (pinlerden, gövdeye değmeden) korunuyor', 12],
+    ['cizgi_kirilim','trend','K',3,'Trend çizgisi kırıldı (hacimli mi?)', 10],
     ['ma920_birles', 'trend','S',1.5,'9 ve 20 birleşip yukarı açıldı ("zor durdurulur")', 18],
     ['ma_kavga',     'trend','S',1.5,'Ortalamalarda sık kesişim ("kavga başlar")', 17],
     ['duzeltme',     'trend','S',1,'9/20 aşağı ama MA200 kırılmadı → düzeltme', 19],
@@ -354,6 +356,7 @@
     this.zz = [];      // zigzag swing listesi {j, type, price}
     this.zones = [];   // onaylı fraktal bölgeleri
     this.rsiPiv = [];
+    this.pLo = []; this.pHi = [];  // trend çizgisi için onaylı fraktal dip/tepeler
     this.wkCloses = []; this.wkCur = null; this.wkIdx = 0;
     this.lastI = -1;
   }
@@ -372,6 +375,7 @@
       while (this.pi < I.piv.length && I.piv[this.pi].conf <= k) {
         const p = I.piv[this.pi++];
         this.zones.push(p); if (this.zones.length > 60) this.zones.shift();
+        const pl = p.type === 'L' ? this.pLo : this.pHi; pl.push(p); if (pl.length > 40) pl.shift();
         const thr = 2 * (I.atr[p.j] || 0);
         const zz = this.zz, last = zz[zz.length - 1];
         if (!last) zz.push({ j: p.j, type: p.type, price: p.price });
@@ -523,9 +527,31 @@
       if (C < z.zone[0] && c[i - 1] >= z.zone[0]) { fire('destek_kirildi', volOK ? -1 : -0.4, `Destek ${fmt(z.zone[0])} kırıldı${volOK ? ' (hacimli)' : ' (hacimsiz, fake olabilir)'}`); break; }
     }
 
-    // Fibonacci (son onaylı swing)
-    if (zz.length >= 2) {
-      const A = zz[zz.length - 2], B = zz[zz.length - 1];
+    // Trend çizgileri
+    const TL = this.trendLines(i);
+    ctx.trend = { up: TL.up && { a: TL.up.a, b: TL.up.b, slope: TL.up.slope, now: TL.up.now, brk: TL.up.brk, volBreak: TL.up.volBreak },
+                  down: TL.down && { a: TL.down.a, b: TL.down.b, slope: TL.down.slope, now: TL.down.now, brk: TL.down.brk, volBreak: TL.down.volBreak } };
+    {
+      const u = TL.up, dn = TL.down, recent = t => t && t.brk > 0 && i - t.brk <= 5;
+      if (u && u.brk < 0) fire('trend_cizgi', 1, `Yükselen trend çizgisi korunuyor (çizgi ${fmt(u.now)})`);
+      else if (dn && dn.brk < 0) fire('trend_cizgi', -1, `Düşen trend çizgisi altında (çizgi ${fmt(dn.now)})`);
+      if (recent(dn)) fire('cizgi_kirilim', dn.volBreak ? 1 : 0.35, `Düşen trend çizgisi ${i - dn.brk ? (i - dn.brk) + ' gün önce' : 'bugün'} yukarı kırıldı${dn.volBreak ? ' (hacimli)' : ' (hacimsiz, fake olabilir)'}`);
+      if (recent(u)) fire('cizgi_kirilim', u.volBreak ? -1 : -0.4, `Yükselen trend çizgisi ${i - u.brk ? (i - u.brk) + ' gün önce' : 'bugün'} aşağı kırıldı${u.volBreak ? ' (hacimli)' : ' (hacimsiz)'}`);
+    }
+    // Fibonacci: yalnızca trend kırıldıktan sonra çekilir (s.57, 68–69). Çapa = kırılan trendin başlangıcı ve uç noktası.
+    let A = null, B = null;
+    {
+      const cands = [TL.up, TL.down].filter(t => t && t.brk > 0 && i - t.brk <= 120).sort((x, y) => y.brk - x.brk);
+      const t = cands[0];
+      if (t) {
+        let ex = t.up ? -Infinity : Infinity, exJ = t.a.j;
+        for (let q = t.a.j; q <= t.brk; q++) { if (t.up ? h[q] > ex : l[q] < ex) { ex = t.up ? h[q] : l[q]; exJ = q; } }
+        A = { j: t.a.j, price: t.a.price }; B = { j: exJ, price: ex, type: t.up ? 'H' : 'L' };
+        ctx.fibFrom = { kind: t.up ? 'Yükselen trend kırıldı' : 'Düşen trend kırıldı', brk: t.brk, volBreak: t.volBreak };
+        if (Math.abs(B.price - A.price) < 2 * atr) A = null; // yatay/çok küçük hareket: fib anlamsız
+      } else ctx.fibNote = 'Trend kırılmadı: kurala göre fib çekilmez.';
+    }
+    if (A && B && B.j > A.j) {
       const start = A.price, end = B.price, span = start - end; // level(r) = end + r*span
       const lvl = r => end + r * span;
       const up = B.type === 'H';
@@ -535,7 +561,7 @@
         const rh = (h[q] - end) / span, rl = (l[q] - end) / span;
         rMinSince = Math.min(rMinSince, rh, rl); rMaxSince = Math.max(rMaxSince, rh, rl);
       }
-      ctx.fib = { dir: up ? 'up' : 'down', start, end, startJ: A.j, endJ: B.j, r: rNow, levels: FIB.map(r => ({ r, price: lvl(r) })) };
+      ctx.fib = { dir: up ? 'up' : 'down', start, end, startJ: A.j, endJ: B.j, r: rNow, levels: FIB.map(r => ({ r, price: lvl(r) })), from: ctx.fibFrom };
       const rPrev = (c[i - 1] - end) / span;
       if (up) {
         if (rNow >= 0 && rNow < 0.382) fire('fib_sig', 1, `Geri çekilme ${rNow.toFixed(3)}: 0.382 üstünde`);
@@ -721,6 +747,35 @@
     }
 
     return this.score(out, ctx, i);
+  };
+
+  // ───── Trend çizgisi (s.2, 9–12): en yakın iki dip/tepe pininden çizilir, aradaki mum gövdelerine değmez ─────
+  // Yükselen: son yükselen dip + en yakın geçerli önceki dip. Düşen: son alçalan tepe + en yakın geçerli önceki tepe.
+  Walker.prototype.trendLines = function (i) {
+    const { o, c, h, l, v } = this.d, I = this.I;
+    const body = (q, up) => up ? Math.min(o[q], c[q]) : Math.max(o[q], c[q]);
+    const build = (pivs, up) => {
+      const P = pivs.filter(p => p.j >= i - 160 && p.j <= i - 2);
+      for (let bi = P.length - 1; bi >= Math.max(1, P.length - 3); bi--) {
+        const b = P[bi];
+        for (let ai = bi - 1; ai >= Math.max(0, bi - 6); ai--) {
+          const a = P[ai];
+          if (b.j - a.j < 3) continue;
+          if (up ? !(b.price > a.price) : !(b.price < a.price)) continue;
+          const slope = (b.price - a.price) / (b.j - a.j), at = q => a.price + slope * (q - a.j);
+          let ok = true;
+          for (let q = a.j + 1; q < b.j; q++) { const bd = body(q, up); if (up ? bd < at(q) : bd > at(q)) { ok = false; break; } }
+          if (!ok) continue;
+          // b'den sonra ilk kapanış kırılımı
+          let brk = -1;
+          for (let q = b.j + 1; q <= i; q++) if (up ? c[q] < at(q) : c[q] > at(q)) { brk = q; break; }
+          const volBreak = brk > 0 && I.volSma20[brk - 1] > 0 && v[brk] / I.volSma20[brk - 1] >= 1.5;
+          return { up, a: { j: a.j, price: a.price }, b: { j: b.j, price: b.price }, slope, now: at(i), brk, volBreak, at };
+        }
+      }
+      return null;
+    };
+    return { up: build(this.pLo, true), down: build(this.pHi, false) };
   };
 
   Walker.prototype.divergence = function (osc, i, name) {
