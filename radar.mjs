@@ -1,6 +1,6 @@
 // Coin Radarı — komut satırı: tarama + geri test
 // Kullanım (Node 18+):
-//   node radar.mjs                 → ilk 50 USDT paritesini tarar, radar.json yazar
+//   node radar.mjs                 → Binance'teki tüm USDT paritelerini tarar, radar.json yazar (--top 50: hacme göre ilk 50)
 //   node radar.mjs --backtest      → ayrıca geri test yapar, backtest.json + backtest.md yazar
 //   node radar.mjs --export        → candles.json yazar (sayfaya yükleyince her şey sayfada hesaplanır)
 //   node radar.mjs --top 80 --symbols BTCUSDT,ETHUSDT --sezgisel 0.6
@@ -12,7 +12,7 @@ const CR = require('./engine.js');
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true) : d; };
-const TOP = +opt('top', 50), WS = +opt('sezgisel', 0.6), DO_BT = !!opt('backtest', false), DO_EXP = !!opt('export', false);
+const TOP = +opt('top', 0), WS = +opt('sezgisel', 0.6), DO_BT = !!opt('backtest', false), DO_EXP = !!opt('export', false);
 const HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com', 'https://api1.binance.com'];
 const STABLE = /^(USDC|FDUSD|TUSD|DAI|USDP|BUSD|EUR|AEUR|EURI|USDE|PAXG|XUSD|USD1|BFUSD|RLUSD|TRY|BRL|GBP|JPY)$/;
 
@@ -30,15 +30,18 @@ async function universe() {
   const custom = opt('symbols', '');
   if (custom) return String(custom).split(',').map(s => s.trim().toUpperCase());
   const t = await get('/api/v3/ticker/24hr');
-  return t.filter(x => x.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol) && !STABLE.test(x.symbol.replace(/USDT$/, '')))
-    .sort((a, b) => +b.quoteVolume - +a.quoteVolume).slice(0, TOP).map(x => x.symbol);
+  const now = Date.now();
+  const list = t.filter(x => x.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol) && !STABLE.test(x.symbol.replace(/USDT$/, ''))
+      && +x.quoteVolume > 0 && +x.lastPrice > 0 && x.closeTime > now - 2 * 864e5)
+    .sort((a, b) => +b.quoteVolume - +a.quoteVolume);
+  return (TOP > 0 ? list.slice(0, TOP) : list).map(x => x.symbol);
 }
 
 async function pool(items, n, fn) { const out = []; let k = 0; await Promise.all(Array.from({ length: n }, async () => { while (k < items.length) { const i = k++; try { out[i] = await fn(items[i], i); } catch (e) { out[i] = { error: String(e.message || e) }; } } })); return out; }
 
 const syms = await universe();
 console.log(`${syms.length} parite taranıyor…`);
-const data = await pool(syms, 6, async sym => {
+const data = await pool(syms, 8, async sym => {
   const [d1, d4] = await Promise.all([get(`/api/v3/klines?symbol=${sym}&interval=1d&limit=1000`), get(`/api/v3/klines?symbol=${sym}&interval=4h&limit=1000`)]);
   return { sym, d: toSeries(d1), d4: toSeries(d4) };
 });

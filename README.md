@@ -3,7 +3,7 @@
 "Eğitim Notları – İnvestorcoin" PDF'indeki kuralların mekanik karşılığıyla çalışan coin tarayıcı ve geri test aracı.
 
 ## Yayınlama (GitHub Pages)
-Settings → Pages → Source: "Deploy from a branch", Branch: `main` / root. Sayfa `https://ilyashato.github.io/Koinradar/` adresinde açılır ve Binance'ten canlı veri çeker. Canlı veri alınamazsa `data/candles.json` varsa onu kullanır.
+Settings → Pages → Source: "Deploy from a branch", Branch: `main` / root. Sayfa Binance'teki tüm USDT paritelerini canlı tarar (Gelişmiş ayarlar'dan ilk 100/50'ye indirilebilir). En az 7 aylık geçmişi olmayan yeni coinler MA200 hesaplanamadığı için listelenmez. Canlı veri alınamazsa `data/candles.json` varsa onu kullanır.
 
 ## Dosyalar
 - `index.html` — tek dosyalık sayfa. Kendi sitenize (Netlify, GitHub Pages) koyduğunuzda Binance'ten canlı veri çeker.
@@ -14,7 +14,7 @@ Settings → Pages → Source: "Deploy from a branch", Branch: `main` / root. Sa
 
 ## Komut satırı
 ```
-node radar.mjs                  # ilk 50 USDT paritesini tarar → radar.json
+node radar.mjs                  # tüm USDT paritelerini tarar → radar.json (--top 50: ilk 50)
 node radar.mjs --backtest       # + geri test → backtest.json, backtest.md
 node radar.mjs --export         # candles.json → sayfada "Dosya yükle" ile açılır
 node radar.mjs --top 80 --sezgisel 0.4 --symbols BTCUSDT,ETHUSDT

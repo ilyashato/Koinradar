@@ -209,6 +209,8 @@ td.r,th.r{text-align:right}
             <div class="row"><label for="wS">Sezgisel kuralların ağırlığı<span class="muted">0 = yok say, 1 = kesin kurallar kadar</span></label><span><input type="range" id="wS" min="0" max="1" step="0.1" value="0.6"> <span class="num" id="wSv">0.6</span></span></div>
             <div class="row"><span>Güvenlik kapıları<span class="muted">MA200 altı, trend aşağı, RSI 50 altı ise skoru sınırla</span></span><button class="switch" type="button" id="fGates" aria-pressed="true" aria-label="Güvenlik kapıları"></button></div>
             <div class="row"><span>Geri test ağırlıkları<span class="muted" id="wHelp">Önce Geri test sekmesinde testi çalıştırın</span></span><button class="switch" type="button" id="fWeights" aria-pressed="false" aria-label="Geri test ağırlıkları" disabled></button></div>
+            <div class="row"><span>Taranacak coin sayısı<span class="muted">Binance'teki tüm USDT pariteleri ya da hacme göre ilk 100/50. Az coin daha hızlı yüklenir.</span></span>
+              <div class="seg" id="topSeg"><button type="button" data-n="0">Tümü</button><button type="button" data-n="100">İlk 100</button><button type="button" data-n="50">İlk 50</button></div></div>
             <div class="row"><span>Veri dosyası yükle<span class="muted">radar.mjs --export ile üretilen candles.json ya da backtest.json</span></span><label class="btn" for="fileIn">Dosya seç</label><input id="fileIn" type="file" accept=".json,application/json" multiple hidden></div>
           </div>
         </details>
@@ -264,7 +266,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('cr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('cr_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', view: store.get('view', 'guclu'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: 50, btc: null };
+const S = { coins: [], source: 'none', view: store.get('view', 'guclu'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -361,22 +363,53 @@ const GATE_TXT = { g_ma200: 'Uzun vadeli ortalamanın altında olduğu için pua
 // ───────── Veri ─────────
 const HOSTS = ['https://data-api.binance.vision', 'https://api.binance.com'];
 const STABLE = /^(USDC|FDUSD|TUSD|DAI|USDP|BUSD|EUR|AEUR|EURI|USDE|PAXG|XUSD|USD1|BFUSD|RLUSD|TRY|BRL|GBP|JPY)$/;
-async function get(path) { let last; for (const h of HOSTS) { try { const r = await fetch(h + path); if (r.ok) return await r.json(); last = new Error(r.status); } catch (e) { last = e; } } throw last; }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+async function get(path) {
+  let last;
+  for (const h of HOSTS) for (let a = 0; a < 3; a++) {
+    try {
+      const r = await fetch(h + path);
+      if (r.ok) return await r.json();
+      if (r.status === 429 || r.status === 418) { await sleep(1000 * (+r.headers.get('Retry-After') || 5)); continue; } // istek sınırı: bekle, tekrar dene
+      last = new Error(r.status); break;
+    } catch (e) { last = e; break; }
+  }
+  throw last;
+}
 const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[7]) });
+// Tüm USDT pariteleri: işlem gören (son 2 günde fiyatı oluşmuş), hacmi olan, stabil/kaldıraçlı olmayanlar; hacme göre sıralı
 async function loadLive() {
-  setStatus('Veriler indiriliyor…', '');
-  const t = await get('/api/v3/ticker/24hr');
-  const syms = t.filter(x => x.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol) && !STABLE.test(x.symbol.replace(/USDT$/, '')))
-    .sort((a, b) => +b.quoteVolume - +a.quoteVolume).slice(0, S.top).map(x => x.symbol);
-  if (!syms.includes('BTCUSDT')) syms.unshift('BTCUSDT');
-  const coins = []; let done = 0, k = 0;
-  await Promise.all(Array.from({ length: 6 }, async () => {
-    while (k < syms.length) { const sym = syms[k++];
-      try { const [a, b] = await Promise.all([get(`/api/v3/klines?symbol=${sym}&interval=1d&limit=1000`), get(`/api/v3/klines?symbol=${sym}&interval=4h&limit=400`)]); coins.push({ sym, d: toSeries(a), d4: toSeries(b) }); } catch (e) {}
-      setStatus(`Veriler indiriliyor: ${++done}/${syms.length} coin`, ''); }
+  setStatus('Coin listesi alınıyor…', '');
+  const t = await get('/api/v3/ticker/24hr'), now = Date.now();
+  let list = t.filter(x => x.symbol.endsWith('USDT') && !/(UP|DOWN|BULL|BEAR)USDT$/.test(x.symbol) && !STABLE.test(x.symbol.replace(/USDT$/, ''))
+      && +x.quoteVolume > 0 && +x.lastPrice > 0 && x.closeTime > now - 2 * 864e5)
+    .sort((a, b) => +b.quoteVolume - +a.quoteVolume);
+  if (S.top > 0) list = list.slice(0, S.top);
+  const qv = Object.fromEntries(list.map(x => [x.symbol, +x.quoteVolume]));
+  const syms = list.map(x => x.symbol); const bi = syms.indexOf('BTCUSDT'); if (bi > 0) { syms.splice(bi, 1); syms.unshift('BTCUSDT'); }
+  // Yeni liste: veriler geldikçe ekranda görünür
+  S.coins = []; S.young = 0; S.total = syms.length; S.loading = true; S.source = 'live'; S.bt = null; S.useW = false;
+  let done = 0, k = 0, last = 0;
+  const flush = (force) => { const n = Date.now(); if (force || n - last > 700) { last = n; S.btc = S.coins.find(x => x.sym === 'BTCUSDT') || null; render(); } };
+  await Promise.all(Array.from({ length: 8 }, async () => {
+    while (k < syms.length) {
+      const sym = syms[k++];
+      try {
+        const a = await get(`/api/v3/klines?symbol=${sym}&interval=1d&limit=1000`);
+        if (a.length < 212) { S.young++; } // MA200 için en az ~7 aylık geçmiş gerekir
+        else {
+          const b = await get(`/api/v3/klines?symbol=${sym}&interval=4h&limit=400`).catch(() => null);
+          const x = { sym, d: toSeries(a), d4: b ? toSeries(b) : null, qv: qv[sym] };
+          x.I = CR.indicators(x.d); x.J = x.d4 && x.d4.c.length > 220 ? CR.indicators(x.d4) : null; x.res = evalCoin(x);
+          if (x.res) S.coins.push(x);
+        }
+      } catch (e) {}
+      done++; setStatus(`Coinler taranıyor: ${done}/${syms.length}`, ''); flush(false);
+    }
   }));
-  if (!coins.length) throw new Error('veri yok');
-  return coins;
+  S.loading = false;
+  if (!S.coins.length) throw new Error('veri yok');
+  flush(true);
 }
 function demoCoins() {
   const names = ['ÖRNEK-A', 'ÖRNEK-B', 'ÖRNEK-C', 'ÖRNEK-D', 'ÖRNEK-E', 'ÖRNEK-F', 'ÖRNEK-G', 'ÖRNEK-H', 'ÖRNEK-I', 'ÖRNEK-J', 'ÖRNEK-K', 'ÖRNEK-L'];
@@ -423,12 +456,14 @@ function srcStatus() {
   const c0 = S.coins[0], last = c0 && c0.d.t[c0.d.c.length - 2];
   const dt = last ? new Date(last).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) : '';
   const n = S.coins.filter(x => x.res).length;
+  if (S.source === 'live' && S.loading) return;
   if (S.source === 'live') setStatus(`Canlı · ${n} coin · ${dt} kapanışı`, 'live');
   else if (S.source === 'file') setStatus(`Kayıtlı veri · ${n} coin · ${dt} kapanışı`, 'file');
   else setStatus(`Örnek veri · gerçek coin değil`, 'demo');
 }
 const scoreCls = k => 's-' + k;
-function render() { srcStatus(); renderMarket(); renderViews(); renderList(); renderDetail(); renderRules(); if (S.bt) renderBT(); syncAdv(); }
+let shownSym = null;
+function render() { srcStatus(); renderMarket(); renderViews(); renderList(); if (!(S.loading && shownSym === S.sel)) renderDetail(); renderRules(); if (S.bt) renderBT(); syncAdv(); }
 
 function renderMarket() {
   const el = $('#market'), b = S.btc && S.btc.res;
@@ -461,7 +496,7 @@ function rows() {
 }
 function renderList() {
   const el = $('#list'), rs = rows();
-  if (!S.coins.length) { el.innerHTML = '<div class="empty">Veriler yükleniyor…</div>'; return; }
+  if (!S.coins.length) { el.innerHTML = '<div class="empty">Coinler taranıyor, ilk sonuçlar birkaç saniye içinde gelecek…</div>'; return; }
   if (!rs.length) {
     el.innerHTML = `<div class="empty">${S.q ? 'Aramaya uyan coin yok.' : S.view === 'dip' ? 'Şu anda dipten dönüş kurulumunda coin yok.' : 'Şu anda puanı 60 üstü coin yok. Piyasa genel olarak zayıf.'}<br><button class="btn" type="button" data-go="tum">Tüm coinleri göster</button></div>`; return;
   }
@@ -469,7 +504,8 @@ function renderList() {
     const r = x.res, d = x.d, i = r.i, chg = d.c[i] / d.c[i - 1] - 1, val = S.view === 'dip' ? r.dip : r[S.sort];
     const k = S.view === 'dip' ? (r.dipStage >= 2 ? 'gp' : 'p') : r.label.k;
     const why = S.view === 'dip' ? STAGE[r.dipStage] : (r.score >= 50 ? bullets(r, 1, 1)[0] : bullets(r, -1, 1)[0]) || '';
-    const tag = S.view !== 'dip' && r.dipStage >= 1 && r.dipStage <= 3 ? `<span class="tag">${STAGE_SHORT[r.dipStage]}</span>` : r.badges.some(b => b.k === 'kar') ? '<span class="tag warn">Kâr al uyarısı</span>' : '';
+    const low = x.qv != null && x.qv < 1e6 ? '<span class="tag bad">Düşük hacim</span>' : '';
+    const tag = low + (S.view !== 'dip' && r.dipStage >= 1 && r.dipStage <= 3 ? `<span class="tag">${STAGE_SHORT[r.dipStage]}</span>` : r.badges.some(b => b.k === 'kar') ? '<span class="tag warn">Kâr al uyarısı</span>' : '');
     return `<button class="coin" type="button" data-sym="${esc(x.sym)}" aria-current="${x.sym === S.sel}">
       <span class="score ${scoreCls(k)}">${val.toFixed(0)}</span>
       <span class="cmain"><span class="cname">${esc(x.sym.replace(/USDT$/, ''))}${tag}</span>
@@ -478,6 +514,10 @@ function renderList() {
       <span class="cside"><span class="price">${fmt(r.close)}</span><span class="chg ${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></span>
     </button>`;
   }).join('');
+  const foot = [];
+  if (S.loading) foot.push(`Tarama sürüyor (${S.coins.length} coin hazır). Liste güncelleniyor.`);
+  if (S.young) foot.push(`${S.young} yeni coin listede yok: puan için en az 7 aylık geçmiş gerekir (MA200).`);
+  if (foot.length) el.insertAdjacentHTML('beforeend', `<p class="small muted" style="margin:6px 4px 0">${foot.join(' ')}</p>`);
   if (!S.sel || !rs.some(x => x.sym === S.sel)) S.sel = rs[0].sym;
   document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel));
 }
@@ -486,6 +526,7 @@ function renderList() {
 function renderDetail() {
   const el = $('#detail'), x = S.coins.find(c => c.sym === S.sel);
   if (!x || !x.res) { el.innerHTML = ''; return; }
+  shownSym = x.sym;
   const r = x.res, ctx = r.ctx, I = x.I, i = r.i, d = x.d, chg = d.c[i] / d.c[i - 1] - 1;
   const pos = bullets(r, 1, 4), neg = bullets(r, -1, 4);
   const warn = [...(S.gates ? r.gates.map(g => GATE_TXT[g]) : []), ...(r.badges.some(b => b.k === 'kar') ? ['Yükseliş yorgunluk gösteriyor: kâr almayı düşünün.'] : []), ...(r.badges.some(b => b.k === 'fake') ? ['Son kırılım zayıf hacimli, sahte çıkabilir.'] : [])];
@@ -648,12 +689,14 @@ function renderBT() {
 
 // ───────── Ayarlar ─────────
 function syncAdv() {
+  document.querySelectorAll('#topSeg button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.n === S.top));
   document.querySelectorAll('#sortSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.k === S.sort));
   $('#wS').value = S.wS; $('#wSv').textContent = (+S.wS).toFixed(1);
   $('#fGates').setAttribute('aria-pressed', S.gates);
   const fw = $('#fWeights'); fw.disabled = !S.bt; fw.setAttribute('aria-pressed', S.useW);
   $('#wHelp').textContent = S.bt ? 'Testte işe yarayan kuralları güçlendir, yaramayanları zayıflat' : 'Önce Geri test sekmesinde testi çalıştırın';
 }
+$('#topSeg').addEventListener('click', e => { const n = e.target.dataset.n; if (n == null || S.loading) return; S.top = +n; store.set('top', S.top); syncAdv(); start(); });
 $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if (!k) return; S.sort = k; store.set('sort', k); syncAdv(); renderList(); });
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
@@ -691,7 +734,7 @@ window.addEventListener('hashchange', route); route();
 // Başlat
 async function start() {
   const btn = $('#btnRefresh'); btn.disabled = true;
-  try { const coins = await loadLive(); S.source = 'live'; $('#notice').hidden = true; prepare(coins); }
+  try { $('#notice').hidden = true; await loadLive(); }
   catch (e) {
     try {
       const r = await fetch('data/candles.json', { cache: 'no-store' });

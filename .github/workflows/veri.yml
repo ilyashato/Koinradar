@@ -5,8 +5,8 @@ on:
   workflow_dispatch:
     inputs:
       top:
-        description: 'Taranacak parite sayısı'
-        default: '50'
+        description: 'Taranacak parite sayısı (0 = tümü)'
+        default: '0'
 permissions:
   contents: write
 jobs:
@@ -21,7 +21,7 @@ jobs:
         run: |
           cd data
           cp ../engine.js ../radar.mjs .
-          node radar.mjs --top ${{ github.event.inputs.top || '50' }} --export --backtest
+          node radar.mjs --top ${{ github.event.inputs.top || '0' }} --export --backtest
           rm engine.js radar.mjs
       - name: Kaydet
         run: |
