@@ -1049,8 +1049,7 @@
     };
     P.L.forEach(p => mk(p, true)); P.H.forEach(p => mk(p, false));
     all.sort((a, b) => a.lo - b.lo);
-    const mg = [];
-    for (const z of all) { const m = mg[mg.length - 1]; if (m && z.lo <= m.hi) { m.hi = Math.max(m.hi, z.hi); if (z.j < m.j) { m.j = z.j; m.type = z.type; } } else mg.push({ ...z }); }
+    const mg = all; // birleştirme yok: her bölge yalnız kendi pin mumunun iğne ucu ↔ gövde ucu
     const above = mg.filter(z => z.lo > px).sort((a, b) => a.lo - b.lo).slice(0, 3), below = mg.filter(z => z.hi <= px).sort((a, b) => b.hi - a.hi).slice(0, 3);
     const mid = mg.filter(z => z.lo <= px && z.hi > px);
     const ext = [mg.reduce((a, z) => (!a || z.hi > a.hi ? z : a), null), mg.reduce((a, z) => (!a || z.lo < a.lo ? z : a), null)].filter(Boolean);
