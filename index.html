@@ -1326,6 +1326,25 @@ body.fs-on{overflow:hidden}
     };
     return { down: mk(topJ, false), up: mk(botJ, true) };
   }
+  // Destek/direnç bölgeleri (her zaman diliminde): pin mumunun İĞNESİ ile gövde ucu arası, pin mumundan sağa uzanır.
+  // Kapanışla kırılmış bölge atılır. Fiyata en yakın 3 direnç + 3 destek ve dönemin uç tepe/dibi döner.
+  function zonesOf(d, i, look) {
+    const { o, c, h, l } = d, P = pivotsOf(d, i, 3, look || 300), px = c[i], all = [];
+    const mk = (p, up) => {
+      const zone = up ? [l[p.j], Math.min(o[p.j], c[p.j])] : [Math.max(o[p.j], c[p.j]), h[p.j]];
+      if (!(zone[1] > zone[0])) return;
+      for (let q = p.j + 1; q <= i; q++) if (up ? c[q] < zone[0] : c[q] > zone[1]) return; // kırıldı
+      all.push({ j: p.j, type: up ? 'L' : 'H', lo: zone[0], hi: zone[1] });
+    };
+    P.L.forEach(p => mk(p, true)); P.H.forEach(p => mk(p, false));
+    all.sort((a, b) => a.lo - b.lo);
+    const mg = [];
+    for (const z of all) { const m = mg[mg.length - 1]; if (m && z.lo <= m.hi) { m.hi = Math.max(m.hi, z.hi); if (z.j < m.j) { m.j = z.j; m.type = z.type; } } else mg.push({ ...z }); }
+    const above = mg.filter(z => z.lo > px).sort((a, b) => a.lo - b.lo).slice(0, 3), below = mg.filter(z => z.hi <= px).sort((a, b) => b.hi - a.hi).slice(0, 3);
+    const mid = mg.filter(z => z.lo <= px && z.hi > px);
+    const ext = [mg.reduce((a, z) => (!a || z.hi > a.hi ? z : a), null), mg.reduce((a, z) => (!a || z.lo < a.lo ? z : a), null)].filter(Boolean);
+    return [...new Set([...above, ...below, ...mid, ...ext])].map(z => ({ ...z, res: z.type === 'H' }));
+  }
   // Kırılan trendden fib: başlangıç pininden kırılıma kadarki uç noktaya
   function fibFromTrend(d, t, i) {
     if (!t || t.brk < 0) return null;
@@ -1347,7 +1366,7 @@ body.fs-on{overflow:hidden}
     return w;
   }
 
-  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
+  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, zonesOf, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
   root.CoinRadar = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
@@ -1725,6 +1744,7 @@ function buildModel(x, tf, fibSrc) {
     else { if (!x.d4 || x.d4.c.length < 60) return null; const I = x.J || CR.indicators(x.d4); m = { tf, d: x.d4, I, last: x.d4.c.length - 2 }; }
     if (!m.tr) m.tr = m.last > 10 ? CR.trendShort(m.d, m.I, m.last, TF[tf].look) : {};
     m.trL = m.last > 10 ? CR.trendLong(m.d, m.I, m.last, Math.min(TF[tf].lookL, m.last - 2)) : {};
+    m.zs = m.last > 10 ? CR.zonesOf(m.d, m.last, Math.min(m.last - 2, TF[tf].lookL * 2)) : [];
     m.step = m.last > 0 ? m.d.t[m.last] - m.d.t[m.last - 1] : 864e5;
     x.models[key] = m;
   }
@@ -1768,8 +1788,13 @@ function renderChart(cv, m, view, opt) {
   g.strokeStyle = C.line; g.lineWidth = 1;
   for (let k = 0; k <= 4; k++) { const y = Y(lo + (hi - lo) * k / 4); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); }
   // destek / direnç
-  const zone = (z, col) => { const y1 = Y(z[1]), y0 = Y(z[0]); g.fillStyle = col; g.fillRect(0, y1, X(dEnd) + bw / 2, Math.max(2, y0 - y1)); };
-  if (Lh.zone) { if (m.support) zone(m.support, C.goodS); if (m.resistance) zone(m.resistance, C.badS); }
+  // pin mumunun iğnesi ↔ gövde ucu arası bant; pin mumundan sağ kenara uzanır (kırılana kadar)
+  if (Lh.zone) for (const z of (m.zs || [])) {
+    const y1 = Y(z.hi), y0 = Y(z.lo); if (y0 < padT - 4 || y1 > padT + ph + 4) continue;
+    const x0 = Math.max(0, X(Math.max(beg, z.j)) - bw / 2), col = z.res ? C.bad : C.good;
+    g.fillStyle = z.res ? C.badS : C.goodS; g.fillRect(x0, y1, pw - x0, Math.max(2, y0 - y1));
+    g.strokeStyle = col; g.globalAlpha = 0.7; g.lineWidth = 1; g.beginPath(); const ye = z.res ? y1 : y0; g.moveTo(x0, ye); g.lineTo(pw, ye); g.stroke(); g.globalAlpha = 1;
+  }
   // son mumun sağı: gelecek alanı ince çizgiyle ayrılır
   if (end > last) { g.strokeStyle = C.line; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(X(last) + bw / 2, padT); g.lineTo(X(last) + bw / 2, padT + ph); g.stroke(); g.setLineDash([]); }
   // fib: TradingView gibi düz çizgiler, başlangıçtan sağ kenara; sağ uçta "0,618 (fiyat)"
@@ -1875,7 +1900,7 @@ function openFS(x) {
 function syncFsControls() {
   const has4 = !!(FS.x.d4 && FS.x.d4.c.length >= 60);
   $('#fsTF').innerHTML = Object.entries(TF).map(([k, v]) => `<button type="button" data-tf="${k}" aria-pressed="${FS.tf === k}" ${k === '4h' && !has4 ? 'disabled title="4 saatlik veri yok"' : ''}>${v.t}</button>`).join('');
-  $('#fsLayers').innerHTML = LAYERS_DEF.filter(([k]) => FS.tf === '1d' || (k !== 'zone' && k !== 'dip')).map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('')
+  $('#fsLayers').innerHTML = LAYERS_DEF.filter(([k]) => FS.tf === '1d' || k !== 'dip').map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('')
     + `<button type="button" class="chipl src" id="fsFibSrc" aria-pressed="true">Fib: ${FS.fibSrc === 'uzun' ? 'uzun trendden' : 'kısa trendden'}</button>`;
 }
 function setTF(tf) {
@@ -1887,7 +1912,7 @@ function closeFS() { FS.open = false; $('#fs').hidden = true; document.body.clas
 let fsGeo = null;
 function drawFS() {
   if (!FS.open) return;
-  const lay = FS.tf === '1d' ? FS.layers : Object.assign({}, FS.layers, { zone: false, dip: false });
+  const lay = FS.tf === '1d' ? FS.layers : Object.assign({}, FS.layers, { dip: false });
   fsGeo = renderChart($('#fsChart'), FS.m, { beg: FS.beg, end: FS.end }, { big: true, layers: lay, cross: FS.cross });
   const f = FS.m.fb;
   $('#fsRead').textContent = dayText(FS.m, FS.cross != null ? FS.cross : Math.min(FS.end, FS.m.last)) + (FS.layers.fib ? (f ? ` · Fib: ${f.from.kind.toLowerCase()}` : ' · Fib yok: trend kırılmadı') : '');

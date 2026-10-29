@@ -1037,6 +1037,25 @@
     };
     return { down: mk(topJ, false), up: mk(botJ, true) };
   }
+  // Destek/direnç bölgeleri (her zaman diliminde): pin mumunun İĞNESİ ile gövde ucu arası, pin mumundan sağa uzanır.
+  // Kapanışla kırılmış bölge atılır. Fiyata en yakın 3 direnç + 3 destek ve dönemin uç tepe/dibi döner.
+  function zonesOf(d, i, look) {
+    const { o, c, h, l } = d, P = pivotsOf(d, i, 3, look || 300), px = c[i], all = [];
+    const mk = (p, up) => {
+      const zone = up ? [l[p.j], Math.min(o[p.j], c[p.j])] : [Math.max(o[p.j], c[p.j]), h[p.j]];
+      if (!(zone[1] > zone[0])) return;
+      for (let q = p.j + 1; q <= i; q++) if (up ? c[q] < zone[0] : c[q] > zone[1]) return; // kırıldı
+      all.push({ j: p.j, type: up ? 'L' : 'H', lo: zone[0], hi: zone[1] });
+    };
+    P.L.forEach(p => mk(p, true)); P.H.forEach(p => mk(p, false));
+    all.sort((a, b) => a.lo - b.lo);
+    const mg = [];
+    for (const z of all) { const m = mg[mg.length - 1]; if (m && z.lo <= m.hi) { m.hi = Math.max(m.hi, z.hi); if (z.j < m.j) { m.j = z.j; m.type = z.type; } } else mg.push({ ...z }); }
+    const above = mg.filter(z => z.lo > px).sort((a, b) => a.lo - b.lo).slice(0, 3), below = mg.filter(z => z.hi <= px).sort((a, b) => b.hi - a.hi).slice(0, 3);
+    const mid = mg.filter(z => z.lo <= px && z.hi > px);
+    const ext = [mg.reduce((a, z) => (!a || z.hi > a.hi ? z : a), null), mg.reduce((a, z) => (!a || z.lo < a.lo ? z : a), null)].filter(Boolean);
+    return [...new Set([...above, ...below, ...mid, ...ext])].map(z => ({ ...z, res: z.type === 'H' }));
+  }
   // Kırılan trendden fib: başlangıç pininden kırılıma kadarki uç noktaya
   function fibFromTrend(d, t, i) {
     if (!t || t.brk < 0) return null;
@@ -1058,7 +1077,7 @@
     return w;
   }
 
-  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
+  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, zonesOf, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
   root.CoinRadar = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
