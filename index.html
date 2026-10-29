@@ -58,6 +58,15 @@ h3{font-weight:700;font-size:15px;margin:0}
 .tab[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 
 /* Görünüm seçici */
+.ib{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--mute);background:none;color:var(--mute);font:italic 700 11px/1 Georgia,serif;padding:0;vertical-align:1px;margin-left:2px;cursor:pointer}
+.tfbar{position:sticky;top:62px;z-index:2;background:var(--bg);display:flex;align-items:center;gap:10px;padding:2px 0 8px;flex-wrap:wrap}
+.tfbar .seg button{padding:7px 12px;font-weight:700}
+.tfbar .seg button:disabled{opacity:.4}
+#tip{position:fixed;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:90;max-width:520px;margin:0 auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 16px;box-shadow:0 10px 34px rgba(0,0,0,.22);max-height:60vh;overflow:auto;font-size:14.5px}
+#tip[hidden]{display:none}
+#tip p{margin:6px 0 0;line-height:1.45}
+.tiph{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.tipx{border:0;background:none;font-size:24px;line-height:1;color:var(--mute);padding:0 4px}
 .star{cursor:pointer;color:var(--mute);font-size:17px;line-height:1;padding:0 2px;background:none;border:0}
 .star.on{color:#e0a100}
 .star.big{font-size:26px;margin-left:auto;padding:4px 8px}
@@ -292,6 +301,7 @@ body.fs-on{overflow:hidden}
   <div class="fshint">Kaydır: sürükle · Yakınlaştır: iki parmak ya da tekerlek · Gün: dokun · Telefonu yan çevirebilirsiniz</div>
 </div>
 
+<div id="tip" hidden role="dialog" aria-live="polite"></div>
 <script>
 /*  Coin Radarı — skor motoru
     Kaynak: "Eğitim Notları – İnvestorcoin" (87 sayfa) kurallarının mekanik karşılığı.
@@ -1491,6 +1501,126 @@ const PLAIN = {
 };
 const plainOf = r => { const t = PLAIN[r.id]; const s = t && (r.p > 0 ? t[0] : t[1]); return s || CR.RULE[r.id].label.replace(/ \(.*\)$/, '').replace(/"/g, ''); };
 const wOf = r => Math.abs(r.p) * (r.tier === 'K' ? 1 : S.wS) * (PLAIN[r.id] ? 1.15 : 1);
+// ───────── Açıklamalar: her gösterge için "ne ölçer" ve "nasıl yorumlanır" ─────────
+const INFO = {
+  dip_kurulum: ['Fiyat zirvesinden en az %30 düşmüş ve 20/50/100/200 günlük ortalamalar dar bir bantta toplanmış (maliyetlenme).', 'Ne kadar uzun ve sıkı olursa sonraki hareket o kadar sağlam olur. Tek başına al sinyali değil; kutu tavanının üstünde kapanış beklenir.'],
+  dip_tetik: ['Fiyatın sıkışma kutusunun tavanı ve tüm ortalamaların üstünde kapatması.', 'Hacimle gelirse kırılım güvenilir. Hacimsizse sahte çıkış olabilir; kapanış tavanın altına dönerse iptal.'],
+  dip_200: ['MA200 eğiminin yatay seyre dönmesi.', 'Yatay MA200 üstteki direnci yumuşatır, dönüşü kolaylaştırır. Hâlâ hızla düşen MA200 dönüşü zorlaştırır.'],
+  dip_yelpaze: ['MA20 > MA50 > MA100 sıralanıp uçların yukarı açılması.', 'Yelpazenin açılması dipten dönüşün ilk teyidi. Kapalı kalıyorsa sıkışma sürüyor demektir.'],
+  dip_uzun: ['Maliyetlenmenin uzun sürmesi (yaklaşık 90 gün ve üstü).', 'Uzun sıkışma daha sağlam bir zemin demektir: MA200 kısa sürede yeniden test edilmez.'],
+  ma200: ['Fiyatın 200 mumluk ortalamaya göre konumu.', 'Üstünde boğa, altında ayı bölgesi sayılır. Altındayken puan en fazla 40 olabilir.'],
+  ma_dizilim: ['MA9 > 20 > 50 > 100 > 200 sıralaması.', 'Tam dizilim güçlü yükseliş, ters dizilim güçlü düşüş. Karışıksa trend belirsizdir.'],
+  ma_egim: ['MA20 ve MA50 uçlarının yönü.', 'İkisi de yukarıysa ivme sürüyor. Aşağı dönmeye başladıysa yükseliş yoruluyor olabilir.'],
+  ema510: ['EMA5 ile EMA10’un birbirine göre konumu (kısa vade trend yönü).', 'EMA5 üstteyse kısa vade yukarı. Aşağıysa puan en fazla 55 olabilir.'],
+  ema510_kesis: ['EMA5’in EMA10’u yeni kesmesi.', 'Yukarı kesişim erken alım işareti, aşağı kesişim zayıflama. 1–3 mum içindeki taze kesişim önemlidir; hacimle teyit ara.'],
+  fiyat_9_20: ['Kapanışın MA9 ve MA20 üstünde olması.', 'İkisinin üstünde kaldıkça trend sağlıklı. MA9 altı ilk uyarı, MA20 altı düzeltme başlangıcı olabilir.'],
+  yapi_hhhl: ['Tepe ve diplerin yükselen mi alçalan mı olduğu.', 'Yükselen tepe + yükselen dip boğa yapısı. Alçalan tepe + alçalan dip ayı yapısı.'],
+  trend_kirilim: ['Fiyatın önceki dibin altına sarkması.', 'Önceki dibin altında kapanış yükselen yapıyı bozar. Hacimliyse ciddiye al.'],
+  trend_cizgi: ['İki pinden geçen, aradaki gövdelere değmeyen trend çizgisinin korunması.', 'Çizginin üstünde kapandıkça trend sürer; altında kapanış kırılım demektir.'],
+  cizgi_kirilim: ['Trend çizgisinin kapanışla kırılması.', 'Hacim 20 mum ortalamasının 1,5 katı ve üstüyse güvenilir; değilse sahte kırılım olabilir. Fib yalnızca kırılımdan sonra çekilir.'],
+  ma920_birles: ['MA9 ve MA20’nin birleşip yukarı açılması.', 'Kursa göre “zor durdurulur” hareket. Hacimle gelmesi güçlendirir.'],
+  ma_kavga: ['Ortalamaların kısa sürede sık sık kesişmesi.', 'Kararsız, testere piyasası. Yön netleşene kadar beklemek mantıklı.'],
+  duzeltme: ['MA9/20 aşağı dönmüş ama fiyat MA200 üstünde.', 'Boğa içinde düzeltme olabilir. MA200 kırılırsa senaryo bozulur.'],
+  hepsinin_alti: ['Fiyatın bütün ortalamaların altında olması.', 'Tutunacak ortalama yok. Yeni giriş için erken; önce MA9/20 üstüne dönmesi beklenir.'],
+  ma9_kirildi: ['Kapanışın MA9’un altına inmesi.', 'İlk hedef MA20. Yükselişteki ilk uyarıdır; MA9 üstüne dönülürse etkisi biter.'],
+  wma522: ['WMA5, WMA22 ve WMA200 ağırlıklı ortalamalarının konumu.', 'Hızlı ortalama yavaşın üstündeyse ivme olumlu. Sezgisel bir kuraldır; tek başına karar verdirmez.'],
+  ma200_test: ['Fiyatın MA200’e dokunup üstünde kapanması.', 'Tutarsa “son kale” savunulmuş olur. Kırılırsa uzun vadeli yapı bozulur.'],
+  yatay: ['Fiyatın dar bir bantta yatay seyretmesi.', 'Zaman kaybı ve testere riski taşır. Çıkış yönü hacimle belli olur.'],
+  yatay_sonrasi: ['Uzun yataydan sonra hacimli çıkış.', 'Sağlıklı bir yükselişin başlangıcı olabilir. Hacimsiz çıkışa güvenme.'],
+  v_hareket: ['5 mumda 4 ATR’den fazla hızlı hareket.', 'Taban oluşmadan gelen hızlı hareket sert geri dönüş getirebilir; kovalamak riskli.'],
+  uzun_mum: ['Mum aralığının 2,5 ATR’den büyük olması.', 'Uzun mumdan sonra ortalamaların yetişmesi için yatay beklenir; hemen kovalama.'],
+  fraktal_destek: ['En yakın fraktal destek ve direnç bölgesi (pin mumunun iğnesi ile gövde ucu arası).', 'Destekte alıcı, dirençte satıcı beklenir. Fiyat 1 ATR içindeyse etkisi artar.'],
+  fib_sig: ['Geri çekilmenin 0,382’yi geçmemesi.', 'Sığ geri çekilme trendin güçlü olduğunu gösterir.'],
+  william_bolge: ['En uzun mumun (William filtresi) oluşturduğu destek/direnç bölgesi.', 'Bölgenin içindeyse ya da hemen yanındaysa etkisi güçlü; hacimle geçilirse yön teyidi olur.'],
+  william_gecis: ['William direncinin hacimle yukarı geçilmesi.', 'Hacimliyse “boyalı bölge” aşılmış demektir, güçlüdür. Hacimsizse sahte olabilir.'],
+  ust_pin: ['Uzun üst iğneli mum.', 'Yukarıda satış baskısı var. Tepede çıkıyorsa uzak durma uyarısıdır.'],
+  alt_pin: ['Destek bölgesinde uzun alt iğneli mum.', 'Alıcılar fiyatı geri aldı. Destek tutuyor işareti; sonraki mumun teyit etmesi gerekir.'],
+  bolge_yaklasma: ['Desteğe yaklaşırken hacim.', 'Hacimsiz yaklaşma sekme ihtimali, hacimli yaklaşma kırılım riski demektir.'],
+  destek_ust_uste: ['3 ATR içinde birden çok destek ya da direnç olması.', 'Altta çok destek varsa düşüş kolay durur. Üstte çok direnç varsa yükseliş zorlanır.'],
+  destek_kirildi: ['Desteğin kapanışla aşağı kırılması.', 'Hacimliyse retest sonrası düşüş beklenir. Hacimsizse sahte kırılım olabilir.'],
+  fib_618_donus: ['Fiyatın 0,618 fib seviyesinden dönmesi.', '0,618 kritik geri çekilme seviyesi. Tutarsa trend sürer.'],
+  fib_618_kirilim: ['0,618 seviyesinin kırılması.', 'Kırılırsa kursa göre hedef 1,618; geri çekilme derinleşiyor demektir.'],
+  fib_786_gecis: ['0,786’nın hacimle geçilmesi.', 'İlk hedef 1,114, sonra 1,618.'],
+  fib_1114: ['1,114 fib seviyesi.', 'Kapı gibi durur. Üstünde kapanış 1,272–1,414 hedeflerini açar; reddedilirse düşüş gelir.'],
+  fib_1114_red: ['1,114 ya da 1,272’den reddedilme.', 'Düşüş sinyali: yukarı denemede satıcı çıktı.'],
+  fib_272: ['−0,272 seviyesine dokunma.', 'Sonrasında 0,707–0,786 bölgesine geri çekilme beklenir.'],
+  fib_382_hacimsiz: ['0,382’nin hacimsiz kırılması.', 'Zayıf kırılım; geri dönebilir.'],
+  tfib: ['Trend temelli (3 noktalı) fib hedefleri.', 'Geçerliyse hedefler izlenir. Fiyat iptal seviyesini kaybederse yok sayılır.'],
+  dirgen: ['Schiff dirgeni: medyan çizgi ve kanal.', 'Medyanın üstü olumlu. Kanal dışına çıkış güçlü hareket ya da aşırılık işaretidir.'],
+  hiz_fani: ['Fib hız fanı çizgileri.', '0,786 çizgisinin altı düşüş trendi anlamına gelir.'],
+  fib_kanal: ['Fib kanalının kırılması.', 'Yukarı kırılım ivme artışı, aşağı kırılım zayıflama demektir.'],
+  cmf_sifir: ['CMF (para akışı) sıfırın üstünde mi altında mı.', 'Üstü alım baskısı, altı satış baskısı.'],
+  mfi_50: ['MFI’nin 50’ye göre konumu.', '50 üstü para girişi (olumlu), altı para çıkışı (olumsuz).'],
+  kirilim_hacmi: ['Kırılım mumunun hacminin 20 mum ortalamasına oranı.', '1,5 kat ve üstü güvenilir. Altı sahte kırılım olabilir.'],
+  mfi_10: ['MFI’nin 10’a değmesi.', 'Kursun “kesin al” dediği aşırı satım bölgesi. Sezgisel; teyit mumuyla birlikte değerlendir.'],
+  mfi_90: ['MFI 90 üstü.', 'Aşırı alım. Yükseliş yorulabilir; kâr almayı düşün.'],
+  cmf_kesis: ['CMF’nin sıfırı yukarı kesmesi.', 'Alım baskısı başlıyor, fiyatı yukarı iter.'],
+  cmf_yaniltici: ['Fiyat artarken CMF’nin sıfırın altında kalması.', 'Yükseliş para akışıyla desteklenmiyor; yanıltıcı olabilir.'],
+  cmf_guclu: ['CMF’nin 0,2’nin üstünde olması.', 'Güçlü alım. Kursa göre 3–4 gün rahat yükseliş beklenir.'],
+  di_sifir: ['Demand Index’in sıfıra göre konumu (yaklaşık hesap).', 'Sıfır üstü talep güçlü, altı zayıf.'],
+  di_sahte: ['Fiyat düşerken talebin sabit kalması.', 'Düşüş sahte olabilir; toparlanma ihtimali var.'],
+  di_zayif: ['Fiyat artarken talebin azalması.', 'Yükseliş zayıflıyor; dikkat.'],
+  hacimsiz_yatay: ['Hacimsiz yatay seyir.', 'Mal toplama ya da dağıtma olabilir. Çıkış yönü hacimle belli olur.'],
+  mfi_uyumsuz: ['Fiyat ile MFI’nin zıt yöne gitmesi.', 'Uyumsuzluk dönüş habercisidir; teyit mumu bekle.'],
+  rsi_50: ['RSI’ın 50’ye göre konumu.', '50 üstü alıcılar kontrolde, altı satıcılar kontrolde. Altındayken puan en fazla 50 olabilir.'],
+  rsi_50_kesis: ['RSI’ın 50’yi aşağıdan kesmesi.', 'Momentum alıcıya geçiyor.'],
+  rsi_uyumsuz: ['Fiyat yeni tepe yaparken RSI’ın düşük tepe yapması (veya tersi dipte).', 'Tepe uyumsuzluğu kâr al, dip uyumsuzluğu dönüş ihtimali demektir. Teyit gerekir.'],
+  macd_sinyal: ['MACD’nin sinyal çizgisine göre konumu.', 'Üstünde boğa momentumu, altı zayıf. MACD boğa tarafındaysa negatif momentum puanları yarıya iner.'],
+  macd_sifir: ['MACD’nin sıfıra göre konumu.', 'Sıfır üstü orta vadede olumlu, altı olumsuz.'],
+  fisher: ['Fisher dönüştürücü kesişimi.', 'Yukarı kesişim alım, aşağı kesişim zayıflama işareti.'],
+  wt: ['WaveTrend’in ±53 bölgesindeki kesişimi.', 'Aşırı bölgedeki kesişim dönüş sinyalidir.'],
+  vortex: ['VI+ ile VI−’nin konumu.', 'VI+ üstteyse yukarı trend, değilse aşağı trend.'],
+  rsi_50_alti: ['RSI’ın 50’nin altında olması.', 'Kursa göre “kesinlikle işlemde olunmaz” bölgesi.'],
+  rsi_yukaridan: ['RSI’ın 70’ten inip 50–60 arasında olması.', 'Yükseliş bitmiş olabilir; işlemde olma.'],
+  rsi_70: ['RSI’ın 70’in üstünde olması.', 'Güçlü momentum (kursa göre en az %7–8 potansiyel), ama aşırı alım riski de vardır.'],
+  rsi_70_yok: ['Yükselişte RSI’ın 70’i geçememesi.', 'Güç eksikliği; yükseliş zayıf.'],
+  rsi_trend: ['RSI trend çizgisinin fiyattan önce kırılması.', 'Öncü sinyal; fiyatın ardından gelmesi beklenir.'],
+  rsi_dip_yesil: ['Dip uyumsuzluğu ve ardından yeşil mum.', 'Dönüş teyidi olarak okunur.'],
+  macd_0_kesis: ['Sıfır üstünde taze MACD kesişimi.', 'Trend içinde yeni ivme.'],
+  macd_aci: ['MACD çizgisinin açısının açılması.', 'Sert hareket ihtimali; yöne dikkat et.'],
+  macd_uyumsuz: ['Fiyat ile MACD’nin zıt yöne gitmesi.', 'Sıfırın altındaysa riskli. Dönüş habercisi olabilir.'],
+  smi_giris: ['SMI’ın −0,5 altından dönmesi.', 'Giriş fırsatı olarak okunur.'],
+  smi_tepe: ['SMI’ın +0,5 üstünde dönmesi.', 'MACD kesişimi yaklaşıyor; yükseliş yorulabilir.'],
+  vortex_agiz: ['Vortex çizgileri arasındaki ağzın açılması.', 'Trend gücü artıyor.'],
+  hafta_ma9: ['Haftalık MA9 ortalamasına göre konum.', 'Üstünde kaldıkça ana trend sağlam kabul edilir.'],
+  tf4_ema: ['4 saatlik EMA5/10 yönünün günlükle aynı olup olmadığı.', 'Uyum teyit eder, uyumsuzluk erken uyarıdır.'],
+  tf4_bozulma: ['4 saatlikte fiyatın MA9/20/50 altına inmesi.', 'Alt zaman dilimindeki bozulma üst zaman dilimine yayılabilir.'],
+  tf4_erken: ['4 saatlik tüm ortalamaların üstünde, günlük MA200 altında.', 'Erken dönüş işareti; günlük teyit gelmeden riskli.'],
+  // ── özel başlıklar (rule olmayanlar) ──
+  _skor: ['Puan nasıl okunur?', '0–100 arası. Kuralların ağırlıklı toplamıdır; kapılar (MA200 altı, EMA5/10 aşağı, RSI 50 altı) puanı sınırlar. Kesin kurallar tam, sezgisel (kursa özgü) kurallar ayarlanan ağırlıkla girer.', '75+ güçlü, 60+ olumlu, 45–60 kararsız, 30–45 zayıf, altı uzak dur. Puan, üstte seçtiğin zaman diliminin mumlarına göre hesaplanır. Yatırım tavsiyesi değildir.'],
+  _g_ma200: ['Kapı: MA200 altı', 'Fiyat 200 mumluk ortalamanın altında.', 'Puan en fazla 40 olur. Ortalamanın üstüne çıkmadan güçlü sinyal sayılmaz.'],
+  _g_ema: ['Kapı: EMA5/10 aşağı', 'Kısa vadeli trend yönü aşağı.', 'Puan en fazla 55 olur. EMA5 tekrar EMA10 üstüne çıkınca kalkar.'],
+  _g_rsi: ['Kapı: RSI 50 altı', 'Satıcılar baskın.', 'Puan en fazla 50 olur. RSI 50 üstüne dönünce kalkar.'],
+  _kar: ['Kâr al uyarısı', 'Yükselişin yorulduğuna dair işaretler (ör. RSI/MFI tepe uyumsuzluğu).', 'Pozisyon varsa kâr almak ya da stop yükseltmek düşünülür; yeni giriş için beklemek mantıklı.'],
+  _dip_asama: ['Dipten dönüş aşamaları', 'Maliyetlenme → Eşikte → Çıkış → Gecikmiş. Fiyatın ortalamalara ve kutu tavanına göre yeri.', 'Maliyetlenmede bekle, Eşikte hazırlan, tavanın üstünde kapanış (tercihen hacimli) çıkışı onaylar. Gecikmişte kovalama.'],
+  _dip_cikis: ['Çıkış seviyesi', 'Sıkışma kutusunun tavanı.', 'Bu seviyenin üstünde kapanış çıkışı onaylar; hacim 1,5× ortalamaysa daha güvenilir.'],
+  _dip_dip: ['Kutunun dibi', 'Sıkışma kutusunun alt sınırı.', 'Altında kapanış kurulumu bozar (aşağı kırılım).'],
+  _trend_uzun: ['Uzun vadeli trend çizgisi', 'Dönemin gerçek tepesinden (düşen) ya da dibinden (yükselen) başlayan çizgi.', 'Kırılması büyük resmin değiştiğini gösterir. Hacimsiz kırılım sahte olabilir; fib kırılımdan sonra çekilir.'],
+  _trend_kisa: ['Kısa vadeli trend çizgisi', 'Tepeden/dipten başlayıp en yakın pinlere yaslanan en dik çizgi.', 'Kapanışla kırılması erken sinyaldir. Kırılmadıkça trend sürüyor sayılır.'],
+  _fib: ['Fib seviyeleri', 'Kırılan trendin tepe ve dibi arasına çekilen oranlar (0,382 / 0,618 / 0,786 / 1,114…).', '0,618 ve 0,786 geri çekilme bölgeleri, 1,114 ve üstü hedef bölgeleridir. Fiyatın altındaki seviye destek, üstündeki direnç gibi okunur.'],
+  _destek: ['En yakın destek', 'Fiyatın altındaki en yakın fraktal destek bölgesinin üst ucu.', 'Fiyat buraya yaklaşırsa alıcı beklenir; kapanışla kırılırsa bir sonraki desteğe inebilir.'],
+  _direnc: ['En yakın direnç', 'Fiyatın üstündeki en yakın fraktal direnç bölgesinin alt ucu.', 'Fiyat buraya yaklaşırsa satıcı beklenir; hacimli kapanışla geçilirse yön yukarı döner.'],
+  _ma200v: ['MA200 (uzun vade)', 'Son 200 mumun ortalama kapanışı.', 'Üstünde kalmak boğa, altı ayı bölgesi. Fark ne kadar büyükse fiyat ortalamadan o kadar uzaklaşmıştır.'],
+  _fibhedef: ['Sıradaki fib hedefi', 'Trend temelli fib’in fiyata en yakın bir sonraki hedefi.', 'Fiyat bu seviyeye gelince kâr alma ya da direnç bölgesi olarak izlenir.'],
+  _kesin: ['Kesin kurallar puanı', 'Yalnızca tanımı net, standart teknik analiz kurallarıyla hesaplanan puan.', 'Daha güvenilir kısımdır. Sezgisel puanla büyük fark varsa kursa özgü iddialar ağırlık yapıyordur.'],
+  _sezgisel: ['Sezgisel kurallar puanı', 'Kursa özgü ya da yoruma açık kuralların puanı.', 'Geri testle doğrulanmadıkça temkinli oku.'],
+  _m_dip: ['Dip sıkışması modülü', 'Dipte ortalamaların iç içe geçmesi ve çıkış hazırlığı.', 'Yüksekse maliyetlenme kurulumu güçlü demektir.'],
+  _m_trend: ['Trend ve ortalamalar modülü', 'MA dizilimi, eğimler, trend çizgileri.', 'Yüksekse yön yukarı, düşükse aşağı.'],
+  _m_yapi: ['Yapı modülü', 'Pin, William, fib ve dirgen kuralları.', 'Destek-direnç ve fib seviyelerinin fiyat için ne söylediğini toplar.'],
+  _m_akis: ['Para akışı ve hacim modülü', 'CMF, MFI, hacim ve talep göstergeleri.', 'Yüksekse yükselişi para girişi destekliyor.'],
+  _m_mom: ['Momentum modülü', 'RSI, MACD, Fisher, WT, Vortex, SMI.', 'Yüksekse ivme alıcıda, düşükse satıcıda.'],
+  _m_mtf: ['Zaman dilimi uyumu modülü', 'Haftalık MA9 ve 4 saatlik yönün günlükle uyumu.', 'Yüksekse zaman dilimleri aynı yönde.'],
+};
+
+const ib = k => `<button type="button" class="ib" data-info="${k}" aria-label="Açıklama">i</button>`;
+const TFL = { '4h': '4 saatlik', '1d': 'günlük', '1w': 'haftalık', '1m': 'aylık' };
+function showTip(k) {
+  const el = $('#tip'); let title, ne, yo, badge = '';
+  if (k[0] === '_') [title, ne, yo] = INFO[k] || [k, '', '']; else { const R = CR.RULE[k]; title = R ? R.label : k; [ne, yo] = INFO[k] || ['', '']; badge = R ? `<span class="muted small">${R.tier === 'K' ? 'Kesin kural' : 'Sezgisel kural'} · PDF s.${R.p}</span>` : ''; }
+  el.innerHTML = `<div class="tiph"><b>${esc(title)}</b><button type="button" class="tipx" aria-label="Kapat">×</button></div>${badge ? `<div style="margin:2px 0 6px">${badge}</div>` : ''}${ne ? `<p><b>Ne ölçer:</b> ${esc(ne)}</p>` : ''}${yo ? `<p><b>Nasıl yorumlanır:</b> ${esc(yo)}</p>` : ''}`;
+  el.hidden = false;
+}
+function bulletsR(res, sign, n) { return res.rules.filter(r => sign > 0 ? r.p > 0.3 : r.p < -0.3).sort((a, b) => wOf(b) - wOf(a)).slice(0, n); }
 function bullets(res, sign, n) { return res.rules.filter(r => sign > 0 ? r.p > 0.3 : r.p < -0.3).sort((a, b) => wOf(b) - wOf(a)).slice(0, n).map(plainOf); }
 const GATE_TXT = { g_ma200: 'Uzun vadeli ortalamanın altında olduğu için puan en fazla 40 olabilir.', g_ema: 'Kısa vadeli trend aşağı olduğu için puan en fazla 55 olabilir.', g_rsi: 'Satıcılar baskın (RSI 50 altı) olduğu için puan en fazla 50 olabilir.' };
 
@@ -1582,7 +1712,7 @@ function evalCoin(x) {
   if (x.J) { const tEnd = d.t[i] + 864e5; let k = x.d4.c.length - 2; while (k > 0 && x.d4.t[k] + 4 * 36e5 > tEnd) k--; tf4 = { I: x.J, d: x.d4, i: k }; }
   return w.evaluate(i, tf4);
 }
-function rescore() { for (const x of S.coins) x.res = evalCoin(x); S.btc = S.coins.find(x => /^BTC/.test(x.sym)) || null; render(); }
+function rescore() { for (const x of S.coins) { x.res = evalCoin(x); x.tfres = {}; } S.btc = S.coins.find(x => /^BTC/.test(x.sym)) || null; render(); }
 
 // ───────── Genel ─────────
 function setStatus(txt, cls) { $('#status').innerHTML = `<span class="dot ${cls}"></span>${txt}`; }
@@ -1663,96 +1793,132 @@ function renderList() {
   document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel));
 }
 
+// ───────── Zaman dilimine göre veri / puan ─────────
+function tfData(x, tf) {
+  if (tf === '1d') return { d: x.d, I: x.I };
+  if (tf === '4h') return x.d4 && x.d4.c.length >= 60 ? { d: x.d4, I: x.J || (x.J4 = x.J4 || CR.indicators(x.d4)) } : null;
+  const k = tf === '1w' ? 'dw' : 'dm';
+  const d = x[k] || (x[k + 'r'] = x[k + 'r'] || (tf === '1w' ? CR.toWeekly(x.d) : CR.toMonthly(x.d)));
+  const ik = 'I' + k; if (!x[ik] || x[ik + 'n'] !== d) { x[ik] = CR.indicators(d); x[ik + 'n'] = d; }
+  return { d, I: x[ik] };
+}
+function evalTF(x, tf) {
+  if (tf === '1d') return x.res;
+  const D = tfData(x, tf); if (!D) return null;
+  x.tfres = x.tfres || {}; const key = tf + (D.d === x.dw || D.d === x.dm ? 'R' : 'r');
+  if (key in x.tfres) return x.tfres[key];
+  const i = D.d.c.length - 2; let res = null;
+  if (i >= (tf === '4h' ? 100 : 30)) { try { res = new CR.Walker(D.d, D.I, opts()).evaluate(i, null); if (!res || !isFinite(res.score)) res = null; } catch (e) { res = null; } }
+  return x.tfres[key] = res;
+}
+// Haftalık / aylık için Binance'ten gerçek geçmiş (MA200 için daha fazla mum); olmazsa günlükten türetilir
+async function ensureTF(x, tf) {
+  if (S.source !== 'live' || (tf !== '1w' && tf !== '1m')) return;
+  const k = tf === '1w' ? 'dw' : 'dm'; if (x[k] || x[k + 'Try']) return; x[k + 'Try'] = true;
+  try {
+    const rows = await get(`/api/v3/klines?symbol=${x.sym}&interval=${tf === '1w' ? '1w' : '1M'}&limit=1000`);
+    if (rows && rows.length > 10) { x[k] = toSeries(rows); if (x.models) delete x.models[tf]; if (S.sel === x.sym && S.tcTF === tf) renderDetail(); }
+  } catch (e) {}
+}
+
 // ───────── Coin sayfası ─────────
 function renderDetail() {
   const el = $('#detail'), x = S.coins.find(c => c.sym === S.sel);
   if (!x || !x.res) { el.innerHTML = ''; return; }
-  shownSym = x.sym;
-  const r = x.res, ctx = r.ctx, I = x.I, i = r.i, d = x.d, chg = d.c[i] / d.c[i - 1] - 1;
-  const pos = bullets(r, 1, 4), neg = bullets(r, -1, 4);
-  const warn = [...(S.gates ? r.gates.map(g => GATE_TXT[g]) : []), ...(r.badges.some(b => b.k === 'kar') ? ['Yükseliş yorgunluk gösteriyor: kâr almayı düşünün.'] : [])];
-  const dp = ctx.dip;
-  const dipCard = dp && dp.stage !== 0 ? `<div class="card">
-      <div class="sect">Dipten dönüş kurulumu</div>
+  const keep = shownSym === x.sym ? el.scrollTop : 0; shownSym = x.sym;
+  let tf = TF[S.tcTF] ? S.tcTF : '1d'; if (!tfData(x, tf)) tf = '1d';
+  ensureTF(x, tf);
+  const D = tfData(x, tf), r = evalTF(x, tf), I = D.I, d = D.d;
+  const has4 = !!(x.d4 && x.d4.c.length >= 60);
+  const head = `<div class="sheethead"><button class="iconbtn close" type="button" id="btnClose" aria-label="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h2>${esc(x.sym.replace(/USDT$/, ''))}<span class="muted small" style="font-weight:500"> / USDT</span></h2><button type="button" class="star big ${isFav(x.sym) ? 'on' : ''}" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</button></div>
+    <div class="tfbar"><div class="seg" data-tcseg>${Object.entries(TF).map(([k, v]) => `<button type="button" data-tc="${k}" aria-pressed="${tf === k}" ${k === '4h' && !has4 ? 'disabled' : ''}>${v.t}</button>`).join('')}</div><span class="small muted">Puan ve yorumlar bu zaman dilimine göre</span></div>`;
+  let body = '';
+  const chartCard = `<div class="card">
+      <div class="sect" style="display:flex;justify-content:space-between;align-items:center">Grafik · ${TF[tf].t} <button type="button" class="btn small" id="btnFS" style="padding:5px 10px">⤢ Tam ekran</button></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:2px"></i>Kısa trend</span><span><i style="background:var(--bad);height:4px"></i>Uzun trend (kalın)</span><span><i style="background:var(--fib-o)"></i>Fib</span></div>
+      <canvas class="chart" id="chart" aria-label="${TFL[tf]} mum grafiği"></canvas>
+      <div class="readout" id="readout">Tam ekran için grafiğe dokunun.</div>
+    </div>`;
+  if (!r) {
+    body = `<div class="card say"><div class="sect">Puan</div><p class="help" style="margin:0">Bu zaman diliminde puan için yeterli geçmiş yok (${D.d.c.length} mum). ${tf === '1m' || tf === '1w' ? 'Genç coinlerde haftalık ve aylık puan çıkmayabilir.' : ''} Aşağıda trend ve grafik yine de gösteriliyor.</p></div>${trendCard(x, tf)}${chartCard}`;
+  } else {
+    const ctx = r.ctx, i = r.i, chg = d.c[i] / d.c[i - 1] - 1;
+    const pos = bulletsR(r, 1, 4), neg = bulletsR(r, -1, 4);
+    const warn = [...(S.gates ? r.gates.map(g => [GATE_TXT[g], '_' + g]) : []), ...(r.badges.some(b => b.k === 'kar') ? [['Yükseliş yorgunluk gösteriyor: kâr almayı düşünün.', '_kar']] : [])];
+    const dp = ctx.dip;
+    const dipCard = tf === '1d' && dp && dp.stage !== 0 ? `<div class="card">
+      <div class="sect">Dipten dönüş kurulumu ${ib('_dip_asama')}</div>
       <h3>${STAGE[dp.stage]} · <span class="num">${dp.score.toFixed(0)}/100</span></h3>
       ${dp.stage > 0 ? `<div class="steps">${[1, 2, 3, 4].map(k => `<div class="step ${k < dp.stage ? 'done' : k === dp.stage ? 'now' : ''}">${STAGE_SHORT[k]}</div>`).join('')}</div>` : ''}
       <p class="help" style="margin:6px 0 10px">Fiyat zirvesinden %${(dp.drop * 100).toFixed(0)} düşmüş, ${dp.dur} gündür 20/50/100/200 günlük ortalamalar iç içe (aralarındaki fark %${(dp.avgDisp * 100).toFixed(1)}). ${dp.stage === 1 ? `Yukarı çıkış için ${fmt(dp.boxH)} üstünde kapanış beklenir.` : dp.stage === 2 ? `Fiyat tüm ortalamaların üstünde; ${fmt(dp.boxH)} üstünde kapanış çıkışı onaylar.` : dp.stage === 3 ? `${fmt(dp.boxH)} seviyesi ${dp.volBreak ? 'yüksek hacimle' : 'düşük hacimle'} geçildi.` : dp.stage === 4 ? 'Çıkış gerçekleşmiş ama fiyat epey uzaklaşmış.' : `Kutunun dibi (${fmt(dp.boxL)}) kırıldı.`}</p>
-      <div class="tiles"><div class="tile"><div class="k">Çıkış seviyesi</div><div class="v">${fmt(dp.boxH)}</div></div><div class="tile"><div class="k">Kutunun dibi</div><div class="v">${fmt(dp.boxL)}</div></div></div>
+      <div class="tiles"><div class="tile"><div class="k">Çıkış seviyesi ${ib('_dip_cikis')}</div><div class="v">${fmt(dp.boxH)}</div></div><div class="tile"><div class="k">Kutunun dibi ${ib('_dip_dip')}</div><div class="v">${fmt(dp.boxL)}</div></div></div>
     </div>` : '';
-  const tiles = [];
-  if (ctx.support) tiles.push(['En yakın destek', fmt(ctx.support[1]), pc(ctx.support[1] / r.close - 1) + ' aşağıda']);
-  if (ctx.resistance) tiles.push(['En yakın direnç', fmt(ctx.resistance[0]), pc(ctx.resistance[0] / r.close - 1) + ' yukarıda']);
-  if (isFinite(I.sma200[i])) tiles.push(['MA200 (uzun vade)', fmt(I.sma200[i]), pc(I.sma200[i] / r.close - 1) + ' fark']);
-  if (ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1)]); }
-  const fired = new Set(r.rules.map(z => z.id));
-  el.innerHTML = `
-    <div class="sheethead"><button class="iconbtn close" type="button" id="btnClose" aria-label="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h2>${esc(x.sym.replace(/USDT$/, ''))}<span class="muted small" style="font-weight:500"> / USDT</span></h2><button type="button" class="star big ${isFav(x.sym) ? 'on' : ''}" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</button></div>
+    const tiles = [];
+    if (ctx.support) tiles.push(['En yakın destek', fmt(ctx.support[1]), pc(ctx.support[1] / r.close - 1) + ' aşağıda', '_destek']);
+    if (ctx.resistance) tiles.push(['En yakın direnç', fmt(ctx.resistance[0]), pc(ctx.resistance[0] / r.close - 1) + ' yukarıda', '_direnc']);
+    if (isFinite(I.sma200[i])) tiles.push(['MA200 (uzun vade)', fmt(I.sma200[i]), pc(I.sma200[i] / r.close - 1) + ' fark', '_ma200v']);
+    if (ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1), '_fibhedef']); }
+    const fired = new Set(r.rules.map(z => z.id));
+    const dt = new Date(r.t), L = { day: 'numeric', month: 'long' };
+    const when = tf === '4h' ? dt.toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' 4 saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
+    const noMA = !isFinite(I.sma200[i]) ? `<p class="small muted" style="margin:8px 0 0">Bu zaman diliminde MA200 için yeterli mum yok (${d.c.length}); ilgili kurallar devre dışı.</p>` : '';
+    body = `
     <div class="card">
       <div class="hero"><span class="score ${scoreCls(r.label.k)}">${r.score.toFixed(0)}</span>
-        <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]}</div><div class="p">${fmt(r.close)} <span class="${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></div><div class="small muted">${new Date(r.t).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} günlük kapanışı</div></div></div>
+        <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]} ${ib('_skor')}</div><div class="p">${fmt(r.close)} <span class="${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></div><div class="small muted">${when}</div></div></div>
       <div class="meter"><i style="left:${Math.max(1, Math.min(99, r.score))}%"></i></div>
-      <div class="meterlab"><span>Uzak dur</span><span>Zayıf</span><span>Kararsız</span><span>Olumlu</span></div>
+      <div class="meterlab"><span>Uzak dur</span><span>Zayıf</span><span>Kararsız</span><span>Olumlu</span></div>${noMA}
     </div>
     <div class="card say">
       <div class="sect">Neden bu puan?</div>
-      ${pos.length ? `<ul>${pos.map(t => `<li><span class="ic p">+</span>${esc(t)}</li>`).join('')}</ul>` : ''}
-      ${neg.length ? `<ul>${neg.map(t => `<li><span class="ic n">−</span>${esc(t)}</li>`).join('')}</ul>` : ''}
-      ${warn.length ? `<ul>${warn.map(t => `<li><span class="ic w">!</span>${esc(t)}</li>`).join('')}</ul>` : ''}
+      ${pos.length ? `<ul>${pos.map(z => `<li><span class="ic p">+</span>${esc(plainOf(z))} ${ib(z.id)}</li>`).join('')}</ul>` : ''}
+      ${neg.length ? `<ul>${neg.map(z => `<li><span class="ic n">−</span>${esc(plainOf(z))} ${ib(z.id)}</li>`).join('')}</ul>` : ''}
+      ${warn.length ? `<ul>${warn.map(([t, k]) => `<li><span class="ic w">!</span>${esc(t)} ${ib(k)}</li>`).join('')}</ul>` : ''}
     </div>
     ${dipCard}
-    ${trendCard(r, x)}
-    <div class="card">
-      <div class="sect" style="display:flex;justify-content:space-between;align-items:center">Grafik <button type="button" class="btn small" id="btnFS" style="padding:5px 10px">⤢ Tam ekran</button></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:2px"></i>Kısa trend</span><span><i style="background:var(--bad);height:4px"></i>Uzun trend (kalın)</span>${ctx.fib ? '<span><i style="background:var(--fib-o)"></i>Fib</span>' : ''}${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
-      <canvas class="chart" id="chart" aria-label="Günlük mum grafiği"></canvas>
-      <div class="readout" id="readout">Tam ekran için grafiğe dokunun.</div>
-    </div>
-    ${tiles.length ? `<div class="card"><div class="sect">Önemli seviyeler</div><div class="tiles">${tiles.map(([k, v, dd]) => `<div class="tile"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div><div class="d">${esc(dd)}</div></div>`).join('')}</div></div>` : ''}
+    ${trendCard(x, tf)}
+    ${chartCard}
+    ${tiles.length ? `<div class="card"><div class="sect">Önemli seviyeler</div><div class="tiles">${tiles.map(([k, v, dd, key]) => `<div class="tile"><div class="k">${esc(k)} ${ib(key)}</div><div class="v">${esc(v)}</div><div class="d">${esc(dd)}</div></div>`).join('')}</div></div>` : ''}
     <div class="card"><details class="more"><summary>Teknik ayrıntılar (${r.rules.length} kural)</summary>
-      <div class="tiles" style="margin:8px 0 12px"><div class="tile"><div class="k">Kesin kurallar puanı</div><div class="v">${r.kesin.toFixed(0)}</div></div><div class="tile"><div class="k">Sezgisel kurallar puanı</div><div class="v">${r.sezgisel.toFixed(0)}</div></div></div>
-      ${Object.entries(CR.MODULES).map(([m, M]) => `<div class="mod"><span>${M.label}</span><span class="bar"><i style="width:${r.mods[m].toFixed(0)}%"></i></span><span class="num" style="text-align:right">${r.mods[m].toFixed(0)}</span></div>`).join('')}
-      <div style="margin-top:10px">${[...r.rules].sort((a, b) => Math.abs(b.p) - Math.abs(a.p)).map(z => { const R = CR.RULE[z.id], v = z.p * (z.tier === 'S' ? S.wS : 1); return `<div class="rr"><span class="tier ${z.tier}" title="${z.tier === 'K' ? 'Kesin' : 'Sezgisel'}">${z.tier}</span><span><b>${esc(R.label)}</b> <span class="muted small">s.${R.p}</span><br><span class="note">${esc(z.note)}</span></span><span class="pts ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span></div>`; }).join('')}</div>
+      <div class="tiles" style="margin:8px 0 12px"><div class="tile"><div class="k">Kesin kurallar puanı ${ib('_kesin')}</div><div class="v">${r.kesin.toFixed(0)}</div></div><div class="tile"><div class="k">Sezgisel kurallar puanı ${ib('_sezgisel')}</div><div class="v">${r.sezgisel.toFixed(0)}</div></div></div>
+      ${Object.entries(CR.MODULES).map(([m, M]) => `<div class="mod"><span>${M.label} ${ib('_m_' + m)}</span><span class="bar"><i style="width:${r.mods[m].toFixed(0)}%"></i></span><span class="num" style="text-align:right">${r.mods[m].toFixed(0)}</span></div>`).join('')}
+      <div style="margin-top:10px">${[...r.rules].sort((a, b) => Math.abs(b.p) - Math.abs(a.p)).map(z => { const R = CR.RULE[z.id], v = z.p * (z.tier === 'S' ? S.wS : 1); return `<div class="rr"><span class="tier ${z.tier}" title="${z.tier === 'K' ? 'Kesin' : 'Sezgisel'}">${z.tier}</span><span><b>${esc(R.label)}</b> ${ib(z.id)} <span class="muted small">s.${R.p}</span><br><span class="note">${esc(z.note)}</span></span><span class="pts ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span></div>`; }).join('')}</div>
       <p class="small muted" style="margin-top:8px">Ateşlenmeyen ${CR.RULES.length - fired.size} kural puanı etkilemedi.</p>
     </details></div>`;
+  }
+  el.innerHTML = head + body;
+  el.scrollTop = keep;
   $('#btnClose').onclick = closeSheet;
   $('#btnFS').onclick = () => openFS(x);
-  bindTC(x);
   drawChart(x);
 }
 function openSheet() { $('#detail').classList.add('open'); document.body.style.overflow = 'hidden'; const x = S.coins.find(c => c.sym === S.sel); if (x) requestAnimationFrame(() => drawChart(x)); }
 function closeSheet() { $('#detail').classList.remove('open'); document.body.style.overflow = ''; }
 
-function trendCard(r, x) {
-  let tf = S.tcTF; if (!TF[tf]) tf = '1d';
-  let m = buildModel(x, tf, FS.fibSrc); if (!m) { tf = '1d'; m = buildModel(x, tf, FS.fibSrc); }
+function trendCard(x, tf) {
+  const m = buildModel(x, tf, FS.fibSrc);
   const i = m.last, lines = [], U = { '4h': ['saat', 4], '1d': ['gün', 1], '1w': ['hafta', 1], '1m': ['ay', 1] }[tf];
   const ago = k => i - k === 0 ? (tf === '1d' ? 'bugün' : 'bu mumda') : `${(i - k) * U[1]} ${U[0]} önce`;
-  const say = (t, name) => {
+  const say = (t, name, key) => {
     if (!t) return;
-    if (t.up) lines.push(t.brk > 0 ? `<li><span class="ic n">↘</span>${name} yükselen trend ${ago(t.brk)} aşağı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic p">↗</span>${name} yükselen trend sağlam; çizgi şu an ${fmt(t.now)}. Altında kapanış trendi bozar.</li>`);
-    else lines.push(t.brk > 0 ? `<li><span class="ic p">↗</span>${name} düşen trend ${ago(t.brk)} yukarı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic n">↘</span>${name} düşen trend sürüyor; çizgi şu an ${fmt(t.now)}. Üstünde kapanış kırılım olur.</li>`);
+    if (t.up) lines.push(t.brk > 0 ? `<li><span class="ic n">↘</span>${name} yükselen trend ${ago(t.brk)} aşağı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}. ${ib(key)}</li>` : `<li><span class="ic p">↗</span>${name} yükselen trend sağlam; çizgi şu an ${fmt(t.now)}. Altında kapanış trendi bozar. ${ib(key)}</li>`);
+    else lines.push(t.brk > 0 ? `<li><span class="ic p">↗</span>${name} düşen trend ${ago(t.brk)} yukarı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}. ${ib(key)}</li>` : `<li><span class="ic n">↘</span>${name} düşen trend sürüyor; çizgi şu an ${fmt(t.now)}. Üstünde kapanış kırılım olur. ${ib(key)}</li>`);
   };
   const same = (p, q) => p && q && p.a.j === q.a.j && p.b.j === q.b.j;
-  say(m.trL.down, 'Uzun vadeli'); say(m.trL.up, 'Uzun vadeli');
-  if (!same(m.tr.down, m.trL.down)) say(m.tr.down, 'Kısa vadeli'); if (!same(m.tr.up, m.trL.up)) say(m.tr.up, 'Kısa vadeli');
+  say(m.trL.down, 'Uzun vadeli', '_trend_uzun'); say(m.trL.up, 'Uzun vadeli', '_trend_uzun');
+  if (!same(m.tr.down, m.trL.down)) say(m.tr.down, 'Kısa vadeli', '_trend_kisa'); if (!same(m.tr.up, m.trL.up)) say(m.tr.up, 'Kısa vadeli', '_trend_kisa');
   if (!lines.length) lines.push('<li><span class="ic w">·</span>Şu an çizilebilecek net bir trend çizgisi yok.</li>');
   const f = m.fb, px = m.d.c[i]; let fibHtml = '';
   if (f) {
     const near = f.levels.filter(z => [0, 0.236, 0.382, 0.5, 0.618, 0.707, 0.786, 0.886, 1, 1.114, 1.272, 1.414, 1.618].includes(z.r));
     const below = near.filter(z => z.price < px).sort((a, b) => b.price - a.price)[0], above = near.filter(z => z.price > px).sort((a, b) => a.price - b.price)[0];
     const keys = [0.382, 0.618, 0.786, 1.114];
-    fibHtml = `<p class="help" style="margin:10px 0 8px"><b>Fib:</b> ${f.from.kind.toLowerCase()}; fib ${f.dir === 'up' ? 'trendin dibinden tepesine' : 'trendin tepesinden dibine'} çekildi.</p>
+    fibHtml = `<p class="help" style="margin:10px 0 8px"><b>Fib ${ib('_fib')}:</b> ${f.from.kind.toLowerCase()}; fib ${f.dir === 'up' ? 'trendin dibinden tepesine' : 'trendin tepesinden dibine'} çekildi.</p>
       <div class="tiles">${below ? `<div class="tile"><div class="k">Alttaki fib (${fibNum(below.r)})</div><div class="v">${fmt(below.price)}</div><div class="d">${pc(below.price / px - 1)}</div></div>` : ''}${above ? `<div class="tile"><div class="k">Üstteki fib (${fibNum(above.r)})</div><div class="v">${fmt(above.price)}</div><div class="d">${pc(above.price / px - 1)}</div></div>` : ''}
       ${keys.map(k => `<div class="tile"><div class="k">Fib ${fibNum(k)}</div><div class="v">${fmt(f.levels.find(z => z.r === k).price)}</div></div>`).join('')}</div>`;
   } else fibHtml = '<p class="help" style="margin:10px 0 0">Trend kırılmadı: kurala göre fib çekilmez.</p>';
-  const has4 = !!(x.d4 && x.d4.c.length >= 60);
-  const seg = `<div class="seg" data-tcseg>${Object.entries(TF).map(([k, v]) => `<button type="button" data-tc="${k}" aria-pressed="${tf === k}" ${k === '4h' && !has4 ? 'disabled' : ''}>${v.t}</button>`).join('')}</div>`;
   const short = m.d.c.length < 60 ? '<p class="small muted" style="margin-top:8px">Bu zaman diliminde az mum var, çizgiler güvenilir olmayabilir.</p>' : '';
-  return `<div class="card say" id="tcard"><div class="tcrow"><div class="sect">Trend çizgisi ve fib</div>${seg}</div><ul>${lines.join('')}</ul>${fibHtml}${short}<p class="small muted" style="margin-top:8px">Puan her zaman günlük grafiğe göre hesaplanır; bu kart seçtiğin zaman dilimini anlatır.</p></div>`;
-}
-function bindTC(x) {
-  const c = $('#tcard'); if (!c) return;
-  c.onclick = e => { const b = e.target.closest('[data-tc]'); if (!b || b.disabled) return; S.tcTF = b.dataset.tc; store.set('tcTF', S.tcTF); c.outerHTML = trendCard(x.res, x); bindTC(x); };
+  return `<div class="card say" id="tcard"><div class="sect">Trend çizgisi ve fib · ${TF[tf].t}</div><ul>${lines.join('')}</ul>${fibHtml}${short}<p class="small muted" style="margin-top:8px">Üstteki zaman dilimi düğmeleriyle 4S / 1G / 1H / 1Ay arasında geçebilirsin.</p></div>`;
 }
 
 // ───────── Grafik ─────────
@@ -1772,8 +1938,8 @@ function buildModel(x, tf, fibSrc) {
   let m = x.models[key];
   if (!m) {
     if (tf === '1d') { const T = x.res.ctx.trend || {}; m = { tf, d: x.d, I: x.I, last: x.res.i, dip: x.res.ctx.dip }; }
-    else if (tf === '1m') { const d = CR.toMonthly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
-    else if (tf === '1w') { const d = CR.toWeekly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
+    else if (tf === '1m') { const d = x.dm || CR.toMonthly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
+    else if (tf === '1w') { const d = x.dw || CR.toWeekly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
     else { if (!x.d4 || x.d4.c.length < 60) return null; const I = x.J || CR.indicators(x.d4); m = { tf, d: x.d4, I, last: x.d4.c.length - 2 }; }
     if (!m.tr) m.tr = m.last > 10 ? CR.trendShort(m.d, m.I, m.last, TF[tf].look) : {};
     m.trL = m.last > 10 ? CR.trendLong(m.d, m.I, m.last, Math.min(TF[tf].lookL, m.last - 2)) : {};
@@ -1911,13 +2077,13 @@ function renderChart(cv, m, view, opt) {
 }
 function dayText(m, i) {
   const d = m.d, I = m.I, dt = new Date(d.t[i]);
-  return `${dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${m.tf === '4h' ? ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === '1w' ? ' haftası' : ''} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
+  return `${dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${m.tf === '4h' ? ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === '1w' ? ' haftası' : m.tf === '1m' ? ' ayı' : ''} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
 }
 // Küçük grafik (coin sayfasında). Dokununca tam ekran açılır.
 function drawChart(x) {
   const cv = $('#chart'); if (!cv) return;
-  const m = buildModel(x, '1d', FS.fibSrc);
-  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: true } });
+  const tf = TF[S.tcTF] && buildModel(x, S.tcTF, FS.fibSrc) ? S.tcTF : '1d', m = buildModel(x, tf, FS.fibSrc);
+  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: tf === '1d' } });
   if (!geo) return;
   cv.onpointermove = e => { if (e.pointerType !== 'mouse') return; const rc = cv.getBoundingClientRect(); const i = Math.min(geo.dEnd, Math.max(geo.beg, geo.beg + Math.floor((e.clientX - rc.left) / geo.bw))); $('#readout').textContent = dayText(m, i); };
   cv.onclick = () => openFS(x);
@@ -2077,7 +2243,15 @@ let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wS
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
 $('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b) return; S.view = b.dataset.v; store.set('view', S.view); renderViews(); renderList(); renderDetail(); });
-$('#detail').addEventListener('click', e => { const fv = e.target.closest('[data-fav]'); if (fv) toggleFav(fv.dataset.fav); });
+$('#detail').addEventListener('click', e => {
+  const fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
+  const tb = e.target.closest('[data-tc]'); if (tb && !tb.disabled) { S.tcTF = tb.dataset.tc; store.set('tcTF', S.tcTF); renderDetail(); }
+});
+document.addEventListener('click', e => {
+  const t = $('#tip'), b = e.target.closest('[data-info]');
+  if (b) { e.preventDefault(); e.stopPropagation(); if (!t.hidden && t.dataset.k === b.dataset.info) { t.hidden = true; return; } t.dataset.k = b.dataset.info; showTip(b.dataset.info); return; }
+  if (!t.hidden && (e.target.closest('.tipx') || !e.target.closest('#tip'))) t.hidden = true;
+}, true);
 $('#list').addEventListener('click', e => {
   const go = e.target.closest('[data-go]'); if (go) { S.view = go.dataset.go; S.q = ''; $('#q').value = ''; renderViews(); renderList(); renderDetail(); return; }
   const fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
