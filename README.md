@@ -35,6 +35,9 @@ Not: Binance ABD IP'lerini engeller; GitHub Actions'ın varsayılan sunucuların
 - Kırılım: çizginin ötesinde kapanış. Ortalama hacmin 1.5 katı yoksa "sahte olabilir" diye işaretlenir.
 - Fib yalnızca trend kırıldıktan sonra çekilir: kırılan trendin başlangıç pininden uç noktasına. Trend kırılmadıysa fib kuralları çalışmaz.
 - Grafikte trend çizgileri, kırılım noktası ve fib seviyeleri çizilir.
+- İki ölçek: **kısa trend** (en yakın iki pin) ve **uzun trend** (dönemin en yüksek tepesinden/en düşük dibinden başlar, sonraki pinlere değer).
+- Tam ekranda zaman dilimi seçilir (4S / 1G / 1H); her zaman diliminde trend ve fib o zaman diliminin mumlarıyla ayrı çizilir. Fib kaynağı (uzun/kısa trend) değiştirilebilir.
+- Skor hesabı günlük kısa trendi kullanır; uzun trend ve diğer zaman dilimleri grafik ve açıklama içindir.
 
 ## Dip sıkışması (s.27–30, 18, 23)
 Sert düşüşten sonra 20/50/100/200 ortalamaların iç içe geçtiği maliyetlenme dönemleri ayrı bir dedektörle izlenir.

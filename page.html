@@ -175,14 +175,19 @@ td.r,th.r{text-align:right}
 .fsbar h2{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fsbar .seg{flex:none}
 .fsbar .seg button{padding:6px 9px}
-.fslayers{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+.fsrow{display:flex;gap:8px;align-items:center;min-width:0}
+.fsrow .seg{flex:none}
+.fsrow .seg button{padding:6px 10px;font-weight:700}
+.fsrow .seg button:disabled{opacity:.4}
+.fslayers{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;min-width:0}
+.chipl.src{border-style:dashed;color:var(--ink2)}
 .chipl{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:700;color:var(--mute);white-space:nowrap}
 .chipl[aria-pressed="true"]{border-color:var(--ink2);color:var(--ink)}
 .fsread{font-size:12px;color:var(--ink2);min-height:16px;white-space:nowrap;overflow-x:auto}
 #fsChart{flex:1;min-height:0;width:100%;display:block;background:var(--panel);border-radius:12px;touch-action:none;cursor:crosshair}
 .fshint{font-size:11.5px;color:var(--mute);text-align:center}
 body.fs-on{overflow:hidden}
-@media (max-height:500px){.fshint{display:none}.fslayers{display:none}}
+@media (max-height:500px){.fshint{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 
@@ -275,7 +280,7 @@ body.fs-on{overflow:hidden}
     <div class="seg" id="fsPeriod"></div>
     <button class="iconbtn" type="button" id="fsReset" aria-label="Görünümü sıfırla" title="Görünümü sıfırla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg></button>
   </div>
-  <div class="fslayers" id="fsLayers"></div>
+  <div class="fsrow"><div class="seg" id="fsTF" aria-label="Zaman dilimi"></div><div class="fslayers" id="fsLayers"></div></div>
   <div class="fsread num" id="fsRead"></div>
   <canvas id="fsChart" aria-label="Tam ekran grafik"></canvas>
   <div class="fshint">Kaydır: sürükle · Yakınlaştır: iki parmak ya da tekerlek · Gün: dokun · Telefonu yan çevirebilirsiniz</div>
@@ -593,7 +598,7 @@ function renderDetail() {
     ${trendCard(r, x)}
     <div class="card">
       <div class="sect" style="display:flex;justify-content:space-between;align-items:center">Grafik <button type="button" class="btn small" id="btnFS" style="padding:5px 10px">⤢ Tam ekran</button></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:3px"></i>Yükselen trend</span><span><i style="background:var(--bad);height:3px"></i>Düşen trend</span>${ctx.fib ? '<span><i style="background:var(--fib-o)"></i>Fib</span>' : ''}${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:2px"></i>Kısa trend</span><span><i style="background:var(--bad);height:4px"></i>Uzun trend (kalın)</span>${ctx.fib ? '<span><i style="background:var(--fib-o)"></i>Fib</span>' : ''}${dp && dp.stage !== 0 ? '<span><i style="border:1.5px dashed var(--accent);height:8px;background:none"></i>Maliyetlenme kutusu</span>' : ''}</div>
       <canvas class="chart" id="chart" aria-label="Günlük mum grafiği"></canvas>
       <div class="readout" id="readout">Tam ekran için grafiğe dokunun.</div>
     </div>
@@ -612,44 +617,73 @@ function openSheet() { $('#detail').classList.add('open'); document.body.style.o
 function closeSheet() { $('#detail').classList.remove('open'); document.body.style.overflow = ''; }
 
 function trendCard(r, x) {
-  const t = r.ctx.trend || {}, f = r.ctx.fib, i = r.i, lines = [];
+  const m = buildModel(x, '1d', FS.fibSrc), i = m.last, lines = [];
   const ago = k => i - k === 0 ? 'bugün' : `${i - k} gün önce`;
-  if (t.up) lines.push(t.up.brk > 0 ? `<li><span class="ic n">↘</span>Yükselen trend çizgisi ${ago(t.up.brk)} aşağı kırıldı${t.up.volBreak ? ', yüksek hacimle' : ', ama hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic p">↗</span>Yükselen trend çizgisi sağlam. Çizgi şu an ${fmt(t.up.now)} seviyesinde; altında kapanış trendi bozar.</li>`);
-  if (t.down) lines.push(t.down.brk > 0 ? `<li><span class="ic p">↗</span>Düşen trend çizgisi ${ago(t.down.brk)} yukarı kırıldı${t.down.volBreak ? ', yüksek hacimle' : ', ama hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic n">↘</span>Düşen trend çizgisi devam ediyor. Çizgi şu an ${fmt(t.down.now)}; üstünde kapanış kırılım olur.</li>`);
-  if (!lines.length) lines.push('<li><span class="ic w">·</span>Şu an çizilebilecek net bir trend çizgisi yok (pinlerden geçen ve gövdelere değmeyen iki nokta bulunamadı).</li>');
-  let fibHtml = '';
+  const say = (t, name) => {
+    if (!t) return;
+    if (t.up) lines.push(t.brk > 0 ? `<li><span class="ic n">↘</span>${name} yükselen trend ${ago(t.brk)} aşağı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic p">↗</span>${name} yükselen trend sağlam; çizgi şu an ${fmt(t.now)}. Altında kapanış trendi bozar.</li>`);
+    else lines.push(t.brk > 0 ? `<li><span class="ic p">↗</span>${name} düşen trend ${ago(t.brk)} yukarı kırıldı${t.volBreak ? ', yüksek hacimle' : ', hacim düşük (sahte olabilir)'}.</li>` : `<li><span class="ic n">↘</span>${name} düşen trend sürüyor; çizgi şu an ${fmt(t.now)}. Üstünde kapanış kırılım olur.</li>`);
+  };
+  const same = (p, q) => p && q && p.a.j === q.a.j && p.b.j === q.b.j;
+  say(m.trL.down, 'Uzun vadeli'); say(m.trL.up, 'Uzun vadeli');
+  if (!same(m.tr.down, m.trL.down)) say(m.tr.down, 'Kısa vadeli'); if (!same(m.tr.up, m.trL.up)) say(m.tr.up, 'Kısa vadeli');
+  if (!lines.length) lines.push('<li><span class="ic w">·</span>Şu an çizilebilecek net bir trend çizgisi yok.</li>');
+  const f = m.fb; let fibHtml = '';
   if (f) {
-    const keys = f.dir === 'up' ? [0.382, 0.618, 0.786, 1.618] : [0.382, 0.618, 0.786, 1.114, 1.618];
-    const L = k => f.levels.find(z => z.r === k).price;
-    const near = [...f.levels].filter(z => [0, 0.236, 0.382, 0.5, 0.618, 0.707, 0.786, 0.886, 1, 1.114, 1.272, 1.414, 1.618].includes(z.r));
+    const near = f.levels.filter(z => [0, 0.236, 0.382, 0.5, 0.618, 0.707, 0.786, 0.886, 1, 1.114, 1.272, 1.414, 1.618].includes(z.r));
     const below = near.filter(z => z.price < r.close).sort((a, b) => b.price - a.price)[0], above = near.filter(z => z.price > r.close).sort((a, b) => a.price - b.price)[0];
-    fibHtml = `<p class="help" style="margin:10px 0 8px"><b>Fib çekildi:</b> ${f.from ? f.from.kind.toLowerCase() : 'trend kırıldı'}, fib ${f.dir === 'up' ? 'trendin dibinden tepesine' : 'trendin tepesinden dibine'} çekildi. ${f.dir === 'up' ? 'Geri çekilmede destekler' : 'Toparlanmada hedefler'} aşağıda.</p>
-      <div class="tiles">${below ? `<div class="tile"><div class="k">Alttaki fib (${below.r})</div><div class="v">${fmt(below.price)}</div><div class="d">${pc(below.price / r.close - 1)}</div></div>` : ''}${above ? `<div class="tile"><div class="k">Üstteki fib (${above.r})</div><div class="v">${fmt(above.price)}</div><div class="d">${pc(above.price / r.close - 1)}</div></div>` : ''}
-      ${keys.map(k => `<div class="tile"><div class="k">Fib ${k}</div><div class="v">${fmt(L(k))}</div></div>`).join('')}</div>`;
-  } else fibHtml = `<p class="help" style="margin:10px 0 0">${esc(r.ctx.fibNote || 'Fib için uygun hareket yok.')}</p>`;
-  return `<div class="card say"><div class="sect">Trend çizgisi ve fib</div><ul>${lines.join('')}</ul>${fibHtml}</div>`;
+    const keys = [0.382, 0.618, 0.786, 1.114];
+    fibHtml = `<p class="help" style="margin:10px 0 8px"><b>Fib:</b> ${f.from.kind.toLowerCase()}; fib ${f.dir === 'up' ? 'trendin dibinden tepesine' : 'trendin tepesinden dibine'} çekildi.</p>
+      <div class="tiles">${below ? `<div class="tile"><div class="k">Alttaki fib (${fibNum(below.r)})</div><div class="v">${fmt(below.price)}</div><div class="d">${pc(below.price / r.close - 1)}</div></div>` : ''}${above ? `<div class="tile"><div class="k">Üstteki fib (${fibNum(above.r)})</div><div class="v">${fmt(above.price)}</div><div class="d">${pc(above.price / r.close - 1)}</div></div>` : ''}
+      ${keys.map(k => `<div class="tile"><div class="k">Fib ${fibNum(k)}</div><div class="v">${fmt(f.levels.find(z => z.r === k).price)}</div></div>`).join('')}</div>`;
+  } else fibHtml = '<p class="help" style="margin:10px 0 0">Trend kırılmadı: kurala göre fib çekilmez.</p>';
+  return `<div class="card say"><div class="sect">Trend çizgisi ve fib (günlük)</div><ul>${lines.join('')}</ul>${fibHtml}<p class="small muted" style="margin-top:8px">4 saatlik ve haftalık trendler için grafiği tam ekran açın.</p></div>`;
 }
 
 // ───────── Grafik ─────────
-const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trend', 'Trend'], ['fib', 'Fib'], ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
-const FS = { open: false, x: null, beg: 0, end: 0, cross: null, layers: store.get('layers', { ma: true, trend: true, fib: true, zone: true, dip: true, vol: true }) };
+const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ['fib', 'Fib'], ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
+const LDEF = { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: true, vol: true };
+const FS = { open: false, x: null, m: null, tf: '1d', beg: 0, end: 0, cross: null, fibSrc: store.get('fibSrc', 'uzun'), layers: Object.assign({}, LDEF, store.get('layers2', {})) };
+const TF = { '4h': { t: '4S', look: 180, lookL: 240, day: 1 / 6 }, '1d': { t: '1G', look: 160, lookL: 200, day: 1 }, '1w': { t: '1H', look: 104, lookL: 156, day: 7 } };
+// Kırılmış trendlerden en yenisinden fib; kaynak: 'uzun' ya da 'kisa' (yoksa diğerine düşer)
+function pickFib(m, src, maxAge) {
+  const pick = T => { const c = [T.up, T.down].filter(t => t && t.brk > 0 && m.last - t.brk <= maxAge).sort((a, b) => b.brk - a.brk)[0]; return c ? CR.fibFromTrend(m.d, c, m.last) : null; };
+  const order = src === 'kisa' ? [m.tr, m.trL] : [m.trL, m.tr];
+  for (const T of order) { const f = T && pick(T); if (f && Math.abs(f.start - f.end) > 1e-12) return f; }
+  return null;
+}
+function buildModel(x, tf, fibSrc) {
+  x.models = x.models || {}; const key = tf;
+  let m = x.models[key];
+  if (!m) {
+    if (tf === '1d') { const T = x.res.ctx.trend || {}; m = { tf, d: x.d, I: x.I, last: x.res.i, tr: { up: T.up && { ...T.up, up: true, scale: 'kisa' }, down: T.down && { ...T.down, up: false, scale: 'kisa' } }, support: x.res.ctx.support, resistance: x.res.ctx.resistance, dip: x.res.ctx.dip }; }
+    else if (tf === '1w') { const d = CR.toWeekly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
+    else { if (!x.d4 || x.d4.c.length < 60) return null; const I = x.J || CR.indicators(x.d4); m = { tf, d: x.d4, I, last: x.d4.c.length - 2 }; }
+    if (!m.tr) m.tr = m.last > 10 ? CR.trendShort(m.d, m.I, m.last, TF[tf].look) : {};
+    m.trL = m.last > 10 ? CR.trendLong(m.d, m.I, m.last, Math.min(TF[tf].lookL, m.last - 2)) : {};
+    m.step = m.last > 0 ? m.d.t[m.last] - m.d.t[m.last - 1] : 864e5;
+    x.models[key] = m;
+  }
+  m.fb = pickFib(m, fibSrc, tf === '1w' ? 52 : 150);
+  return m;
+}
 // Sağda boş alan (gelecek): fib ve trend çizgileri bu alana uzanır, etiketler orada okunur
 const FUT = { mini: 0.14, big: 0.3 };
-function defaultWindow(x, frac) {
-  const r = x.res, last = r.i, tr = r.ctx.trend || {}, fb = r.ctx.fib, dpw = r.ctx.dip && r.ctx.dip.stage !== 0;
-  const want = Math.min(dpw ? r.ctx.dip.start - 30 : last, tr.up ? tr.up.a.j - 5 : last, tr.down ? tr.down.a.j - 5 : last, fb ? fb.startJ - 5 : last);
+function defaultWindow(m, frac) {
+  const last = m.last, tr = m.tr || {}, tl = m.trL || {}, fb = m.fb, dpw = m.dip && m.dip.stage !== 0;
+  const want = Math.min(dpw ? m.dip.start - 30 : last, tr.up ? tr.up.a.j - 5 : last, tr.down ? tr.down.a.j - 5 : last, tl.up ? tl.up.a.j - 5 : last, tl.down ? tl.down.a.j - 5 : last, fb ? fb.startJ - 5 : last);
   const beg = Math.max(0, Math.min(last - 119, want), last - 259), nd = last - beg + 1;
   return { beg, end: last + Math.ceil(nd * (frac ?? FUT.mini)) };
 }
 const fibColor = (C, r) => r === 1.114 ? C.fg : r === 0.786 ? C.fb : r === 0.618 ? C.fr : r === 0.382 ? C.fo : C.fk;
 const fibNum = r => String(r).replace('.', ',');
 // Tek çizim fonksiyonu: küçük grafik ve tam ekran aynı kodu kullanır
-function renderChart(cv, x, view, opt) {
-  if (!cv || !cv.clientWidth) return null;
-  const big = !!opt.big, Lh = opt.layers || {}, r = x.res, d = x.d, I = x.I, last = r.i;
+function renderChart(cv, m, view, opt) {
+  if (!cv || !cv.clientWidth || !m) return null;
+  const big = !!opt.big, Lh = opt.layers || {}, d = m.d, I = m.I, last = m.last;
   const beg = view.beg, end = view.end, dEnd = Math.min(end, last);
-  const tAt = i => i <= last ? d.t[i] : d.t[last] + (i - last) * 864e5;
-  const tr = r.ctx.trend || {}, fb = r.ctx.fib, dp = r.ctx.dip, dpw = dp && dp.stage !== 0;
+  const tAt = i => i <= last ? d.t[i] : d.t[last] + (i - last) * m.step;
+  const tr = m.tr || {}, trL = m.trL || {}, fb = m.fb, dp = m.dip, dpw = dp && dp.stage !== 0;
   const dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
   cv.width = W * dpr; cv.height = H * dpr;
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
@@ -671,7 +705,7 @@ function renderChart(cv, x, view, opt) {
   for (let k = 0; k <= 4; k++) { const y = Y(lo + (hi - lo) * k / 4); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); }
   // destek / direnç
   const zone = (z, col) => { const y1 = Y(z[1]), y0 = Y(z[0]); g.fillStyle = col; g.fillRect(0, y1, X(dEnd) + bw / 2, Math.max(2, y0 - y1)); };
-  if (Lh.zone) { if (r.ctx.support) zone(r.ctx.support, C.goodS); if (r.ctx.resistance) zone(r.ctx.resistance, C.badS); }
+  if (Lh.zone) { if (m.support) zone(m.support, C.goodS); if (m.resistance) zone(m.resistance, C.badS); }
   // son mumun sağı: gelecek alanı ince çizgiyle ayrılır
   if (end > last) { g.strokeStyle = C.line; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(X(last) + bw / 2, padT); g.lineTo(X(last) + bw / 2, padT + ph); g.stroke(); g.setLineDash([]); }
   // fib: TradingView gibi düz çizgiler, başlangıçtan sağ kenara; sağ uçta "0,618 (fiyat)"
@@ -704,19 +738,24 @@ function renderChart(cv, x, view, opt) {
   }
   const line = (a, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; for (let i = beg; i <= dEnd; i++) { const v = a[i]; if (!isFinite(v)) continue; const y = Y(v); if (!st) { g.moveTo(X(i), y); st = true; } else g.lineTo(X(i), y); } g.stroke(); g.setLineDash([]); };
   if (Lh.ma) { line(I.sma100, C.mute, 1.4); line(I.sma20, C.acc, 1.6); line(I.sma50, C.warn, 1.6); line(I.sma200, C.ink, 1.8, [6, 3]); }
-  // trend çizgileri: kırılmamış olan sağa (geleceğe) uzar
-  if (Lh.trend) for (const t of [tr.up, tr.down]) {
-    if (!t) continue;
-    const col = t === tr.up ? C.good : C.bad, stop = t.brk > 0 ? Math.min(dEnd, t.brk + 8) : end;
+  // trend çizgileri: kısa (ince) ve uzun (kalın, etiketli); kırılmamış olan sağa (geleceğe) kesikli uzar
+  const drawTrend = (t, longT) => {
+    if (!t) return;
+    const col = t.up ? C.good : C.bad, stop = t.brk > 0 ? Math.min(dEnd, t.brk + 8) : end;
     const at = q => t.a.price + t.slope * (q - t.a.j), x0 = Math.max(beg, t.a.j);
-    if (stop <= x0) continue;
-    g.strokeStyle = col; g.lineWidth = big ? 2.5 : 2;
+    if (stop <= x0) return;
+    g.strokeStyle = col; g.lineWidth = longT ? (big ? 3.5 : 2.6) : (big ? 2 : 1.6); g.globalAlpha = longT ? 0.95 : 0.8;
     const sEnd = Math.min(stop, last);
     g.beginPath(); g.moveTo(X(x0), Y(at(x0))); g.lineTo(X(sEnd), Y(at(sEnd))); g.stroke();
     if (stop > last) { g.setLineDash([6, 4]); g.beginPath(); g.moveTo(X(last), Y(at(last))); g.lineTo(X(stop), Y(at(stop))); g.stroke(); g.setLineDash([]); }
-    for (const pt of [t.a, t.b]) if (pt.j >= beg && pt.j <= end) { g.fillStyle = col; g.beginPath(); g.arc(X(pt.j), Y(pt.price), big ? 4 : 3, 0, 7); g.fill(); }
-    if (t.brk > 0 && t.brk >= beg && t.brk <= end) { const yb = Y(d.c[t.brk]); g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.arc(X(t.brk), yb, big ? 8 : 6, 0, 7); g.stroke(); g.fillStyle = C.ink; g.textAlign = 'center'; g.fillText('kırılım', X(t.brk), yb + (t === tr.up ? 16 : -16)); }
-  }
+    g.globalAlpha = 1;
+    for (const pt of [t.a, t.b]) if (pt.j >= beg && pt.j <= end) { g.fillStyle = col; g.beginPath(); g.arc(X(pt.j), Y(pt.price), longT ? (big ? 5 : 3.5) : (big ? 3.5 : 2.5), 0, 7); g.fill(); }
+    if (longT && t.a.j >= beg) { g.fillStyle = col; g.textAlign = 'left'; g.fillText(t.up ? 'uzun trend' : 'uzun trend', X(t.a.j) + 6, Y(t.a.price) + (t.up ? 14 : -12)); }
+    if (t.brk > 0 && t.brk >= beg && t.brk <= end) { const yb = Y(d.c[t.brk]); g.strokeStyle = C.ink; g.lineWidth = 1.5; g.beginPath(); g.arc(X(t.brk), yb, big ? 8 : 6, 0, 7); g.stroke(); g.fillStyle = C.ink; g.textAlign = 'center'; g.fillText(longT ? 'uzun kırılım' : 'kırılım', X(t.brk), yb + (t.up ? 16 : -16)); }
+  };
+  const same = (p, q) => p && q && p.a.j === q.a.j && p.b.j === q.b.j;
+  if (Lh.trendU) { drawTrend(trL.up, true); drawTrend(trL.down, true); }
+  if (Lh.trendK) { if (!(Lh.trendU && same(tr.up, trL.up))) drawTrend(tr.up, false); if (!(Lh.trendU && same(tr.down, trL.down))) drawTrend(tr.down, false); }
   // dip kutusu
   if (Lh.dip && dpw && dp.end >= beg) {
     const x0 = X(Math.max(beg, dp.start)) - bw / 2, x1 = X(Math.min(dEnd, dp.end)) + bw / 2, y0 = Y(dp.boxH), y1 = Y(dp.boxL);
@@ -748,33 +787,46 @@ function renderChart(cv, x, view, opt) {
   }
   return { beg, end, dEnd, bw, pw };
 }
-function dayText(x, i) {
-  const d = x.d, I = x.I;
-  return `${new Date(d.t[i]).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
+function dayText(m, i) {
+  const d = m.d, I = m.I, dt = new Date(d.t[i]);
+  return `${dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${m.tf === '4h' ? ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === '1w' ? ' haftası' : ''} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
 }
 // Küçük grafik (coin sayfasında). Dokununca tam ekran açılır.
 function drawChart(x) {
   const cv = $('#chart'); if (!cv) return;
-  const geo = renderChart(cv, x, defaultWindow(x), { layers: { ma: true, trend: true, fib: true, zone: true, dip: true } });
+  const m = buildModel(x, '1d', FS.fibSrc);
+  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: true } });
   if (!geo) return;
-  cv.onpointermove = e => { if (e.pointerType !== 'mouse') return; const rc = cv.getBoundingClientRect(); const i = Math.min(geo.dEnd, Math.max(geo.beg, geo.beg + Math.floor((e.clientX - rc.left) / geo.bw))); $('#readout').textContent = dayText(x, i); };
+  cv.onpointermove = e => { if (e.pointerType !== 'mouse') return; const rc = cv.getBoundingClientRect(); const i = Math.min(geo.dEnd, Math.max(geo.beg, geo.beg + Math.floor((e.clientX - rc.left) / geo.bw))); $('#readout').textContent = dayText(m, i); };
   cv.onclick = () => openFS(x);
 }
 
 // ───────── Tam ekran grafik ─────────
 function openFS(x) {
-  FS.open = true; FS.x = x; FS.cross = null; FS.period = null; Object.assign(FS, defaultWindow(x, FUT.big));
+  FS.open = true; FS.x = x; FS.tf = '1d';
   const el = $('#fs'); el.hidden = false; document.body.classList.add('fs-on');
   $('#fsTitle').textContent = x.sym.replace(/USDT$/, '');
-  $('#fsLayers').innerHTML = LAYERS_DEF.map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('');
-  syncPeriod(); requestAnimationFrame(drawFS);
+  setTF('1d');
+}
+function syncFsControls() {
+  const has4 = !!(FS.x.d4 && FS.x.d4.c.length >= 60);
+  $('#fsTF').innerHTML = Object.entries(TF).map(([k, v]) => `<button type="button" data-tf="${k}" aria-pressed="${FS.tf === k}" ${k === '4h' && !has4 ? 'disabled title="4 saatlik veri yok"' : ''}>${v.t}</button>`).join('');
+  $('#fsLayers').innerHTML = LAYERS_DEF.filter(([k]) => FS.tf === '1d' || (k !== 'zone' && k !== 'dip')).map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('')
+    + `<button type="button" class="chipl src" id="fsFibSrc" aria-pressed="true">Fib: ${FS.fibSrc === 'uzun' ? 'uzun trendden' : 'kısa trendden'}</button>`;
+}
+function setTF(tf) {
+  const m = buildModel(FS.x, tf, FS.fibSrc); if (!m) return;
+  FS.tf = tf; FS.m = m; FS.cross = null; FS.period = null; Object.assign(FS, defaultWindow(m, FUT.big));
+  syncFsControls(); syncPeriod(); requestAnimationFrame(drawFS);
 }
 function closeFS() { FS.open = false; $('#fs').hidden = true; document.body.classList.remove('fs-on'); }
 let fsGeo = null;
 function drawFS() {
   if (!FS.open) return;
-  fsGeo = renderChart($('#fsChart'), FS.x, { beg: FS.beg, end: FS.end }, { big: true, layers: FS.layers, cross: FS.cross });
-  $('#fsRead').textContent = dayText(FS.x, FS.cross != null ? FS.cross : Math.min(FS.end, FS.x.res.i));
+  const lay = FS.tf === '1d' ? FS.layers : Object.assign({}, FS.layers, { zone: false, dip: false });
+  fsGeo = renderChart($('#fsChart'), FS.m, { beg: FS.beg, end: FS.end }, { big: true, layers: lay, cross: FS.cross });
+  const f = FS.m.fb;
+  $('#fsRead').textContent = dayText(FS.m, FS.cross != null ? FS.cross : Math.min(FS.end, FS.m.last)) + (FS.layers.fib ? (f ? ` · Fib: ${f.from.kind.toLowerCase()}` : ' · Fib yok: trend kırılmadı') : '');
 }
 const PERIODS = [['1A', 30], ['3A', 90], ['6A', 180], ['1Y', 365], ['Tümü', 0]];
 function syncPeriod() {
@@ -782,7 +834,7 @@ function syncPeriod() {
 }
 // Pencere sınırları: en az 20 mum; sağda en fazla pencerenin %70'i kadar boşluk; en az 10 mum görünür kalır
 function setWindow(beg, end, keepPeriod) {
-  const last = FS.x.res.i; let n = Math.round(end - beg + 1);
+  const last = FS.m.last; let n = Math.round(end - beg + 1);
   n = Math.max(20, Math.min(Math.round((last + 1) * 1.6), n));
   const endMax = Math.min(last + Math.round(n * 0.7), last - 10 + n - 1), endMin = n - 1;
   end = Math.max(endMin, Math.min(endMax, Math.round(end))); beg = end - n + 1;
@@ -795,7 +847,7 @@ function setWindow(beg, end, keepPeriod) {
     const p = [...pts.values()];
     st = p.length === 1 ? { mode: 'tap', x0: e.clientX, beg: FS.beg, end: FS.end } : { mode: 'pinch', d0: Math.abs(p[0].x - p[1].x) || 1, mid: idxAt((p[0].x + p[1].x) / 2), beg: FS.beg, end: FS.end }; });
   cv.addEventListener('pointermove', e => {
-    if (!pts.has(e.pointerId)) { if (e.pointerType === 'mouse' && fsGeo) { FS.cross = Math.round(Math.min(Math.min(FS.end, FS.x.res.i), Math.max(FS.beg, idxAt(e.clientX)))); drawFS(); } return; }
+    if (!pts.has(e.pointerId)) { if (e.pointerType === 'mouse' && fsGeo) { FS.cross = Math.round(Math.min(Math.min(FS.end, FS.m.last), Math.max(FS.beg, idxAt(e.clientX)))); drawFS(); } return; }
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); if (!st || !fsGeo) return;
     const p = [...pts.values()];
     if (st.mode === 'pinch' && p.length >= 2) {
@@ -807,14 +859,17 @@ function setWindow(beg, end, keepPeriod) {
       if (st.mode === 'pan') { const sh = Math.round(dx / fsGeo.bw); setWindow(st.beg - sh, st.end - sh); }
     }
   });
-  const up = e => { if (st && st.mode === 'tap' && pts.size === 1 && fsGeo) { FS.cross = Math.round(Math.min(Math.min(FS.end, FS.x.res.i), Math.max(FS.beg, idxAt(e.clientX)))); drawFS(); }
+  const up = e => { if (st && st.mode === 'tap' && pts.size === 1 && fsGeo) { FS.cross = Math.round(Math.min(Math.min(FS.end, FS.m.last), Math.max(FS.beg, idxAt(e.clientX)))); drawFS(); }
     pts.delete(e.pointerId); if (!pts.size) st = null; else { const q = [...pts.values()][0]; st = { mode: 'pan', x0: q.x, beg: FS.beg, end: FS.end }; } };
   cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', e => { pts.delete(e.pointerId); if (!pts.size) st = null; });
   cv.addEventListener('wheel', e => { e.preventDefault(); if (!fsGeo) return; const mid = idxAt(e.clientX), n0 = FS.end - FS.beg + 1, n = n0 * (e.deltaY > 0 ? 1.15 : 1 / 1.15), f = (mid - FS.beg) / n0; setWindow(mid - f * n, mid - f * n + n - 1); }, { passive: false });
-  $('#fsPeriod').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const k = +b.dataset.p, last = FS.x.res.i, beg = k ? Math.max(0, last - k + 1) : 0, nd = last - beg + 1; FS.cross = null; FS.period = k; setWindow(beg, last + Math.ceil(nd * (k ? FUT.big : 0.12)), true); });
-  $('#fsLayers').addEventListener('click', e => { const b = e.target.closest('.chipl'); if (!b) return; const k = b.dataset.l; FS.layers[k] = !FS.layers[k]; store.set('layers', FS.layers); b.setAttribute('aria-pressed', FS.layers[k]); drawFS(); });
+  $('#fsPeriod').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const k = +b.dataset.p, last = FS.m.last, nb = k ? Math.max(20, Math.round(k / TF[FS.tf].day)) : 0, beg = k ? Math.max(0, last - nb + 1) : 0, nd = last - beg + 1; FS.cross = null; FS.period = k; setWindow(beg, last + Math.ceil(nd * (k ? FUT.big : 0.12)), true); });
+  $('#fsLayers').addEventListener('click', e => { const b = e.target.closest('.chipl'); if (!b) return;
+    if (b.id === 'fsFibSrc') { FS.fibSrc = FS.fibSrc === 'uzun' ? 'kisa' : 'uzun'; store.set('fibSrc', FS.fibSrc); FS.m = buildModel(FS.x, FS.tf, FS.fibSrc); syncFsControls(); drawFS(); const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) { drawChart(x); } return; }
+    const k = b.dataset.l; FS.layers[k] = !FS.layers[k]; store.set('layers2', FS.layers); b.setAttribute('aria-pressed', FS.layers[k]); drawFS(); });
+  $('#fsTF').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled) return; setTF(b.dataset.tf); });
   $('#fsClose').addEventListener('click', closeFS);
-  $('#fsReset').addEventListener('click', () => { FS.cross = null; FS.period = null; Object.assign(FS, defaultWindow(FS.x, FUT.big)); syncPeriod(); drawFS(); });
+  $('#fsReset').addEventListener('click', () => { FS.cross = null; FS.period = null; Object.assign(FS, defaultWindow(FS.m, FUT.big)); syncPeriod(); drawFS(); });
 })();
 
 // ───────── Nasıl çalışır ─────────

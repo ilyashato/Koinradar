@@ -978,7 +978,79 @@
       gates: gateStats, suggestedWeights: sugg, generated: Date.now() };
   }
 
-  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, backtest, collect, summarize, label, fmt, version: '1.0.0' };
+
+  // ───────────────────────── Grafik yardımcıları (her zaman diliminde ayrı trend/fib) ─────────────────────────
+  // Fraktal pinler: k mum sol / k mum sağ
+  function pivotsOf(d, i, k, look) {
+    const { h, l } = d, H = [], L = [], from = Math.max(k, i - look);
+    for (let j = from; j <= i - k; j++) {
+      let isH = true, isL = true;
+      for (let q = 1; q <= k; q++) { if (!(h[j] > h[j - q] && h[j] >= h[j + q])) isH = false; if (!(l[j] < l[j - q] && l[j] <= l[j + q])) isL = false; }
+      if (isH) H.push({ j, price: h[j] }); if (isL) L.push({ j, price: l[j] });
+    }
+    return { H, L };
+  }
+  function breakOf(d, I, t, i) {
+    const { c, v } = d; let brk = -1;
+    for (let q = t.b.j + 1; q <= i; q++) if (t.up ? c[q] < t.at(q) : c[q] > t.at(q)) { brk = q; break; }
+    const volBreak = brk > 0 && I.volSma20[brk - 1] > 0 && v[brk] / I.volSma20[brk - 1] >= 1.5;
+    return { ...t, brk, volBreak, now: t.at(i) };
+  }
+  // Kısa trend: en yakın iki pin, aradaki gövdelere değmez (Walker.trendLines ile aynı kural, her seride çalışır)
+  function trendShort(d, I, i, look) {
+    const { o, c } = d, P = pivotsOf(d, i, 2, look || 160);
+    const body = (q, up) => up ? Math.min(o[q], c[q]) : Math.max(o[q], c[q]);
+    const build = (piv, up) => {
+      for (let bi = piv.length - 1; bi >= Math.max(1, piv.length - 3); bi--) { const b = piv[bi];
+        for (let ai = bi - 1; ai >= Math.max(0, bi - 6); ai--) { const a = piv[ai];
+          if (b.j - a.j < 3 || (up ? !(b.price > a.price) : !(b.price < a.price))) continue;
+          const slope = (b.price - a.price) / (b.j - a.j), at = q => a.price + slope * (q - a.j);
+          let ok = true; for (let q = a.j + 1; q < b.j; q++) { const bd = body(q, up); if (up ? bd < at(q) : bd > at(q)) { ok = false; break; } }
+          if (ok) return breakOf(d, I, { up, a, b, slope, at, scale: 'kisa' }, i);
+        } }
+      return null;
+    };
+    return { up: build(P.L, true), down: build(P.H, false) };
+  }
+  // Uzun trend: dönemin en yüksek tepesinden (düşen) / en düşük dibinden (yükselen) başlar;
+  // ikinci nokta, sonraki pinler arasında çizgiyi hiçbir pinin aşmayacağı şekilde seçilir (pinlere değer, gövdeyi kesmez)
+  function trendLong(d, I, i, look) {
+    const { h, l } = d, from = Math.max(2, i - look);
+    let topJ = from, botJ = from;
+    for (let q = from; q <= i - 6; q++) { if (h[q] > h[topJ]) topJ = q; if (l[q] < l[botJ]) botJ = q; }
+    const P = pivotsOf(d, i, 2, i - from + 2);
+    const mk = (aJ, up) => {
+      const a = { j: aJ, price: up ? l[aJ] : h[aJ] }, cand = (up ? P.L : P.H).filter(p => p.j >= aJ + 3 && p.j <= i - 2 && (up ? p.price > a.price : p.price < a.price));
+      if (!cand.length) return null;
+      let b = null, best = up ? Infinity : -Infinity;
+      for (const p of cand) { const sl = (p.price - a.price) / (p.j - a.j); if (up ? sl < best : sl > best) { best = sl; b = p; } }
+      const at = q => a.price + best * (q - a.j);
+      return breakOf(d, I, { up, a, b, slope: best, at, scale: 'uzun' }, i);
+    };
+    return { down: mk(topJ, false), up: mk(botJ, true) };
+  }
+  // Kırılan trendden fib: başlangıç pininden kırılıma kadarki uç noktaya
+  function fibFromTrend(d, t, i) {
+    if (!t || t.brk < 0) return null;
+    const { h, l } = d; let ex = t.up ? -Infinity : Infinity, exJ = t.a.j;
+    for (let q = t.a.j; q <= t.brk; q++) { if (t.up ? h[q] > ex : l[q] < ex) { ex = t.up ? h[q] : l[q]; exJ = q; } }
+    const start = t.a.price, end = ex, span = start - end;
+    if (!span) return null;
+    return { dir: t.up ? 'up' : 'down', start, end, startJ: t.a.j, endJ: exJ, r: (d.c[i] - end) / span, levels: FIB.map(r => ({ r, price: end + r * span })),
+      from: { kind: (t.up ? 'Yükselen' : 'Düşen') + (t.scale === 'uzun' ? ' uzun' : ' kısa') + ' trend kırıldı', brk: t.brk, volBreak: t.volBreak } };
+  }
+  // Günlük mumlardan haftalık seri (Pazartesi başlangıç)
+  function toWeekly(d) {
+    const w = { t: [], o: [], h: [], l: [], c: [], v: [] };
+    for (let i = 0; i < d.c.length; i++) {
+      const k = weekKey(d.t[i]), n = w.t.length;
+      if (!n || weekKey(w.t[n - 1]) !== k) { w.t.push(d.t[i]); w.o.push(d.o[i]); w.h.push(d.h[i]); w.l.push(d.l[i]); w.c.push(d.c[i]); w.v.push(d.v[i]); }
+      else { w.h[n - 1] = Math.max(w.h[n - 1], d.h[i]); w.l[n - 1] = Math.min(w.l[n - 1], d.l[i]); w.c[n - 1] = d.c[i]; w.v[n - 1] += d.v[i]; }
+    }
+    return w;
+  }
+
+  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
   root.CoinRadar = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
