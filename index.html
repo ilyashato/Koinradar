@@ -1289,14 +1289,22 @@ body.fs-on{overflow:hidden}
   function trendShort(d, I, i, look) {
     const { o, c } = d, P = pivotsOf(d, i, 2, look || 160);
     const body = (q, up) => up ? Math.min(o[q], c[q]) : Math.max(o[q], c[q]);
+    // Çıpa: yakın dönemin (son ~70 mum) en uç pini (düşende en yüksek tepe, yükselende en düşük dip).
+    // İkinci pin: çıpadan sonraki pinler arasında, aradaki gövdelere değmeyen EN DİK çizgiyi veren pin
+    // → çizgi tepeye en yakın pinlere yaslanır, fiyat kapanışla üstüne çıkınca kırılım sayılır.
+    const W = Math.min(look || 160, 70);
     const build = (piv, up) => {
-      for (let bi = piv.length - 1; bi >= Math.max(1, piv.length - 3); bi--) { const b = piv[bi];
-        for (let ai = bi - 1; ai >= Math.max(0, bi - 6); ai--) { const a = piv[ai];
+      const cands = piv.filter(p => p.j >= i - W).sort((x, y) => up ? x.price - y.price : y.price - x.price).slice(0, 4);
+      for (const a of cands) {
+        let best = null;
+        for (const b of piv) {
           if (b.j - a.j < 3 || (up ? !(b.price > a.price) : !(b.price < a.price))) continue;
           const slope = (b.price - a.price) / (b.j - a.j), at = q => a.price + slope * (q - a.j);
           let ok = true; for (let q = a.j + 1; q < b.j; q++) { const bd = body(q, up); if (up ? bd < at(q) : bd > at(q)) { ok = false; break; } }
-          if (ok) return breakOf(d, I, { up, a, b, slope, at, scale: 'kisa' }, i);
-        } }
+          if (ok && (!best || (up ? slope > best.slope : slope < best.slope))) best = { b, slope, at };
+        }
+        if (best) return breakOf(d, I, { up, a, b: best.b, slope: best.slope, at: best.at, scale: 'kisa' }, i);
+      }
       return null;
     };
     return { up: build(P.L, true), down: build(P.H, false) };
