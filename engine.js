@@ -1040,7 +1040,7 @@
   // Destek/direnç bölgeleri (her zaman diliminde): pin mumunun İĞNESİ ile gövde ucu arası, pin mumundan sağa uzanır.
   // Kapanışla kırılmış bölge atılır. Fiyata en yakın 3 direnç + 3 destek ve dönemin uç tepe/dibi döner.
   function zonesOf(d, i, look) {
-    const { o, c, h, l } = d, P = pivotsOf(d, i, 3, look || 300), px = c[i], all = [];
+    const { o, c, h, l } = d, P = pivotsOf(d, i, 2, look || 300), px = c[i], all = [];
     const mk = (p, up) => {
       const zone = up ? [l[p.j], Math.min(o[p.j], c[p.j])] : [Math.max(o[p.j], c[p.j]), h[p.j]];
       if (!(zone[1] > zone[0])) return;
