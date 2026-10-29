@@ -1065,6 +1065,16 @@
     return { dir: t.up ? 'up' : 'down', start, end, startJ: t.a.j, endJ: exJ, r: (d.c[i] - end) / span, levels: FIB.map(r => ({ r, price: end + r * span })),
       from: { kind: (t.up ? 'Yükselen' : 'Düşen') + (t.scale === 'uzun' ? ' uzun' : ' kısa') + ' trend kırıldı', brk: t.brk, volBreak: t.volBreak } };
   }
+  // Günlük mumlardan aylık seri
+  function toMonthly(d) {
+    const w = { t: [], o: [], h: [], l: [], c: [], v: [] }, key = ts => { const x = new Date(ts); return x.getUTCFullYear() * 12 + x.getUTCMonth(); };
+    for (let i = 0; i < d.c.length; i++) {
+      const k = key(d.t[i]), n = w.t.length;
+      if (!n || key(w.t[n - 1]) !== k) { w.t.push(d.t[i]); w.o.push(d.o[i]); w.h.push(d.h[i]); w.l.push(d.l[i]); w.c.push(d.c[i]); w.v.push(d.v[i]); }
+      else { w.h[n - 1] = Math.max(w.h[n - 1], d.h[i]); w.l[n - 1] = Math.min(w.l[n - 1], d.l[i]); w.c[n - 1] = d.c[i]; w.v[n - 1] += d.v[i]; }
+    }
+    return w;
+  }
   // Günlük mumlardan haftalık seri (Pazartesi başlangıç)
   function toWeekly(d) {
     const w = { t: [], o: [], h: [], l: [], c: [], v: [] };
@@ -1076,7 +1086,7 @@
     return w;
   }
 
-  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, zonesOf, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
+  const api = { MODULES, RULES, RULE, GATES, FIB, indicators, Walker, analyze, trendShort, trendLong, fibFromTrend, zonesOf, toMonthly, toWeekly, backtest, collect, summarize, label, fmt, version: '1.0.0' };
   root.CoinRadar = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
