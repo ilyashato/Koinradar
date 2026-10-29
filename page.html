@@ -72,6 +72,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .star.big{font-size:26px;margin-left:auto;padding:4px 8px}
 .tcrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
 .tcrow .sect{margin:0}
+.row2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
 .views{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px}
 .view{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;white-space:nowrap;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
 .view b{font-family:var(--f-num);font-weight:600;font-size:12.5px;color:var(--mute)}
@@ -260,10 +261,14 @@ body.fs-on{overflow:hidden}
   <section id="view-test" hidden>
     <div class="card">
       <p class="answer">Bu skor geçmişte işe yarar mıydı?</p>
-      <p class="help">Her coinin geçmişteki her günü, sadece o güne kadarki veriyle puanlanır. Sonra 7 gün içinde fiyatın ne yaptığına bakılır. Yüksek puanlı günlerin ardından fiyat daha çok yükseldiyse skor işe yarıyor demektir.</p>
+      <p class="help">Her coinin geçmişteki her günü, sadece o güne kadarki veriyle puanlanır. Sonra 3, 7, 14 ve 30 gün sonra fiyatın ne yaptığına bakılır. Yüksek puanlı günlerin ardından fiyat daha çok yükseldiyse (piyasanın geneline göre) skor işe yarıyor demektir.</p>
       <button class="btn primary" id="btnBT" type="button">Testi çalıştır</button>
       <span class="small muted" id="btInfo" style="margin-left:8px"></span>
       <div class="prog" id="btProg" hidden><i></i></div>
+      <div id="btCtl" hidden style="margin-top:12px">
+        <div class="row2"><span class="small muted">Kaç gün sonrasına bakılsın?</span><div class="seg" id="btHseg"></div></div>
+        <div class="row2"><span class="small muted">Getiri nasıl ölçülsün?</span><div class="seg" id="btAdjSeg"><button type="button" data-a="1">Piyasaya göre</button><button type="button" data-a="0">Ham</button></div></div>
+      </div>
     </div>
     <div id="btOut"></div>
   </section>
@@ -316,7 +321,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('cr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('cr_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', view: store.get('view', 'guclu'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d') };
+const S = { coins: [], source: 'none', view: store.get('view', 'guclu'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true) };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -1082,19 +1087,19 @@ function renderRules() {
 async function runBT() {
   const coins = S.coins.filter(x => x.d.c.length >= 260); if (!coins.length) return;
   const btn = $('#btnBT'), prog = $('#btProg'), bar = prog.querySelector('i');
-  btn.disabled = true; prog.hidden = false; const recs = []; const o = { sezgiselW: S.wS, gates: S.gates };
+  btn.disabled = true; prog.hidden = false; const recs = []; const o = { sezgiselW: S.wS, gates: S.gates, horizons: [3, 7, 14, 30] };
   for (let k = 0; k < coins.length; k++) {
     $('#btInfo').textContent = `${coins[k].sym.replace(/USDT$/, '')} hesaplanıyor (${k + 1}/${coins.length})`;
     await new Promise(r => setTimeout(r, 0));
     CR.collect({ sym: coins[k].sym, d: coins[k].d }, o, recs);
     bar.style.width = ((k + 1) / coins.length * 100) + '%';
   }
-  S.bt = CR.summarize(recs, [3, 7, 14]); S.bt.source = S.source;
+  S.bt = CR.summarize(recs, [3, 7, 14, 30]); S.bt.source = S.source;
   btn.disabled = false; prog.hidden = true; btn.textContent = 'Testi yeniden çalıştır';
   render();
 }
-function bucketChart(title, b, h, faded) {
-  const W = 260, H = 150, pl = 34, pb = 26, pt = 18, vals = b.map(x => x.n ? x.mean[h].m : 0);
+function bucketChart(title, b, h, faded, adj) {
+  const W = 260, H = 150, pl = 34, pb = 26, pt = 18, vals = b.map(x => x.n ? ((adj && x.ex ? x.ex : x.mean)[h].m) : 0);
   const lim = Math.ceil(Math.max(0.01, ...vals.map(Math.abs)) * 100) / 100;
   const bw = (W - pl - 8) / b.length, Y = v => pt + (lim - v) / (2 * lim) * (H - pt - pb);
   let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><text x="${pl}" y="11" font-size="11.5" font-weight="700" fill="var(--ink2)" font-family="Schibsted Grotesk,sans-serif">${esc(title)}</text>`;
@@ -1103,12 +1108,33 @@ function bucketChart(title, b, h, faded) {
     s += `<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(1, hh)}" rx="2" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" ${faded ? 'fill-opacity=".55"' : ''}><title>Puan ${x.a}–${Math.min(100, x.b)}: ${x.n} gün, ${h} günde ortalama ${pc(v, 2)}</title></rect><text x="${x0 + w / 2}" y="${H - 12}" font-size="9.5" text-anchor="middle" fill="var(--ink2)" font-family="IBM Plex Mono,monospace">${x.a}–${Math.min(100, x.b)}</text><text x="${x0 + w / 2}" y="${H - 2}" font-size="8.5" text-anchor="middle" fill="var(--mute)" font-family="IBM Plex Mono,monospace">${x.n >= 1000 ? (x.n / 1000).toFixed(x.n >= 10000 ? 0 : 1).replace('.', ',') + ' B' : x.n}</text>`; });
   return s + '</svg>';
 }
+function btView(bt) {
+  const h = (bt.horizons || [7]).includes(S.btH) ? S.btH : bt.hMain, adj = !!(S.btAdj && bt.quint);
+  return { h, adj, rules: (bt.rulesH && bt.rulesH[h]) || bt.rules, q: bt.quint && bt.quint[h], c: bt.corrH ? (adj ? bt.corrH.ex : bt.corrH.raw) : null };
+}
 function verdictText(bt) {
-  const b = bt.buckets.score, lo = b[0].n ? b[0].mean[bt.hMain].m : NaN, hi = b[4].n ? b[4].mean[bt.hMain].m : (b[3].n ? b[3].mean[bt.hMain].m : NaN), c = bt.corr.score;
-  if (!isFinite(lo) || !isFinite(hi)) return 'Sonuç için yeterli veri yok.';
-  if (c > 0.05 && hi > lo) return `Evet. Puanı yüksek günlerin ardından fiyat 7 günde ortalama ${pc(hi, 1)} değişmiş, puanı düşük günlerin ardından ${pc(lo, 1)}.`;
-  if (c > 0) return `Zayıf da olsa evet. Yüksek puan sonrası ${pc(hi, 1)}, düşük puan sonrası ${pc(lo, 1)}.`;
-  return `Hayır, bu veride skor işe yaramamış. Yüksek puan sonrası ${pc(hi, 1)}, düşük puan sonrası ${pc(lo, 1)}.`;
+  const V = btView(bt), { h, adj } = V, key = adj ? 'ex' : 'raw';
+  if (!V.q) { // eski dosya biçimi
+    const b = bt.buckets.score, lo = b[0].n ? b[0].mean[bt.hMain].m : NaN, hi = b[4].n ? b[4].mean[bt.hMain].m : (b[3].n ? b[3].mean[bt.hMain].m : NaN);
+    return isFinite(lo) && isFinite(hi) ? `Yüksek puan sonrası ${pc(hi, 1)}, düşük puan sonrası ${pc(lo, 1)} (${bt.hMain} günde).` : 'Sonuç için yeterli veri yok.';
+  }
+  const q = V.q.score, top = q.top[key], bot = q.bot[key], sp = top - bot, c = V.c.score[h], what = adj ? 'piyasaya göre' : 'ham';
+  const nums = `En yüksek puanlı %20'lik günlerin ardından ${h} günde ${pc(top, 1)}, en düşük puanlı %20'lik günlerin ardından ${pc(bot, 1)} (${what}). Fark ${pc(sp, 1)}.`;
+  if (sp > 0.005 && c > 0.02) return `Evet, ${h} günlük ufukta puan işe yarıyor. ${nums}`;
+  if (sp > 0 && c > 0) return `Zayıf da olsa evet (${h} gün). ${nums}`;
+  if (sp > 0) return `Karışık sonuç (${h} gün): uçlarda fark olumlu ama genel sıralama ilişkisi ${c.toFixed(2)}. ${nums}`;
+  return `Bu ufukta (${h} gün) puan işe yaramamış. ${nums}`;
+}
+function horizonTable(bt) {
+  if (!bt.quint || !bt.corrH) return '';
+  const adj = !!S.btAdj, key = adj ? 'ex' : 'raw', c = adj ? bt.corrH.ex : bt.corrH.raw;
+  const rows = bt.horizons.map(h => { const q = bt.quint[h].score, sp = q.top[key] - q.bot[key]; return { h, top: q.top[key], bot: q.bot[key], sp, c: c.score[h], ck: c.kesin[h], cs: c.sezgisel[h] }; });
+  const best = rows.reduce((a, r) => (r.sp > a.sp ? r : a), rows[0]);
+  return `<div class="card"><div class="sect">Hangi vadede işe yarıyor?</div>
+    <p class="help">Puan en çok hangi ufukta ayırt edici? Üst %20 = en yüksek puanlı günler, Alt %20 = en düşük puanlı günler; getirileri karşılaştırılır${adj ? ' (aynı günün piyasa ortalaması çıkarılmış)' : ''}. İlişki (sıra korelasyonu) +1'e yaklaştıkça puan ile getiri aynı yönde demektir; 0 ilişki yok demektir.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Ufuk</th><th class="r">Üst %20</th><th class="r">Alt %20</th><th class="r">Fark</th><th class="r">İlişki</th><th class="r">Kesin</th><th class="r">Sezg.</th></tr></thead><tbody>
+    ${rows.map(r => `<tr${r.h === best.h ? ' style="background:var(--accent-soft)"' : ''}><td><b>${r.h} gün</b>${r.h === best.h ? ' ★' : ''}</td><td class="r num ${r.top >= 0 ? 'up' : 'dn'}">${pc(r.top, 1)}</td><td class="r num ${r.bot >= 0 ? 'up' : 'dn'}">${pc(r.bot, 1)}</td><td class="r num ${r.sp >= 0 ? 'up' : 'dn'}">${pc(r.sp, 1)}</td><td class="r num">${r.c.toFixed(3)}</td><td class="r num">${r.ck.toFixed(3)}</td><td class="r num">${r.cs.toFixed(3)}</td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted" style="margin-top:8px">★ farkın en büyük olduğu ufuk. İlişki örtüşen pencerelerden hesaplanır; 0,02–0,03 altı pratikte gürültü sayılır.</p></div>`;
 }
 function dipBT(bt) {
   const D = bt.dip; if (!D) return '';
@@ -1121,19 +1147,23 @@ function dipBT(bt) {
     <p class="small muted" style="margin-top:8px">"En iyi/en kötü anı": sonraki 60 gün içindeki en yüksek ve en düşük fiyat. 20'den az görülen satırlar tesadüf olabilir.</p></div>`;
 }
 function renderBT() {
-  const bt = S.bt, h = bt.hMain, el = $('#btOut');
+  const bt = S.bt, el = $('#btOut'), BV = btView(bt), h = BV.h, adj = BV.adj, rl = BV.rules;
+  $('#btCtl').hidden = !bt.quint;
+  $('#btHseg').innerHTML = (bt.horizons || []).map(x => `<button type="button" data-h="${x}" aria-pressed="${x === h}">${x} gün</button>`).join('');
+  document.querySelectorAll('#btAdjSeg button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.a === '1') === adj));
   $('#btInfo').textContent = `${bt.symbols.length} coin · ${bt.n.toLocaleString('tr-TR')} gün${bt.source === 'demo' ? ' · örnek veri, sonuç anlamsız' : ''}`;
   const V = { destek: 'Çalışıyor', zayif: 'Zayıf', yok: 'Etkisiz', ters: 'Ters' };
-  const best = [...bt.rules].filter(r => r.verdict === 'destek').sort((a, b) => b.dirT - a.dirT).slice(0, 8);
-  const worst = [...bt.rules].filter(r => r.verdict === 'ters').sort((a, b) => a.dirT - b.dirT).slice(0, 6);
+  const best = [...rl].filter(r => r.verdict === 'destek').sort((a, b) => b.dirT - a.dirT).slice(0, 8);
+  const worst = [...rl].filter(r => r.verdict === 'ters').sort((a, b) => a.dirT - b.dirT).slice(0, 6);
   el.innerHTML = `
-    <div class="card"><p class="answer">${verdictText(bt)}</p><p class="help" style="margin:0">Taban: herhangi bir günde alınsaydı 7 günde ortalama ${pc(bt.base[h].m, 2)}.</p></div>
-    <div class="multiples"><div class="card">${bucketChart('Puana göre 7 günlük getiri', bt.buckets.score, h)}</div><div class="card">${bucketChart('Sadece kesin kurallar', bt.buckets.kesin, h)}</div><div class="card">${bucketChart('Sadece sezgisel kurallar', bt.buckets.sezgisel, h, true)}</div></div><p class="small muted" style="margin:4px 2px 10px">Çubukların altındaki sayı, o puan aralığında kaç gözlem (gün) olduğunu gösterir. B = bin.</p>
+    <div class="card"><p class="answer">${verdictText(bt)}</p><p class="help" style="margin:0">Taban: herhangi bir günde alınsaydı ${h} günde ortalama ${pc(bt.base[h].m, 2)}${adj ? '; aşağıdaki sayılar aynı günün piyasa ortalamasına göre fark olarak verilir' : ''}.</p></div>
+    ${horizonTable(bt)}
+    <div class="multiples"><div class="card">${bucketChart(`Puana göre ${h} günlük getiri`, bt.buckets.score, h, false, adj)}</div><div class="card">${bucketChart('Sadece kesin kurallar', bt.buckets.kesin, h, false, adj)}</div><div class="card">${bucketChart('Sadece sezgisel kurallar', bt.buckets.sezgisel, h, true, adj)}</div></div><p class="small muted" style="margin:4px 2px 10px">Çubukların altındaki sayı, o puan aralığında kaç gözlem (gün) olduğunu gösterir. B = bin.</p>
     <p class="help">İyi bir skorda çubuklar soldan sağa yükselir. Sezgisel kurallar çizgisi düzse onların ağırlığını Gelişmiş ayarlar'dan düşürebilir ya da "Geri test ağırlıkları"nı açabilirsiniz.</p>
     ${dipBT(bt)}
     <div class="card"><div class="sect">En iyi çalışan kurallar</div>${best.length ? best.map(r => `<div class="rr"><span class="tier ${r.tier}">${r.tier}</span><span><b>${esc(r.label)}</b> <span class="muted small">${r.side > 0 ? 'olumlu sinyal' : 'olumsuz sinyal'} · ${r.n} gün</span></span><span class="pts up">${pc(r.edge * r.side, 1)}</span></div>`).join('') : '<p class="small muted">Anlamlı sonuç veren kural yok.</p>'}
       ${worst.length ? `<div class="sect" style="margin-top:12px">Ters çalışan kurallar</div>${worst.map(r => `<div class="rr"><span class="tier ${r.tier}">${r.tier}</span><span><b>${esc(r.label)}</b> <span class="muted small">${r.side > 0 ? 'olumlu sinyal' : 'olumsuz sinyal'} · ${r.n} gün</span></span><span class="pts dn">${pc(r.edge * r.side, 1)}</span></div>`).join('')}` : ''}</div>
-    <div class="card"><details class="more"><summary>Tüm kuralların sonuçları</summary><div class="tbl-wrap"><table><thead><tr><th>Tür</th><th>Kural</th><th>Yön</th><th class="r">Gün</th><th class="r">Fark (7g)</th><th class="r">t</th><th>Sonuç</th></tr></thead><tbody>${[...bt.rules].sort((a, b) => b.dirT - a.dirT).map(r => `<tr><td><span class="tier ${r.tier}">${r.tier}</span></td><td class="tw">${esc(r.label)}</td><td>${r.side > 0 ? '▲' : '▼'}</td><td class="r num">${r.n}</td><td class="r num ${r.edge >= 0 ? 'up' : 'dn'}">${pc(r.edge, 2)}</td><td class="r num">${r.t.toFixed(1)}</td><td><span class="verd ${r.verdict}">${V[r.verdict]}</span></td></tr>`).join('')}</tbody></table></div></details></div>`;
+    <div class="card"><details class="more"><summary>Tüm kuralların sonuçları</summary><div class="tbl-wrap"><table><thead><tr><th>Tür</th><th>Kural</th><th>Yön</th><th class="r">Gün</th><th class="r">Fark (${h}g)</th><th class="r">t</th><th>Sonuç</th></tr></thead><tbody>${[...rl].sort((a, b) => b.dirT - a.dirT).map(r => `<tr><td><span class="tier ${r.tier}">${r.tier}</span></td><td class="tw">${esc(r.label)}</td><td>${r.side > 0 ? '▲' : '▼'}</td><td class="r num">${r.n}</td><td class="r num ${r.edge >= 0 ? 'up' : 'dn'}">${pc(r.edge, 2)}</td><td class="r num">${r.t.toFixed(1)}</td><td><span class="verd ${r.verdict}">${V[r.verdict]}</span></td></tr>`).join('')}</tbody></table></div></details></div>`;
 }
 
 // ───────── Ayarlar ─────────
@@ -1169,6 +1199,8 @@ $('#list').addEventListener('click', e => {
 });
 $('#q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
 $('#btnBT').addEventListener('click', runBT);
+$('#btHseg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !S.bt) return; S.btH = +b.dataset.h; store.set('btH', S.btH); renderBT(); });
+$('#btAdjSeg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !S.bt) return; S.btAdj = b.dataset.a === '1'; store.set('btAdj', S.btAdj); renderBT(); });
 $('#btnRefresh').addEventListener('click', () => start());
 document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (FS.open) closeFS(); else closeSheet(); } });
 window.addEventListener('resize', () => { const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) drawChart(x); if (FS.open) drawFS(); });

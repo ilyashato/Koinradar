@@ -883,7 +883,7 @@
   // Geri test: her mumda değerlendir, ileri getirileri topla
   function backtest(seriesList, opts) {
     opts = opts || {};
-    const H = opts.horizons || [3, 7, 14];
+    const H = opts.horizons || [3, 7, 14, 30];
     const recs = [];
     for (const s of seriesList) collect(s, opts, recs);
     return summarize(recs, H);
@@ -891,7 +891,7 @@
   // Tek parite için gözlemleri toplar (sayfada parça parça çalıştırmak için)
   function collect(s, opts, recs) {
     opts = opts || {}; recs = recs || [];
-    const H = opts.horizons || [3, 7, 14];
+    const H = opts.horizons || [3, 7, 14, 30];
     {
       const d = s.d; if (d.c.length < 260) return recs;
       const I = indicators(d), w = new Walker(d, I, opts);
@@ -901,7 +901,7 @@
         const fwd = {}; for (const h of H) fwd[h] = d.c[i + h] / d.c[i] - 1;
         const fired = {}; for (const x of r.rules) fired[x.id] = x.v;
         stages[i] = r.dipStage;
-        recs.push({ sym: s.sym, i, score: r.score, kesin: r.kesin, sezgisel: r.sezgisel, raw: r.raw, gates: r.gates, fired, fwd,
+        recs.push({ sym: s.sym, i, t: d.t ? d.t[i] : null, score: r.score, kesin: r.kesin, sezgisel: r.sezgisel, raw: r.raw, gates: r.gates, fired, fwd,
           dipStage: r.dipStage, f30: i + 30 < n ? d.c[i + 30] / d.c[i] - 1 : N, f60: i + 60 < n ? d.c[i + 60] / d.c[i] - 1 : N });
       }
       // Dip sıkışması olay testi: aşamaya ilk giriş günleri (40 gün soğuma)
@@ -923,31 +923,56 @@
   function meanSd(a) { const n = a.length; if (!n) return { m: N, sd: N, n: 0 }; const m = a.reduce((s, x) => s + x, 0) / n; const sd = Math.sqrt(a.reduce((s, x) => s + (x - m) ** 2, 0) / Math.max(1, n - 1)); return { m, sd, n }; }
 
   function summarize(recs, H) {
-    const hMain = H.includes(7) ? 7 : H[0];
+    const hMain = H.includes(7) ? 7 : H[0], DAY = 864e5;
+    // Piyasaya göre fazla getiri: aynı gün tüm coinlerin ortalama getirisi çıkarılır (hepsi birlikte yükseldi etkisini temizler)
+    for (const h of H) {
+      const sum = new Map(), cnt = new Map();
+      for (const r of recs) { if (r.t == null) continue; const k = Math.floor(r.t / DAY); sum.set(k, (sum.get(k) || 0) + r.fwd[h]); cnt.set(k, (cnt.get(k) || 0) + 1); }
+      const gm = meanSd(recs.map(r => r.fwd[h])).m;
+      for (const r of recs) { r.ex = r.ex || {}; const k = r.t == null ? null : Math.floor(r.t / DAY), c = k == null ? 0 : cnt.get(k); r.ex[h] = c >= 5 ? r.fwd[h] - sum.get(k) / c : r.fwd[h] - gm; }
+    }
     const base = {}; for (const h of H) base[h] = meanSd(recs.map(r => r.fwd[h]));
     const baseWin = recs.filter(r => r.fwd[hMain] > 0).length / Math.max(1, recs.length);
-    // Kurallar: olumlu ateşleme (v>0) ve olumsuz ateşleme (v<0) ayrı ölçülür
-    const rules = [];
-    for (const R of RULES) {
-      for (const side of [1, -1]) {
-        const sel = recs.filter(r => r.fired[R.id] != null && Math.sign(r.fired[R.id]) === side);
-        if (sel.length < 15) continue;
-        const st = {}; for (const h of H) st[h] = meanSd(sel.map(r => r.fwd[h]));
-        const edge = st[hMain].m - base[hMain].m;
-        // Örtüşen getiriler nedeniyle etkin örneklem ≈ n / h; t buna göre düzeltilir
-        const nEff = Math.max(2, sel.length / hMain);
-        const t = edge / (st[hMain].sd / Math.sqrt(nEff));
-        const win = sel.filter(r => r.fwd[hMain] > 0).length / sel.length;
-        const dirT = t * side; // beklenen yönde ise pozitif
-        const verdict = dirT > 2 ? 'destek' : dirT > 0.5 ? 'zayif' : dirT < -2 ? 'ters' : 'yok';
-        rules.push({ id: R.id, label: R.label, mod: R.mod, tier: R.tier, p: R.p, side, n: sel.length, mean: st, edge, t, dirT, win, verdict });
+    // Kurallar (her ufuk için ayrı): olumlu ateşleme (v>0) ve olumsuz ateşleme (v<0) ayrı ölçülür; fark piyasaya göre ölçülür
+    const rulesFor = h => {
+      const out = [];
+      for (const R of RULES) {
+        for (const side of [1, -1]) {
+          const sel = recs.filter(r => r.fired[R.id] != null && Math.sign(r.fired[R.id]) === side);
+          if (sel.length < 15) continue;
+          const st = {}; for (const g of H) st[g] = meanSd(sel.map(r => r.fwd[g]));
+          const ex = meanSd(sel.map(r => r.ex[h])), edge = ex.m, edgeRaw = st[h].m - base[h].m;
+          // Örtüşen getiriler nedeniyle etkin örneklem ≈ n / h; t buna göre düzeltilir
+          const nEff = Math.max(2, sel.length / h);
+          const t = edge / (ex.sd / Math.sqrt(nEff));
+          const win = sel.filter(r => r.ex[h] > 0).length / sel.length;
+          const dirT = t * side; // beklenen yönde ise pozitif
+          const verdict = dirT > 2 ? 'destek' : dirT > 0.5 ? 'zayif' : dirT < -2 ? 'ters' : 'yok';
+          out.push({ id: R.id, label: R.label, mod: R.mod, tier: R.tier, p: R.p, side, n: sel.length, mean: st, edge, edgeRaw, t, dirT, win, verdict });
+        }
+      }
+      return out;
+    };
+    const rulesH = {}; for (const h of H) rulesH[h] = rulesFor(h);
+    const rules = rulesH[hMain];
+    // Skor kovaları: her ufukta ham ve piyasaya göre ortalama
+    const buckets = [[0, 30], [30, 45], [45, 60], [60, 75], [75, 101]];
+    const bucketStats = key => buckets.map(([a, b]) => { const sel = recs.filter(r => r[key] >= a && r[key] < b); const st = {}, ex = {}; for (const h of H) { st[h] = meanSd(sel.map(r => r.fwd[h])); ex[h] = meanSd(sel.map(r => r.ex[h])); } return { a, b, n: sel.length, mean: st, ex, win: sel.filter(r => r.fwd[hMain] > 0).length / Math.max(1, sel.length) }; });
+    // Sıra korelasyonu (Spearman benzeri): skor ile ileri getiri
+    const rankCorr = (key, h, useEx) => { const n = recs.length; if (n < 30) return N; const rk = a => { const idx = a.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]); const r = new Array(n); idx.forEach(([, i], k) => r[i] = k); return r; }; const a = rk(recs.map(r => r[key])), b = rk(recs.map(r => useEx ? r.ex[h] : r.fwd[h])); const ma = (n - 1) / 2; let s = 0, sa = 0, sb = 0; for (let i = 0; i < n; i++) { s += (a[i] - ma) * (b[i] - ma); sa += (a[i] - ma) ** 2; sb += (b[i] - ma) ** 2; } return s / Math.sqrt(sa * sb); };
+    const corrH = { raw: {}, ex: {} };
+    for (const k of ['score', 'kesin', 'sezgisel']) { corrH.raw[k] = {}; corrH.ex[k] = {}; for (const h of H) { corrH.raw[k][h] = rankCorr(k, h, false); corrH.ex[k][h] = rankCorr(k, h, true); } }
+    // En yüksek %20 ile en düşük %20 puanlı günlerin karşılaştırması (her ufuk)
+    const quint = {};
+    for (const h of H) {
+      quint[h] = {};
+      for (const k of ['score', 'kesin', 'sezgisel']) {
+        const v = recs.map(r => r[k]).sort((x, y) => x - y), lo = v[Math.floor(v.length * 0.2)], hi = v[Math.floor(v.length * 0.8)];
+        const T = recs.filter(r => r[k] >= hi), B = recs.filter(r => r[k] <= lo);
+        const f = (a, key) => meanSd(a.map(r => key === 'ex' ? r.ex[h] : r.fwd[h])).m;
+        quint[h][k] = { top: { n: T.length, raw: f(T, 'raw'), ex: f(T, 'ex') }, bot: { n: B.length, raw: f(B, 'raw'), ex: f(B, 'ex') }, hi, lo };
       }
     }
-    // Skor kovaları
-    const buckets = [[0, 30], [30, 45], [45, 60], [60, 75], [75, 101]];
-    const bucketStats = key => buckets.map(([a, b]) => { const sel = recs.filter(r => r[key] >= a && r[key] < b); const st = {}; for (const h of H) st[h] = meanSd(sel.map(r => r.fwd[h])); return { a, b, n: sel.length, mean: st, win: sel.filter(r => r.fwd[hMain] > 0).length / Math.max(1, sel.length) }; });
-    // Spearman benzeri: skor ile ileri getiri arasındaki sıra korelasyonu
-    const rankCorr = key => { const n = recs.length; if (n < 30) return N; const rk = a => { const idx = a.map((x, i) => [x, i]).sort((p, q) => p[0] - q[0]); const r = new Array(n); idx.forEach(([, i], k) => r[i] = k); return r; }; const a = rk(recs.map(r => r[key])), b = rk(recs.map(r => r.fwd[hMain])); const ma = (n - 1) / 2; let s = 0, sa = 0, sb = 0; for (let i = 0; i < n; i++) { s += (a[i] - ma) * (b[i] - ma); sa += (a[i] - ma) ** 2; sb += (b[i] - ma) ** 2; } return s / Math.sqrt(sa * sb); };
     // Kapılar
     const gateStats = GATES.map(g => { const sel = recs.filter(r => r.gates.includes(g.id)), rest = recs.filter(r => !r.gates.includes(g.id)); return { id: g.id, label: g.label, n: sel.length, mean: meanSd(sel.map(r => r.fwd[hMain])).m, restMean: meanSd(rest.map(r => r.fwd[hMain])).m }; });
     // Önerilen ağırlık çarpanları: kanıta göre 0.25–1.75
@@ -972,10 +997,10 @@
     const brk = recs.filter(r => r.dipStage === -1);
     const dip = { base30, base60, base30win: fin(recs.map(r => r.f30)).filter(x => x > 0).length / Math.max(1, fin(recs.map(r => r.f30)).length), stages: dipStages,
       breakdown: { days: brk.length, in30: meanSd(fin(brk.map(r => r.f30))).m } };
-    return { n: recs.length, symbols: [...new Set(recs.map(r => r.sym))], horizons: H, hMain, base, baseWin, rules, dip,
+    return { n: recs.length, symbols: [...new Set(recs.map(r => r.sym))], horizons: H, hMain, base, baseWin, rules, rulesH, dip,
       buckets: { score: bucketStats('score'), kesin: bucketStats('kesin'), sezgisel: bucketStats('sezgisel') },
-      corr: { score: rankCorr('score'), kesin: rankCorr('kesin'), sezgisel: rankCorr('sezgisel'), raw: rankCorr('raw') },
-      gates: gateStats, suggestedWeights: sugg, generated: Date.now() };
+      corr: { score: corrH.raw.score[hMain], kesin: corrH.raw.kesin[hMain], sezgisel: corrH.raw.sezgisel[hMain], raw: rankCorr('raw', hMain, false) },
+      corrH, quint, gates: gateStats, suggestedWeights: sugg, generated: Date.now() };
   }
 
 
