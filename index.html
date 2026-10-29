@@ -58,6 +58,15 @@ h3{font-weight:700;font-size:15px;margin:0}
 .tab[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 
 /* Görünüm seçici */
+.ig{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:12px 0 2px}
+.ind{padding:9px 0;border-top:1px solid var(--line2)}
+.ih{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.iv{font-size:13px;font-weight:600;word-break:break-word;text-align:right}
+.ic2{margin:3px 0 4px}
+.chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
+.c-p{background:var(--good-soft);color:var(--good)} .c-n{background:var(--bad-soft);color:var(--bad)} .c-z{background:var(--line2);color:var(--ink2)} .c-w{background:var(--warn-soft);color:var(--warn)}
+.spark{display:block;width:100%;height:54px;margin:2px 0 4px;background:var(--bg);border-radius:8px}
+.inote{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink2)}
 .ib{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--mute);background:none;color:var(--mute);font:italic 700 11px/1 Georgia,serif;padding:0;vertical-align:1px;margin-left:2px;cursor:pointer}
 .tfbar{position:sticky;top:62px;z-index:2;background:var(--bg);display:flex;align-items:center;gap:10px;padding:2px 0 8px;flex-wrap:wrap}
 .tfbar .seg button{padding:7px 12px;font-weight:700}
@@ -533,12 +542,12 @@ body.fs-on{overflow:hidden}
     I.macdSig = ema(I.macd, 9);
     I.macdHist = I.macd.map((x, i) => x - I.macdSig[i]);
 
-    // SMI Ergodic (TSI tabanlı: Fast 4 / Slow 8 / Sinyal 3, bantlar ±0.5)
+    // SMI Ergodic (TradingView varsayılanı: TSI(kısa 5, uzun 20), sinyal EMA 5; bantlar ±0.5)
     const mom = arr(n), amom = arr(n);
     for (let i = 1; i < n; i++) { mom[i] = c[i] - c[i - 1]; amom[i] = Math.abs(mom[i]); }
-    const num = ema(ema(mom, 8), 4), den = ema(ema(amom, 8), 4);
+    const num = ema(ema(mom, 20), 5), den = ema(ema(amom, 20), 5);
     I.smi = num.map((x, i) => isF(x) && den[i] > 0 ? x / den[i] : N);
-    I.smiSig = ema(I.smi, 3);
+    I.smiSig = ema(I.smi, 5);
 
     // Fisher 9
     const hl2 = h.map((x, i) => (x + l[i]) / 2), mx9 = rollMax(hl2, 9), mn9 = rollMin(hl2, 9);
@@ -1638,6 +1647,19 @@ const INFO = {
   _fibhedef: ['Sıradaki fib hedefi', 'Trend temelli fib’in fiyata en yakın bir sonraki hedefi.', 'Fiyat bu seviyeye gelince kâr alma ya da direnç bölgesi olarak izlenir.'],
   _kesin: ['Kesin kurallar puanı', 'Yalnızca tanımı net, standart teknik analiz kurallarıyla hesaplanan puan.', 'Daha güvenilir kısımdır. Sezgisel puanla büyük fark varsa kursa özgü iddialar ağırlık yapıyordur.'],
   _sezgisel: ['Sezgisel kurallar puanı', 'Kursa özgü ya da yoruma açık kuralların puanı.', 'Geri testle doğrulanmadıkça temkinli oku.'],
+  _i_rsi: ['RSI (14, Wilder)', 'Fiyat değişimlerinin gücünü 0–100 arasında ölçer. TradingView’daki RSI ile aynı formül (14 periyot, Wilder yumuşatması).', '50 üstü alıcı, altı satıcı kontrolü. 50 altında kursa göre işlem yok. 70’i geçemeyen yapı zayıf; 70 üstü çıkanlar en az %7–8 getirili yapı. 70’ten inip 50–60’ta kalıyorsa işlemde olma. Tepe/dip uyumsuzluğu dönüş habercisidir.'],
+  _i_macd: ['MACD (12, 26, 9)', 'İki EMA’nın farkı (MACD çizgisi), onun 9 periyotluk EMA’sı (sinyal) ve aradaki fark (histogram). TradingView ile aynı.', 'Aklına gelecek tek şey fiyat yönü; gecikmelidir, kesişimler azdır. Sinyal üstü ve 0 üstü tercih nedeni; 0 altı risklidir. Aradaki açı büyüyorsa daha sert hareket gelir. “Her şey sat derken MACD satmıyorsa satmam.”'],
+  _i_smi: ['SMI Ergodic (TSI 5 / 20, sinyal 5)', 'Çift yumuşatılmış momentum oranı (TradingView SMI Ergodic varsayılanı: kısa 5, uzun 20, sinyal EMA 5). Çoğunlukla −1…+1 arasında; kursa göre ±0,5 aşırılık bandı.', '+0,5 üstü ve −0,5 altındaki dip/tepeleri baz al. Aşırı sinyal verir; MACD ile birlikte kullan: SMI ile gir, MACD ile çık. 0,5 üstündeki SMI dönüşü MACD’ye kesişim yaptırır.'],
+  _i_fisher: ['Fisher Transform (9)', 'Fiyatı normal dağılıma yaklaştırarak dönüş noktalarını belirginleştirir. Çizgi ve bir önceki mumdaki değeri (tetik) kesişir.', 'Fiyatı düzeltmeye çalışır, daha az zigzag verir. Çizgi tetiği aşağıdan keserse yukarı, yukarıdan keserse aşağı dönüş sinyali. ±1,5 üzeri uç bölgedir.'],
+  _i_wt: ['WaveTrend / WT Cross (10, 21)', 'LazyBear WaveTrend: iki çizgi (WT1, WT2). ±53 aşırı bölge, ±60 daha uç bölge.', 'Aşırı satımda (−53 altı) yukarı kesişim al, aşırı alımda (+53 üstü) aşağı kesişim sat sinyali. Kesişimin hangi bölgede olduğu önemli.'],
+  _i_vortex: ['Vortex VI (14)', 'VI+ yukarı, VI− aşağı hareketin gücünü ölçer. Trend göstergesidir.', 'VI+ üstteyse yukarı trend, VI− üstteyse aşağı. Çizgiler arası “ağız” açılıyorsa trend güçleniyor; kesişim patlaması yeni trend başlangıcı olabilir.'],
+  _i_mfi: ['MFI (14)', 'Hacim ağırlıklı RSI: tipik fiyat × hacimle para girişi/çıkışını ölçer. Gerçeğe daha yatkın, RSI’dan daha az zigzag.', '50 üstü para girişi, altı para çıkışı. 10’a değiyorsa kursa göre “kesin al” (sezgisel). 90 üstü aşırı alım. Fiyat ile MFI uyumsuzluğu dönüş habercisidir.'],
+  _i_cmf: ['CMF (20)', 'Chaikin Para Akışı: mumun kapanışının aralıktaki yerine göre hacim baskısını ölçer, −1…+1.', '0 üstü para girişi, 0 altı para çıkışı. 0,2 üstü güçlü alım (3–4 gün rahat). Fiyat yükselirken CMF 0 altındaysa yükseliş yanıltıcıdır. 0’ı yukarı kesmesi fiyatı iter.'],
+  _i_di: ['Demand Index (yaklaşık)', 'Alış ve satış baskısını hacim ve fiyat değişimiyle birleştirir, −1…+1. Sibbet yaklaşımıyla hesaplanır; TradingView’daki ile birebir aynı olmayabilir.', 'Genelde zigzagları net gösterir, trend çizilebilir. 0 üstü talep güçlü. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol. Fiyat düşerken talep sabitse düşüş sahte olabilir.'],
+  _i_vol: ['Hacim', 'Son kapanmış mumun hacminin son 20 mumun ortalamasına oranı (baz coin hacmi, TradingView ile aynı).', 'Kırılımın güvenilir sayılması için 1,5 kat ve üstü beklenir. Düşük hacimli kırılım sahte olabilir. Hacimsiz yatay seyir mal toplama/dağıtma olabilir.'],
+  _i_ma: ['Hareketli ortalamalar (SMA 9/20/50/100/200)', 'Kapanışların basit ortalamaları. Fiyatın ve ortalamaların birbirine göre konumu trend yönünü verir.', '9>20>50>100>200 dizilimi güçlü yükseliş. MA200 geçilmeden işleme girilmez. Hepsinin altı “tutunacak dal yok”. Dipte hepsi iç içe geçtiyse maliyetlenme.'],
+  _i_ema: ['EMA 5 / EMA 10', 'Çok kısa vadeli üstel ortalamalar; kısa vade trend yönünü verir.', 'EMA5 üstteyse kısa vade yukarı. Aşağı döndüyse long kovalama (puan tavanı 55). Taze kesişim erken sinyaldir.'],
+  _i_atr: ['ATR (14)', 'Ortalama gerçek aralık: bir mumun tipik oynaklığı. Yüzde olarak fiyata oranı verilir.', 'Yüksekse oynaklık fazla: stop mesafesini ve beklenen hareketi buna göre düşün. Destek/direnç yakınlığı ATR cinsinden ölçülür.'],
   _m_dip: ['Dip sıkışması modülü', 'Dipte ortalamaların iç içe geçmesi ve çıkış hazırlığı.', 'Yüksekse maliyetlenme kurulumu güçlü demektir.'],
   _m_trend: ['Trend ve ortalamalar modülü', 'MA dizilimi, eğimler, trend çizgileri.', 'Yüksekse yön yukarı, düşükse aşağı.'],
   _m_yapi: ['Yapı modülü', 'Pin, William, fib ve dirgen kuralları.', 'Destek-direnç ve fib seviyelerinin fiyat için ne söylediğini toplar.'],
@@ -1674,7 +1696,7 @@ async function get(path) {
   }
   throw last;
 }
-const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[7]) });
+const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[5]) });
 // Tüm USDT pariteleri: işlem gören (son 2 günde fiyatı oluşmuş), hacmi olan, stabil/kaldıraçlı olmayanlar; hacme göre sıralı
 async function loadLive() {
   setStatus('Coin listesi alınıyor…', '');
@@ -1874,6 +1896,108 @@ async function ensureTF(x, tf) {
 }
 
 // ───────── Coin sayfası ─────────
+// ───────── Göstergeler paneli ─────────
+const nf = (v, dg = 2) => isFinite(v) ? v.toLocaleString('tr-TR', { minimumFractionDigits: dg, maximumFractionDigits: dg }) : '—';
+function crossOf(a, b, i, max = 40) {
+  for (let q = i; q > Math.max(1, i - max); q--) { const p0 = a[q - 1] - b[q - 1], p1 = a[q] - b[q]; if (isFinite(p0) && isFinite(p1) && ((p0 <= 0 && p1 > 0) || (p0 >= 0 && p1 < 0))) return { age: i - q, up: p1 > 0 }; }
+  return null;
+}
+const ago2 = c => c ? (c.age === 0 ? 'bu mumda' : c.age + ' mum önce') : '';
+function spark(lines, o) {
+  const W = 300, H = 54, end = o.end, beg = Math.max(0, end - (o.n || 90) + 1);
+  let lo = o.min, hi = o.max;
+  if (lo == null || hi == null) { let mn = Infinity, mx = -Infinity; for (const s of lines) for (let q = beg; q <= end; q++) { const v = s.a[q]; if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); } } for (const r of (o.refs || [])) { mn = Math.min(mn, r); mx = Math.max(mx, r); } if (!isFinite(mn)) return ''; const pad = (mx - mn) * 0.08 || 1; lo = mn - pad; hi = mx + pad; }
+  const X = q => ((q - beg) / Math.max(1, end - beg)) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
+  let s = `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
+  for (const r of (o.refs || [])) if (r >= lo && r <= hi) s += `<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`;
+  for (const b of (o.bars || [])) { const bw = W / ((end - beg) + 1) * 0.7; for (let q = beg; q <= end; q++) { const v = b.a[q]; if (!isFinite(v)) continue; const y0 = Y(0), y1 = Y(v); s += `<rect x="${X(q) - bw / 2}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(0.5, Math.abs(y1 - y0))}" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" opacity=".45"/>`; } }
+  for (const l of lines) { let d = ''; for (let q = beg; q <= end; q++) { const v = l.a[q]; if (!isFinite(v)) continue; d += (d ? 'L' : 'M') + X(q).toFixed(1) + ' ' + Y(v).toFixed(1); } if (d) s += `<path d="${d}" fill="none" stroke="${l.col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`; }
+  return s + '</svg>';
+}
+function indRows(I, d, i) {
+  const c = d.c, R = [], A = 'var(--accent)', B = 'var(--warn)', M = 'var(--mute)';
+  const add = (x) => R.push(x);
+  // RSI
+  { const v = I.rsi[i]; let mx = 0; for (let q = Math.max(0, i - 9); q <= i; q++) if (isFinite(I.rsi[q])) mx = Math.max(mx, I.rsi[q]);
+    const prev = I.rsi[i - 1], k50 = isFinite(prev) && prev < 50 && v >= 50 ? ' 50’yi yeni yukarı kesti: yükseliş habercisi.' : '';
+    let st, lab, note;
+    if (v >= 70) { st = 'w'; lab = '70 üstü'; note = '70 üzeri: kursa göre en az %7–8 getirili yapı. Çıkış için 70 üzerinde uyumsuzluk ara.'; }
+    else if (v >= 50) { if (mx >= 70 && v < 60) { st = 'n'; lab = '70’ten iniyor'; note = '70’ten gelip 50–60’ta: işlemde olma.'; } else { st = 'p'; lab = '50 üstü'; note = '50 üstü: alıcılar kontrolde. 70’i geçemeyen yapı zayıftır.' + k50; } }
+    else if (v >= 30) { st = 'n'; lab = '50 altı'; note = '50 altında kesinlikle işlemde olunmaz (kurs). 50’ye aşağıdan gelip üstüne geçmek yükseliş habercisidir.'; }
+    else { st = 'w'; lab = 'aşırı satım'; note = '30 altı: aşırı satım. Yine de 50 üstüne dönmeden işlem yok; dip uyumsuzluğu ara.'; }
+    add({ g: 'Momentum', k: '_i_rsi', t: 'RSI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.rsi, col: A }], { end: i, min: 0, max: 100, refs: [30, 50, 70] }) }); }
+  // MACD
+  { const m = I.macd[i], sg = I.macdSig[i], h = I.macdHist[i], h1 = I.macdHist[i - 1], cr = crossOf(I.macd, I.macdSig, i);
+    const up = m > sg, z = m > 0; let st, lab;
+    if (up && z) { st = 'p'; lab = 'sinyal üstü · 0 üstü'; } else if (up) { st = 'z'; lab = 'sinyal üstü · 0 altı'; } else if (z) { st = 'n'; lab = 'sinyal altı · 0 üstü'; } else { st = 'n'; lab = 'sinyal altı · 0 altı'; }
+    const note = `MACD sinyalin ${up ? 'üstünde: fiyat yönü yukarı' : 'altında: fiyat yönü aşağı'}. ${z ? '0 üstü: tercih nedeni.' : '0 altı: riskli bölge.'} ${isFinite(h1) && Math.abs(h) > Math.abs(h1) ? 'Aradaki açı büyüyor: daha sert hareket gelebilir.' : 'Açı daralıyor.'}${cr ? ' Son kesişim ' + ago2(cr) + (cr.up ? ' (yukarı).' : ' (aşağı).') : ''} Gecikmelidir.`;
+    add({ g: 'Momentum', k: '_i_macd', t: 'MACD (12,26,9)', val: `${nf(m, 4)} / ${nf(sg, 4)}`, st, lab, note, sp: spark([{ a: I.macd, col: A }, { a: I.macdSig, col: B }], { end: i, bars: [{ a: I.macdHist }], refs: [0] }) }); }
+  // SMI
+  { const v = I.smi[i], sg = I.smiSig[i], cr = crossOf(I.smi, I.smiSig, i);
+    let st, lab, note;
+    if (v >= 0.5) { st = 'w'; lab = '+0,5 üstü'; note = '+0,5 üstü: aşırı bölge. Buradan dönüş MACD’ye kesişim yaptırır; tepe arama bölgesi.'; }
+    else if (v <= -0.5) { st = 'w'; lab = '−0,5 altı'; note = '−0,5 altı: aşırı bölge. Dip arama bölgesi; yukarı dönüşte SMI ile gir, MACD ile çık.'; }
+    else { st = v > sg ? 'p' : 'n'; lab = v > sg ? 'sinyal üstü' : 'sinyal altı'; note = `Aşırı bölgede değil (±0,5 içinde). SMI sinyalin ${v > sg ? 'üstünde' : 'altında'}. Aşırı sinyal verir, MACD ile eşleştir.`; }
+    if (cr) note += ` Son kesişim ${ago2(cr)} (${cr.up ? 'yukarı' : 'aşağı'}).`;
+    add({ g: 'Momentum', k: '_i_smi', t: 'SMI Ergodic', val: `${nf(v, 2)} / ${nf(sg, 2)}`, st, lab, note, sp: spark([{ a: I.smi, col: A }, { a: I.smiSig, col: B }], { end: i, refs: [-0.5, 0, 0.5] }) }); }
+  // Fisher
+  { const f = I.fisher[i], tg = I.fisherTrig[i], cr = crossOf(I.fisher, I.fisherTrig, i), up = f > tg;
+    let st = up ? 'p' : 'n', lab = up ? 'tetik üstü' : 'tetik altı';
+    if (Math.abs(f) >= 1.5) { st = 'w'; lab = f > 0 ? '+1,5 üstü' : '−1,5 altı'; }
+    add({ g: 'Momentum', k: '_i_fisher', t: 'Fisher (9)', val: `${nf(f, 2)} / ${nf(tg, 2)}`, st, lab, note: `Fisher tetiğin ${up ? 'üstünde: yukarı yönlü' : 'altında: aşağı yönlü'}. Fiyatı düzeltmeye çalışır, daha az zigzag verir.${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}${Math.abs(f) >= 1.5 ? ' Uç bölgede: dönüş ihtimali.' : ''}`, sp: spark([{ a: I.fisher, col: A }, { a: I.fisherTrig, col: B }], { end: i, refs: [-1.5, 0, 1.5] }) }); }
+  // WT
+  { const a = I.wt1[i], b = I.wt2[i], cr = crossOf(I.wt1, I.wt2, i), up = a > b;
+    let st = up ? 'p' : 'n', lab = up ? 'WT1 > WT2' : 'WT1 < WT2', note = `WT1 ${up ? 'üstte' : 'altta'}.`;
+    if (a >= 53) { st = 'w'; lab = 'aşırı alım'; note += ' +53 üstü: aşırı alım; aşağı kesişim sat sinyali olur.'; } else if (a <= -53) { st = 'w'; lab = 'aşırı satım'; note += ' −53 altı: aşırı satım; yukarı kesişim al sinyali olur.'; }
+    if (cr) note += ` Son kesişim ${ago2(cr)} (${cr.up ? 'yukarı' : 'aşağı'}${Math.abs(a) >= 53 ? ', uç bölgede' : ''}).`;
+    add({ g: 'Momentum', k: '_i_wt', t: 'WT Cross (10,21)', val: `${nf(a, 1)} / ${nf(b, 1)}`, st, lab, note, sp: spark([{ a: I.wt1, col: A }, { a: I.wt2, col: B }], { end: i, refs: [-53, 0, 53] }) }); }
+  // Vortex
+  { const p2 = I.viP[i], m2 = I.viM[i], up = p2 > m2, gap = p2 - m2, gap3 = I.viP[i - 3] - I.viM[i - 3], cr = crossOf(I.viP, I.viM, i);
+    const opening = isFinite(gap3) && Math.abs(gap) > Math.abs(gap3) + 0.05;
+    add({ g: 'Momentum', k: '_i_vortex', t: 'Vortex VI (14)', val: `${nf(p2, 2)} / ${nf(m2, 2)}`, st: up ? 'p' : 'n', lab: up ? 'VI+ üstte' : 'VI− üstte', note: `${up ? 'VI+ üstte: yukarı trend gücü' : 'VI− üstte: aşağı trend gücü'}. ${opening ? 'Ağız açılıyor: trend güçleniyor.' : 'Ağız genişlemiyor.'}${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}`, sp: spark([{ a: I.viP, col: 'var(--good)' }, { a: I.viM, col: 'var(--bad)' }], { end: i, refs: [1] }) }); }
+  // MFI
+  { const v = I.mfi[i]; let st, lab, note;
+    if (v <= 10) { st = 'w'; lab = '10’a değdi'; note = 'MFI 10’a değdi: kursa göre “kesin al” (sezgisel iddia). Para çıkışı bitmiş olabilir; fiyat teyidi bekle.'; }
+    else if (v >= 90) { st = 'w'; lab = '90 üstü'; note = '90 üstü: aşırı alım. Yükseliş yorulabilir.'; }
+    else if (v >= 50) { st = 'p'; lab = 'para girişi'; note = '50 üstü: para girişi var.'; }
+    else { st = 'n'; lab = 'para çıkışı'; note = '50 altı: para çıkışı var.'; }
+    add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90] }) }); }
+  // CMF
+  { const v = I.cmf[i], rising = c[i] > c[Math.max(0, i - 10)]; let st, lab, note;
+    if (v > 0.2) { st = 'p'; lab = 'güçlü alım'; note = '0,2 üstü: güçlü alım baskısı; kursa göre 3–4 gün rahat.'; }
+    else if (v > 0) { st = 'p'; lab = 'para girişi'; note = '0 üstü: para girişi var.'; }
+    else { st = 'n'; lab = 'para çıkışı'; note = '0 altı: para çıkışı var.'; }
+    if (v < 0 && rising) note += ' Fiyat yükseliyor ama CMF 0 altı: yükseliş yanıltıcı olabilir.';
+    const cr = crossOf(I.cmf, I.cmf.map(() => 0), i, 10); if (cr && cr.up) note += ` 0’ı yeni yukarı kesti (${ago2(cr)}): fiyatı iter.`;
+    add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2] }) }); }
+  // Demand Index
+  { const v = I.di[i]; if (isFinite(v)) add({ g: 'Para akışı', k: '_i_di', t: 'Demand Index', val: nf(v, 2), st: v > 0 ? 'p' : 'n', lab: v > 0 ? 'talep güçlü' : 'talep zayıf', note: v > 0 ? '0 üstü: talep güçlü.' : '0 altı: talep zayıf. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol.', sp: spark([{ a: I.di, col: A }], { end: i, refs: [0] }) }); }
+  // Hacim
+  { const vr = d.v[i] / I.volSma20[i - 1]; if (isFinite(vr)) add({ g: 'Para akışı', k: '_i_vol', t: 'Hacim / 20 ort.', val: nf(vr, 2) + '×', st: vr >= 1.5 ? 'p' : vr < 0.7 ? 'n' : 'z', lab: vr >= 1.5 ? 'hacimli' : vr < 0.7 ? 'düşük hacim' : 'normal', note: vr >= 1.5 ? 'Ortalamanın 1,5 katı ve üstü: kırılım için güvenilir hacim.' : vr < 0.7 ? 'Ortalamanın altında: kırılım olsa da sahte olabilir.' : 'Normal hacim: kırılım için 1,5 kat beklenir.', sp: spark([{ a: d.v.map((x, q) => x / I.volSma20[q - 1]), col: A }], { end: i, min: 0, refs: [1, 1.5] }) }); }
+  // Ortalamalar
+  { const px = c[i], m = [['9', I.sma9], ['20', I.sma20], ['50', I.sma50], ['100', I.sma100], ['200', I.sma200]].map(([n, a]) => [n, a[i]]);
+    const ok = m.filter(([, v]) => isFinite(v)), above = ok.filter(([, v]) => px > v).length, ordered = ok.every(([, v], q) => q === 0 || ok[q - 1][1] > v);
+    let st = above === ok.length ? 'p' : above === 0 ? 'n' : 'z', lab = `${above}/${ok.length} üstünde`;
+    const note = `${ordered && ok.length === 5 ? 'Tam dizilim (9>20>50>100>200): güçlü yükseliş. ' : ''}${above === 0 ? 'Bütün ortalamaların altında: tutunacak dal yok. ' : ''}${isFinite(I.sma200[i]) ? (px > I.sma200[i] ? 'MA200 üstünde. ' : 'MA200 altında: geçilmeden işleme girilmez. ') : 'MA200 için yeterli mum yok. '}Fiyat ile MA200 farkı ${isFinite(I.sma200[i]) ? nf((px / I.sma200[i] - 1) * 100, 1) + '%' : '—'}.`;
+    add({ g: 'Trend', k: '_i_ma', t: 'Ortalamalar (SMA)', val: ok.map(([n, v]) => n + ': ' + fmt(v)).join(' · '), st, lab, note, sp: spark([{ a: c, col: M }, { a: I.sma20, col: A }, { a: I.sma50, col: B }, { a: I.sma200, col: 'var(--ink)' }], { end: i }) }); }
+  // EMA 5/10
+  { const e5 = I.ema5[i], e10 = I.ema10[i], up = e5 > e10, cr = crossOf(I.ema5, I.ema10, i, 60);
+    add({ g: 'Trend', k: '_i_ema', t: 'EMA 5 / EMA 10', val: `${fmt(e5)} / ${fmt(e10)}`, st: up ? 'p' : 'n', lab: up ? 'yukarı' : 'aşağı', note: up ? 'EMA5 üstte: kısa vade yukarı.' : 'EMA5 altta: günlükte 5/10 aşağıysa long kovalama; puan tavanı 55.' + (cr ? ` Son kesişim ${ago2(cr)}.` : ''), sp: '' }); if (up && cr) R[R.length - 1].note += ` Son kesişim ${ago2(cr)}.`; }
+  // ATR
+  { const a = I.atr[i]; if (isFinite(a)) add({ g: 'Trend', k: '_i_atr', t: 'ATR (14)', val: nf((a / c[i]) * 100, 2) + '% (' + fmt(a) + ')', st: 'z', lab: 'oynaklık', note: 'Bir mumun tipik oynaklığı. Stop ve hedef mesafesini buna göre ayarla.', sp: spark([{ a: I.atr.map((x, q) => x / c[q] * 100), col: A }], { end: i, min: 0 }) }); }
+  return R;
+}
+function indCard(I, d, i) {
+  const rows = indRows(I, d, i), CHIP = { p: 'c-p', n: 'c-n', z: 'c-z', w: 'c-w' };
+  const dt = new Date(d.t[i]).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' });
+  let html = '', g = '';
+  for (const r of rows) {
+    if (r.g !== g) { g = r.g; html += `<div class="ig">${esc(g)}</div>`; }
+    html += `<div class="ind"><div class="ih"><span class="in1"><b>${esc(r.t)}</b> ${ib(r.k)}</span><span class="iv num">${esc(r.val)}</span></div><div class="ic2"><span class="chip ${CHIP[r.st]}">${esc(r.lab)}</span></div>${r.sp || ''}<p class="inote">${esc(r.note)}</p></div>`;
+  }
+  return `<div class="card"><div class="sect">Göstergeler</div><p class="small muted" style="margin:0 0 4px">Son kapanmış mum (${dt}) değerleri. TradingView’da içinde bulunulan mumu görürsen küçük farklar olabilir. Grafiklerde son yaklaşık 90 mum var.</p>${html}</div>`;
+}
+
 function renderDetail() {
   const el = $('#detail'), x = S.coins.find(c => c.sym === S.sel);
   if (!x || !x.res) { el.innerHTML = ''; return; }
@@ -1892,7 +2016,7 @@ function renderDetail() {
       <div class="readout" id="readout">Tam ekran için grafiğe dokunun.</div>
     </div>`;
   if (!r) {
-    body = `<div class="card say"><div class="sect">Puan</div><p class="help" style="margin:0">Bu zaman diliminde puan için yeterli geçmiş yok (${D.d.c.length} mum). ${tf === '1m' || tf === '1w' ? 'Genç coinlerde haftalık ve aylık puan çıkmayabilir.' : ''} Aşağıda trend ve grafik yine de gösteriliyor.</p></div>${trendCard(x, tf)}${chartCard}`;
+    body = `<div class="card say"><div class="sect">Puan</div><p class="help" style="margin:0">Bu zaman diliminde puan için yeterli geçmiş yok (${D.d.c.length} mum). ${tf === '1m' || tf === '1w' ? 'Genç coinlerde haftalık ve aylık puan çıkmayabilir.' : ''} Aşağıda trend ve grafik yine de gösteriliyor.</p></div>${trendCard(x, tf)}${chartCard}${indCard(I, d, d.c.length - 2)}`;
   } else {
     const ctx = r.ctx, i = r.i, chg = d.c[i] / d.c[i - 1] - 1;
     const pos = bulletsR(r, 1, 4), neg = bulletsR(r, -1, 4);
@@ -1930,6 +2054,7 @@ function renderDetail() {
     ${dipCard}
     ${trendCard(x, tf)}
     ${chartCard}
+    ${indCard(I, d, i)}
     ${tiles.length ? `<div class="card"><div class="sect">Önemli seviyeler</div><div class="tiles">${tiles.map(([k, v, dd, key]) => `<div class="tile"><div class="k">${esc(k)} ${ib(key)}</div><div class="v">${esc(v)}</div><div class="d">${esc(dd)}</div></div>`).join('')}</div></div>` : ''}
     <div class="card"><details class="more"><summary>Teknik ayrıntılar (${r.rules.length} kural)</summary>
       <div class="tiles" style="margin:8px 0 12px"><div class="tile"><div class="k">Kesin kurallar puanı ${ib('_kesin')}</div><div class="v">${r.kesin.toFixed(0)}</div></div><div class="tile"><div class="k">Sezgisel kurallar puanı ${ib('_sezgisel')}</div><div class="v">${r.sezgisel.toFixed(0)}</div></div></div>

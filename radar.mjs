@@ -24,7 +24,7 @@ async function get(path) {
   }
   throw last;
 }
-const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[7]) });
+const toSeries = rows => ({ t: rows.map(r => r[0]), o: rows.map(r => +r[1]), h: rows.map(r => +r[2]), l: rows.map(r => +r[3]), c: rows.map(r => +r[4]), v: rows.map(r => +r[5]) });
 
 async function universe() {
   const custom = opt('symbols', '');

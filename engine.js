@@ -219,12 +219,12 @@
     I.macdSig = ema(I.macd, 9);
     I.macdHist = I.macd.map((x, i) => x - I.macdSig[i]);
 
-    // SMI Ergodic (TSI tabanlı: Fast 4 / Slow 8 / Sinyal 3, bantlar ±0.5)
+    // SMI Ergodic (TradingView varsayılanı: TSI(kısa 5, uzun 20), sinyal EMA 5; bantlar ±0.5)
     const mom = arr(n), amom = arr(n);
     for (let i = 1; i < n; i++) { mom[i] = c[i] - c[i - 1]; amom[i] = Math.abs(mom[i]); }
-    const num = ema(ema(mom, 8), 4), den = ema(ema(amom, 8), 4);
+    const num = ema(ema(mom, 20), 5), den = ema(ema(amom, 20), 5);
     I.smi = num.map((x, i) => isF(x) && den[i] > 0 ? x / den[i] : N);
-    I.smiSig = ema(I.smi, 3);
+    I.smiSig = ema(I.smi, 5);
 
     // Fisher 9
     const hl2 = h.map((x, i) => (x + l[i]) / 2), mx9 = rollMax(hl2, 9), mn9 = rollMin(hl2, 9);
