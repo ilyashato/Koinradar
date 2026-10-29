@@ -73,6 +73,9 @@ h3{font-weight:700;font-size:15px;margin:0}
 .tcrow{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}
 .tcrow .sect{margin:0}
 .row2{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:6px}
+.listtf{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 8px;flex-wrap:wrap}
+.listtf .seg button{padding:7px 12px;font-weight:700}
+.view:disabled{opacity:.4}
 .views{display:flex;gap:8px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px}
 .view{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;white-space:nowrap;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
 .view b{font-family:var(--f-num);font-weight:600;font-size:12.5px;color:var(--mute)}
@@ -228,10 +231,11 @@ body.fs-on{overflow:hidden}
   <section id="view-radar">
     <div class="grid">
       <div>
+        <div class="listtf"><span class="small muted">Puan zaman dilimi</span><div class="seg" id="listTF" aria-label="Puan zaman dilimi"></div></div>
         <div class="views" id="views">
-          <button class="view" type="button" data-v="guclu" aria-pressed="true">Güçlüler <b id="n-guclu">0</b></button>
+          <button class="view" type="button" data-v="tum" aria-pressed="true">Tümü <b id="n-tum">0</b></button>
+          <button class="view" type="button" data-v="guclu" aria-pressed="false">Güçlüler <b id="n-guclu">0</b></button>
           <button class="view" type="button" data-v="dip" aria-pressed="false">Dipten dönüş adayları <b id="n-dip">0</b></button>
-          <button class="view" type="button" data-v="tum" aria-pressed="false">Tümü <b id="n-tum">0</b></button>
           <button class="view" type="button" data-v="fav" aria-pressed="false">★ Favoriler <b id="n-fav">0</b></button>
         </div>
         <p class="viewhelp" id="viewhelp"></p>
@@ -1438,7 +1442,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('cr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('cr_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', view: store.get('view', 'guclu'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true) };
+const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true) };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -1684,7 +1688,7 @@ async function loadLive() {
   // Yeni liste: veriler geldikçe ekranda görünür
   S.coins = []; S.young = 0; S.total = syms.length; S.loading = true; S.source = 'live'; S.bt = null; S.useW = false;
   let done = 0, k = 0, last = 0;
-  const flush = (force) => { const n = Date.now(); if (force || n - last > 700) { last = n; S.btc = S.coins.find(x => x.sym === 'BTCUSDT') || null; render(); } };
+  const flush = (force) => { const n = Date.now(); if (force || n - last > 2500) { last = n; S.btc = S.coins.find(x => x.sym === 'BTCUSDT') || null; render(); } };
   await Promise.all(Array.from({ length: 8 }, async () => {
     while (k < syms.length) {
       const sym = syms[k++];
@@ -1703,7 +1707,7 @@ async function loadLive() {
   }));
   S.loading = false;
   if (!S.coins.length) throw new Error('veri yok');
-  flush(true);
+  flush(true); loadTFAll(S.listTF);
 }
 function demoCoins() {
   const names = ['ÖRNEK-A', 'ÖRNEK-B', 'ÖRNEK-C', 'ÖRNEK-D', 'ÖRNEK-E', 'ÖRNEK-F', 'ÖRNEK-G', 'ÖRNEK-H', 'ÖRNEK-I', 'ÖRNEK-J', 'ÖRNEK-K', 'ÖRNEK-L'];
@@ -1757,7 +1761,7 @@ function srcStatus() {
 }
 const scoreCls = k => 's-' + k;
 let shownSym = null;
-function render() { srcStatus(); renderMarket(); renderViews(); renderList(); if (!(S.loading && shownSym === S.sel)) renderDetail(); renderRules(); if (S.bt) renderBT(); syncAdv(); }
+function render() { srcStatus(); renderMarket(); renderViews(); renderList(); if (!(S.loading && shownSym === S.sel)) renderDetail(); renderRules(); if (S.bt && !S.loading) renderBT(); syncAdv(); }
 
 function renderMarket() {
   const el = $('#market'), b = S.btc && S.btc.res;
@@ -1770,25 +1774,32 @@ function renderMarket() {
 }
 
 // ───────── Görünümler ─────────
+Object.defineProperty(S, 'view', { get() { const f = effFlt(); return f.includes('dip') ? 'dip' : f.includes('guclu') ? 'guclu' : f.includes('fav') ? 'fav' : 'tum'; } });
+const effFlt = () => S.flt.filter(v => v !== 'dip' || S.listTF === '1d');
+const rOf = x => S.listTF === '1d' ? x.res : evalTF(x, S.listTF);
+const listCoins = () => S.coins.filter(x => x.res && rOf(x));
 function dipRank(r) { return r.dipStage === 0 ? -1 : r.dipStage === -1 ? -0.5 : r.dip + (r.dipStage === 2 || r.dipStage === 3 ? 5 : 0); }
 const isFav = s => S.fav.includes(s);
-function inView(x, v) { const r = x.res; if (v === 'fav') return isFav(x.sym); if (v === 'guclu') return r.score >= 60; if (v === 'dip') return r.dipStage >= 1 && r.dipStage <= 3; return true; }
+function inView(x, v) { const r = rOf(x); if (!r) return false; if (v === 'fav') return isFav(x.sym); if (v === 'guclu') return r.score >= 60; if (v === 'dip') return S.listTF === '1d' && r.dipStage >= 1 && r.dipStage <= 3; return true; }
 const HELP = {
-  guclu: 'Puanı 60 ve üstü olan coinler. En güçlü görünenler üstte.',
+  guclu: 'Puanı 60 ve üstü olan coinler.',
   dip: 'Sert düşüşten sonra ortalamaların iç içe geçtiği, dipten dönüş için hazırlanan coinler. Kursun en çok önem verdiği kurulum.',
-  tum: 'Tüm coinler, puana göre.',
+  tum: 'Tüm coinler, en yüksek puandan başlayarak, puana göre.',
   fav: 'Yıldızladığın coinler. Yıldız işareti coin satırında ve coin sayfasında.',
 };
 function renderViews() {
-  const rs = S.coins.filter(x => x.res);
+  const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
   for (const v of ['guclu', 'dip', 'tum', 'fav']) $('#n-' + v).textContent = rs.filter(x => inView(x, v)).length;
-  document.querySelectorAll('.view').forEach(b => b.setAttribute('aria-pressed', b.dataset.v === S.view));
-  $('#viewhelp').textContent = HELP[S.view];
+  document.querySelectorAll('.view').forEach(b => { const v = b.dataset.v; b.setAttribute('aria-pressed', v === 'tum' ? !eff.length : eff.includes(v)); if (v === 'dip') { b.disabled = !d1; b.title = d1 ? '' : 'Dip sıkışması yalnız günlük puanda'; } });
+  const tfb = $('#listTF'); const want = Object.entries(TF).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
+  if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
+  $('#viewhelp').textContent = (eff.length ? eff.map(v => HELP[v]).join(' ') + (eff.length > 1 ? ' Seçili filtreler birlikte uygulanır.' : '') : HELP.tum).replace('puana göre.', `${TFL[S.listTF]} puana göre.`);
 }
 function rows() {
   const key = S.sort;
-  return S.coins.filter(x => x.res && inView(x, S.view)).filter(x => !S.q || x.sym.toLowerCase().includes(S.q.toLowerCase()))
-    .sort((a, b) => S.view === 'dip' ? dipRank(b.res) - dipRank(a.res) : b.res[key] - a.res[key]);
+  const eff = effFlt();
+  return listCoins().filter(x => eff.every(v => inView(x, v))).filter(x => !S.q || x.sym.toLowerCase().includes(S.q.toLowerCase()))
+    .sort((a, b) => S.view === 'dip' ? dipRank(rOf(b)) - dipRank(rOf(a)) : rOf(b)[key] - rOf(a)[key]);
 }
 function toggleFav(sym) {
   S.fav = isFav(sym) ? S.fav.filter(s => s !== sym) : [...S.fav, sym]; store.set('fav', S.fav);
@@ -1802,11 +1813,11 @@ function renderList() {
     el.innerHTML = `<div class="empty">${S.q ? 'Aramaya uyan coin yok.' : S.view === 'fav' ? 'Henüz favori yok. Coin satırındaki ☆ işaretine dokun.' : S.view === 'dip' ? 'Şu anda dipten dönüş kurulumunda coin yok.' : 'Şu anda puanı 60 üstü coin yok. Piyasa genel olarak zayıf.'}<br><button class="btn" type="button" data-go="tum">Tüm coinleri göster</button></div>`; return;
   }
   el.innerHTML = rs.map(x => {
-    const r = x.res, d = x.d, i = r.i, chg = d.c[i] / d.c[i - 1] - 1, val = S.view === 'dip' ? r.dip : r[S.sort];
+    const r = rOf(x), d = tfData(x, S.listTF).d, i = r.i, chg = d.c[i] / d.c[i - 1] - 1, val = S.view === 'dip' ? r.dip : r[S.sort];
     const k = S.view === 'dip' ? (r.dipStage >= 2 ? 'gp' : 'p') : r.label.k;
     const why = S.view === 'dip' ? STAGE[r.dipStage] : (r.score >= 50 ? bullets(r, 1, 1)[0] : bullets(r, -1, 1)[0]) || '';
     const low = x.qv != null && x.qv < 1e6 ? '<span class="tag bad">Düşük hacim</span>' : '';
-    const tag = low + (S.view !== 'dip' && r.dipStage >= 1 && r.dipStage <= 3 ? `<span class="tag">${STAGE_SHORT[r.dipStage]}</span>` : r.badges.some(b => b.k === 'kar') ? '<span class="tag warn">Kâr al uyarısı</span>' : '');
+    const tag = low + (S.view !== 'dip' && S.listTF === '1d' && r.dipStage >= 1 && r.dipStage <= 3 ? `<span class="tag">${STAGE_SHORT[r.dipStage]}</span>` : r.badges.some(b => b.k === 'kar') ? '<span class="tag warn">Kâr al uyarısı</span>' : '');
     return `<button class="coin" type="button" data-sym="${esc(x.sym)}" aria-current="${x.sym === S.sel}">
       <span class="score ${scoreCls(k)}">${val.toFixed(0)}</span>
       <span class="cmain"><span class="cname">${esc(x.sym.replace(/USDT$/, ''))}<span class="star ${isFav(x.sym) ? 'on' : ''}" role="button" tabindex="0" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</span>${tag}</span>
@@ -1817,6 +1828,8 @@ function renderList() {
   }).join('');
   const foot = [];
   if (S.loading) foot.push(`Tarama sürüyor (${S.coins.length} coin hazır). Liste güncelleniyor.`);
+  if (tfJob && tfJob.tf === S.listTF) foot.push(`${TFL[S.listTF]} geçmiş veriler yükleniyor (${tfJob.done}/${tfJob.total}); sıralama güncellenebilir.`);
+  if (S.listTF !== '1d') { const miss = S.coins.filter(x => x.res && !rOf(x)).length; if (miss) foot.push(`${miss} coin bu zaman diliminde yeterli geçmişe sahip değil, listede yok.`); }
   if (S.young) foot.push(`${S.young} yeni coin listede yok: puan için en az 7 aylık geçmiş gerekir (MA200).`);
   if (foot.length) el.insertAdjacentHTML('beforeend', `<p class="small muted" style="margin:6px 4px 0">${foot.join(' ')}</p>`);
   if (!S.sel || !rs.some(x => x.sym === S.sel)) S.sel = rs[0].sym;
@@ -1842,6 +1855,15 @@ function evalTF(x, tf) {
   return x.tfres[key] = res;
 }
 // Haftalık / aylık için Binance'ten gerçek geçmiş (MA200 için daha fazla mum); olmazsa günlükten türetilir
+let tfJob = null;
+async function loadTFAll(tf) {
+  if (S.source !== 'live' || (tf !== '1w' && tf !== '1m')) return;
+  const k = tf === '1w' ? 'dw' : 'dm', todo = S.coins.filter(x => !x[k] && !x[k + 'Try']); if (!todo.length) return;
+  const job = tfJob = { tf, done: 0, total: todo.length }; let q = 0, last = 0;
+  const upd = () => { if (S.listTF === tf) { renderViews(); renderList(); } };
+  await Promise.all(Array.from({ length: 6 }, async () => { while (q < todo.length && tfJob === job) { const x = todo[q++]; await ensureTF(x, tf); job.done++; const n = Date.now(); if (n - last > 2500) { last = n; upd(); } } }));
+  if (tfJob === job) { tfJob = null; upd(); }
+}
 async function ensureTF(x, tf) {
   if (S.source !== 'live' || (tf !== '1w' && tf !== '1m')) return;
   const k = tf === '1w' ? 'dw' : 'dm'; if (x[k] || x[k + 'Try']) return; x[k + 'Try'] = true;
@@ -2266,7 +2288,7 @@ function dipBT(bt) {
 function renderBT() {
   const bt = S.bt, el = $('#btOut'), BV = btView(bt), h = BV.h, adj = BV.adj, rl = BV.rules;
   $('#btCtl').hidden = !bt.quint;
-  $('#btHseg').innerHTML = (bt.horizons || []).map(x => `<button type="button" data-h="${x}" aria-pressed="${x === h}">${x} gün</button>`).join('');
+  { const hs = (bt.horizons || []).map(x => `<button type="button" data-h="${x}" aria-pressed="${x === h}">${x} gün</button>`).join(''), hb = $('#btHseg'); if (hb.innerHTML !== hs) hb.innerHTML = hs; }
   document.querySelectorAll('#btAdjSeg button').forEach(b => b.setAttribute('aria-pressed', (b.dataset.a === '1') === adj));
   $('#btInfo').textContent = `${bt.symbols.length} coin · ${bt.n.toLocaleString('tr-TR')} gün${bt.source === 'demo' ? ' · örnek veri, sonuç anlamsız' : ''}`;
   const V = { destek: 'Çalışıyor', zayif: 'Zayıf', yok: 'Etkisiz', ters: 'Ters' };
@@ -2297,7 +2319,8 @@ $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if 
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
-$('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b) return; S.view = b.dataset.v; store.set('view', S.view); renderViews(); renderList(); renderDetail(); });
+$('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
+$('#listTF').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.listTF = b.dataset.t; S.tcTF = S.listTF; store.set('listTF', S.listTF); store.set('tcTF', S.tcTF); loadTFAll(S.listTF); renderViews(); renderList(); renderDetail(); });
 $('#detail').addEventListener('click', e => {
   const fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
   const tb = e.target.closest('[data-tc]'); if (tb && !tb.disabled) { S.tcTF = tb.dataset.tc; store.set('tcTF', S.tcTF); renderDetail(); }
@@ -2308,7 +2331,7 @@ document.addEventListener('click', e => {
   if (!t.hidden && (e.target.closest('.tipx') || !e.target.closest('#tip'))) t.hidden = true;
 }, true);
 $('#list').addEventListener('click', e => {
-  const go = e.target.closest('[data-go]'); if (go) { S.view = go.dataset.go; S.q = ''; $('#q').value = ''; renderViews(); renderList(); renderDetail(); return; }
+  const go = e.target.closest('[data-go]'); if (go) { S.flt = []; store.set('flt', S.flt); S.q = ''; $('#q').value = ''; renderViews(); renderList(); renderDetail(); return; }
   const fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
   const b = e.target.closest('.coin'); if (!b) return; S.sel = b.dataset.sym;
   document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel)); renderDetail();
