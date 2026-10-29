@@ -524,7 +524,7 @@ const ib = k => `<button type="button" class="ib" data-info="${k}" aria-label="A
 const TFL = { '4h': '4 saatlik', '1d': 'günlük', '1w': 'haftalık', '1m': 'aylık' };
 function showTip(k) {
   const el = $('#tip'); let title, ne, yo, badge = '';
-  if (k[0] === '_') [title, ne, yo] = INFO[k] || [k, '', '']; else { const R = CR.RULE[k]; title = R ? R.label : k; [ne, yo] = INFO[k] || ['', '']; badge = R ? `<span class="muted small">${R.tier === 'K' ? 'Kesin kural' : 'Sezgisel kural'} · PDF s.${R.p}</span>` : ''; }
+  if (k[0] === '_') [title, ne, yo] = INFO[k] || [k, '', '']; else { const R = CR.RULE[k]; title = R ? R.label : k; [ne, yo] = INFO[k] || ['', '']; badge = R ? `<span class="muted small">${R.tier === 'K' ? 'Kesin kural' : 'Sezgisel kural'}</span>` : ''; }
   el.innerHTML = `<div class="tiph"><b>${esc(title)}</b><button type="button" class="tipx" aria-label="Kapat">×</button></div>${badge ? `<div style="margin:2px 0 6px">${badge}</div>` : ''}${ne ? `<p><b>Ne ölçer:</b> ${esc(ne)}</p>` : ''}${yo ? `<p><b>Nasıl yorumlanır:</b> ${esc(yo)}</p>` : ''}`;
   el.hidden = false;
 }
@@ -790,7 +790,7 @@ function renderDetail() {
     <div class="card"><details class="more"><summary>Teknik ayrıntılar (${r.rules.length} kural)</summary>
       <div class="tiles" style="margin:8px 0 12px"><div class="tile"><div class="k">Kesin kurallar puanı ${ib('_kesin')}</div><div class="v">${r.kesin.toFixed(0)}</div></div><div class="tile"><div class="k">Sezgisel kurallar puanı ${ib('_sezgisel')}</div><div class="v">${r.sezgisel.toFixed(0)}</div></div></div>
       ${Object.entries(CR.MODULES).map(([m, M]) => `<div class="mod"><span>${M.label} ${ib('_m_' + m)}</span><span class="bar"><i style="width:${r.mods[m].toFixed(0)}%"></i></span><span class="num" style="text-align:right">${r.mods[m].toFixed(0)}</span></div>`).join('')}
-      <div style="margin-top:10px">${[...r.rules].sort((a, b) => Math.abs(b.p) - Math.abs(a.p)).map(z => { const R = CR.RULE[z.id], v = z.p * (z.tier === 'S' ? S.wS : 1); return `<div class="rr"><span class="tier ${z.tier}" title="${z.tier === 'K' ? 'Kesin' : 'Sezgisel'}">${z.tier}</span><span><b>${esc(R.label)}</b> ${ib(z.id)} <span class="muted small">s.${R.p}</span><br><span class="note">${esc(z.note)}</span></span><span class="pts ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span></div>`; }).join('')}</div>
+      <div style="margin-top:10px">${[...r.rules].sort((a, b) => Math.abs(b.p) - Math.abs(a.p)).map(z => { const R = CR.RULE[z.id], v = z.p * (z.tier === 'S' ? S.wS : 1); return `<div class="rr"><span class="tier ${z.tier}" title="${z.tier === 'K' ? 'Kesin' : 'Sezgisel'}">${z.tier}</span><span><b>${esc(R.label)}</b> ${ib(z.id)}<br><span class="note">${esc(z.note)}</span></span><span class="pts ${v >= 0 ? 'up' : 'dn'}">${v >= 0 ? '+' : ''}${v.toFixed(1)}</span></div>`; }).join('')}</div>
       <p class="small muted" style="margin-top:8px">Ateşlenmeyen ${CR.RULES.length - fired.size} kural puanı etkilemedi.</p>
     </details></div>`;
   }
@@ -1074,8 +1074,8 @@ function renderRules() {
   const V = { destek: 'Çalışıyor', zayif: 'Zayıf', yok: 'Etkisiz', ters: 'Ters' };
   const mo = Object.keys(CR.MODULES);
   const rs = [...CR.RULES].sort((a, b) => mo.indexOf(a.mod) - mo.indexOf(b.mod) || (a.tier > b.tier ? 1 : -1) || b.w - a.w);
-  $('#ruleTable').innerHTML = `<thead><tr><th>Tür</th><th>Kural</th><th>Grup</th><th class="r">Ağırlık</th><th class="r">PDF sayfa</th>${bt ? '<th>Testte</th>' : ''}</tr></thead><tbody>${rs.map(R => `<tr><td><span class="tier ${R.tier}">${R.tier}</span></td><td class="tw">${esc(R.label)}</td><td>${CR.MODULES[R.mod].label.split(' (')[0]}</td><td class="r num">${R.w}</td><td class="r num">${R.p}</td>${bt ? `<td>${(ver[R.id] || []).map(z => `<span class="verd ${z.verdict}">${z.side > 0 ? '+' : '−'} ${V[z.verdict]}</span>`).join(' ') || '<span class="muted">az örnek</span>'}</td>` : ''}</tr>`).join('')}</tbody>`;
-  $('#gateTable').innerHTML = `<thead><tr><th>Kapı</th><th>Kurstaki kural</th><th class="r">PDF sayfa</th></tr></thead><tbody>${CR.GATES.map(G => `<tr><td class="tw">${esc(G.label)}</td><td class="tw">${esc(G.src)}</td><td class="r num">${G.p}</td></tr>`).join('')}</tbody>`;
+  $('#ruleTable').innerHTML = `<thead><tr><th>Tür</th><th>Kural</th><th>Grup</th><th class="r">Ağırlık</th>${bt ? '<th>Testte</th>' : ''}</tr></thead><tbody>${rs.map(R => `<tr><td><span class="tier ${R.tier}">${R.tier}</span></td><td class="tw">${esc(R.label)}</td><td>${CR.MODULES[R.mod].label.split(' (')[0]}</td><td class="r num">${R.w}</td>${bt ? `<td>${(ver[R.id] || []).map(z => `<span class="verd ${z.verdict}">${z.side > 0 ? '+' : '−'} ${V[z.verdict]}</span>`).join(' ') || '<span class="muted">az örnek</span>'}</td>` : ''}</tr>`).join('')}</tbody>`;
+  $('#gateTable').innerHTML = `<thead><tr><th>Kapı</th><th>Kurstaki kural</th></tr></thead><tbody>${CR.GATES.map(G => `<tr><td class="tw">${esc(G.label)}</td><td class="tw">${esc(G.src)}</td></tr>`).join('')}</tbody>`;
 }
 
 // ───────── Geri test ─────────
@@ -1100,7 +1100,7 @@ function bucketChart(title, b, h, faded) {
   let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(title)}"><text x="${pl}" y="11" font-size="11.5" font-weight="700" fill="var(--ink2)" font-family="Schibsted Grotesk,sans-serif">${esc(title)}</text>`;
   for (const v of [lim, 0, -lim]) s += `<line x1="${pl}" x2="${W - 4}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === 0 ? 'var(--mute)' : 'var(--line2)'}"/><text x="${pl - 4}" y="${Y(v) + 3}" font-size="9.5" text-anchor="end" fill="var(--mute)" font-family="IBM Plex Mono,monospace">${(v * 100).toFixed(0)}%</text>`;
   b.forEach((x, k) => { const v = vals[k], x0 = pl + k * bw + 4, w = bw - 8, y = Y(Math.max(v, 0)), hh = Math.abs(Y(v) - Y(0));
-    s += `<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(1, hh)}" rx="2" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" ${faded ? 'fill-opacity=".55"' : ''}><title>Puan ${x.a}–${Math.min(100, x.b)}: ${x.n} gün, ${h} günde ortalama ${pc(v, 2)}</title></rect><text x="${x0 + w / 2}" y="${H - 12}" font-size="9.5" text-anchor="middle" fill="var(--ink2)" font-family="IBM Plex Mono,monospace">${x.a}–${Math.min(100, x.b)}</text><text x="${x0 + w / 2}" y="${H - 2}" font-size="8.5" text-anchor="middle" fill="var(--mute)" font-family="IBM Plex Mono,monospace">${x.n} gün</text>`; });
+    s += `<rect x="${x0}" y="${y}" width="${w}" height="${Math.max(1, hh)}" rx="2" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" ${faded ? 'fill-opacity=".55"' : ''}><title>Puan ${x.a}–${Math.min(100, x.b)}: ${x.n} gün, ${h} günde ortalama ${pc(v, 2)}</title></rect><text x="${x0 + w / 2}" y="${H - 12}" font-size="9.5" text-anchor="middle" fill="var(--ink2)" font-family="IBM Plex Mono,monospace">${x.a}–${Math.min(100, x.b)}</text><text x="${x0 + w / 2}" y="${H - 2}" font-size="8.5" text-anchor="middle" fill="var(--mute)" font-family="IBM Plex Mono,monospace">${x.n >= 1000 ? (x.n / 1000).toFixed(x.n >= 10000 ? 0 : 1).replace('.', ',') + ' B' : x.n}</text>`; });
   return s + '</svg>';
 }
 function verdictText(bt) {
@@ -1128,7 +1128,7 @@ function renderBT() {
   const worst = [...bt.rules].filter(r => r.verdict === 'ters').sort((a, b) => a.dirT - b.dirT).slice(0, 6);
   el.innerHTML = `
     <div class="card"><p class="answer">${verdictText(bt)}</p><p class="help" style="margin:0">Taban: herhangi bir günde alınsaydı 7 günde ortalama ${pc(bt.base[h].m, 2)}.</p></div>
-    <div class="multiples"><div class="card">${bucketChart('Puana göre 7 günlük getiri', bt.buckets.score, h)}</div><div class="card">${bucketChart('Sadece kesin kurallar', bt.buckets.kesin, h)}</div><div class="card">${bucketChart('Sadece sezgisel kurallar', bt.buckets.sezgisel, h, true)}</div></div>
+    <div class="multiples"><div class="card">${bucketChart('Puana göre 7 günlük getiri', bt.buckets.score, h)}</div><div class="card">${bucketChart('Sadece kesin kurallar', bt.buckets.kesin, h)}</div><div class="card">${bucketChart('Sadece sezgisel kurallar', bt.buckets.sezgisel, h, true)}</div></div><p class="small muted" style="margin:4px 2px 10px">Çubukların altındaki sayı, o puan aralığında kaç gözlem (gün) olduğunu gösterir. B = bin.</p>
     <p class="help">İyi bir skorda çubuklar soldan sağa yükselir. Sezgisel kurallar çizgisi düzse onların ağırlığını Gelişmiş ayarlar'dan düşürebilir ya da "Geri test ağırlıkları"nı açabilirsiniz.</p>
     ${dipBT(bt)}
     <div class="card"><div class="sect">En iyi çalışan kurallar</div>${best.length ? best.map(r => `<div class="rr"><span class="tier ${r.tier}">${r.tier}</span><span><b>${esc(r.label)}</b> <span class="muted small">${r.side > 0 ? 'olumlu sinyal' : 'olumsuz sinyal'} · ${r.n} gün</span></span><span class="pts up">${pc(r.edge * r.side, 1)}</span></div>`).join('') : '<p class="small muted">Anlamlı sonuç veren kural yok.</p>'}
