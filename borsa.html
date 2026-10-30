@@ -89,6 +89,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .view{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;white-space:nowrap;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
 .view b{font-family:var(--f-num);font-weight:600;font-size:12.5px;color:var(--mute)}
 .view[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
+.sighead{margin:2px 2px 6px}.sigs .view{padding:6px 11px;font-size:13px}.view[aria-pressed="true"]{border-color:var(--ink)}
 .viewhelp{font-size:13px;color:var(--ink2);margin:0 0 12px}
 .search{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 12px;width:100%;margin-bottom:12px}
 
@@ -251,6 +252,8 @@ body.fs-on{overflow:hidden}
           <button class="view" type="button" data-v="dip" aria-pressed="false">Dipten dönüş adayları <b id="n-dip">0</b></button>
           <button class="view" type="button" data-v="fav" aria-pressed="false">★ Favoriler <b id="n-fav">0</b></button>
         </div>
+        <div class="sighead small muted">Sinyaller <span>(puandan bağımsız, seçili zaman dilimine göre)</span></div>
+        <div class="views sigs" id="sigs"></div>
         <p class="viewhelp" id="viewhelp"></p>
         <input class="search" id="q" type="search" placeholder="Hisse ara (ör. THYAO)" aria-label="Hisse ara">
         <div class="list" id="list"></div>
@@ -1457,7 +1460,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('br_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('br_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true) };
+const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true), sig: store.get('sig', []) };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -1867,18 +1870,37 @@ const HELP = {
   tum: 'Tüm hisseler, en yüksek puandan başlayarak, puana göre.',
   fav: 'Yıldızladığın hisseler. Yıldız işareti hisse satırında ve hisse sayfasında.',
 };
+// ───────── Sinyal filtreleri (puandan bağımsız) ─────────
+const upX = (a, b, i, n) => { for (let q = i; q > i - n && q > 0; q--) { const p0 = a[q - 1] - b[q - 1], p1 = a[q] - b[q]; if (p0 <= 0 && p1 > 0) return true; } return false; };
+const dnX = (a, b, i, n) => { for (let q = i; q > i - n && q > 0; q--) { const p0 = a[q - 1] - b[q - 1], p1 = a[q] - b[q]; if (p0 >= 0 && p1 < 0) return true; } return false; };
+const SIGS = {
+  rsi50: ['RSI 50 üstü', 'RSI 50’nin üstünde: alıcılar kontrolde.', (d, I, i) => I.rsi[i] > 50],
+  rsi50x: ['RSI 50’yi yeni geçti', 'RSI son 3 mumda 50’yi aşağıdan yukarı kesti: yükseliş habercisi.', (d, I, i) => { for (let q = i; q > i - 3; q--) if (I.rsi[q - 1] < 50 && I.rsi[q] >= 50) return true; return false; }],
+  ma920: ['MA 9/20 yukarı kesişim', 'SMA9, SMA20’yi son 3 mumda yukarı kesti.', (d, I, i) => upX(I.sma9, I.sma20, i, 3)],
+  ma920d: ['MA 9/20 aşağı kesişim', 'SMA9, SMA20’yi son 3 mumda aşağı kesti: zayıflama.', (d, I, i) => dnX(I.sma9, I.sma20, i, 3)],
+  macd: ['MACD yukarı kesişim', 'MACD, sinyal çizgisini son 3 mumda yukarı kesti.', (d, I, i) => upX(I.macd, I.macdSig, i, 3)],
+  giris: ['Para girişi', 'CMF 0 üstü ve MFI 50 üstü.', (d, I, i) => I.cmf[i] > 0 && I.mfi[i] > 50],
+  cikis: ['Para çıkışı', 'CMF 0 altı ve MFI 50 altı.', (d, I, i) => I.cmf[i] < 0 && I.mfi[i] < 50],
+  kirilim: ['Yeni kırılım', 'Son 3 mumda kapanış, önceki 20 mumun en yükseğini aştı.', (d, I, i) => { for (let q = i; q > i - 3 && q > 20; q--) { let mx = -Infinity; for (let k = q - 20; k < q; k++) mx = Math.max(mx, d.h[k]); if (d.c[q] > mx) return true; } return false; }],
+  ma200: ['MA200’ü yeni geçti', 'Fiyat son 5 mumda 200’lük ortalamayı yukarı kesti.', (d, I, i) => { for (let q = i; q > i - 5 && q > 0; q--) if (isFinite(I.sma200[q]) && d.c[q - 1] <= I.sma200[q - 1] && d.c[q] > I.sma200[q]) return true; return false; }],
+  hacim: ['Hacimli', 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ve üstü.', (d, I, i) => d.v[i] / I.volSma20[i - 1] >= 1.5],
+};
+function sigOk(x, k) { const D = tfData(x, S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
 function renderViews() {
   const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
   for (const v of ['guclu', 'dip', 'tum', 'fav']) $('#n-' + v).textContent = rs.filter(x => inView(x, v)).length;
-  document.querySelectorAll('.view').forEach(b => { const v = b.dataset.v; b.setAttribute('aria-pressed', v === 'tum' ? !eff.length : eff.includes(v)); if (v === 'dip') { b.disabled = !d1; b.title = d1 ? '' : 'Dip sıkışması yalnız günlük puanda'; } });
+  document.querySelectorAll('.view[data-v]').forEach(b => { const v = b.dataset.v; b.setAttribute('aria-pressed', v === 'tum' ? !eff.length && !S.sig.length : eff.includes(v)); if (v === 'dip') { b.disabled = !d1; b.title = d1 ? '' : 'Dip sıkışması yalnız günlük puanda'; } });
   const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && k === '4h')).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
   if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
-  $('#viewhelp').textContent = (eff.length ? eff.map(v => HELP[v]).join(' ') + (eff.length > 1 ? ' Seçili filtreler birlikte uygulanır.' : '') : HELP.tum).replace('puana göre.', `${TFL[S.listTF]} puana göre.`);
+  const sg = $('#sigs'), cnt = Object.fromEntries(Object.keys(SIGS).map(k => [k, rs.filter(x => sigOk(x, k)).length]));
+  const sh = Object.entries(SIGS).map(([k, v]) => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(v[1])}">${esc(v[0])} <b>${cnt[k]}</b></button>`).join('');
+  if (sg.dataset.h !== sh) { sg.innerHTML = sh; sg.dataset.h = sh; }
+  $('#viewhelp').textContent = (eff.length ? eff.map(v => HELP[v]).join(' ') + (eff.length > 1 ? ' Seçili filtreler birlikte uygulanır.' : '') : HELP.tum).replace('puana göre.', `${TFL[S.listTF]} puana göre.`) + S.sig.map(k => ' ' + SIGS[k][1]).join('');
 }
 function rows() {
   const key = S.sort;
   const eff = effFlt();
-  return listCoins().filter(x => eff.every(v => inView(x, v))).filter(x => !S.q || x.sym.toLowerCase().includes(S.q.toLowerCase()))
+  return listCoins().filter(x => eff.every(v => inView(x, v))).filter(x => S.sig.every(k => sigOk(x, k))).filter(x => !S.q || x.sym.toLowerCase().includes(S.q.toLowerCase()))
     .sort((a, b) => S.view === 'dip' ? dipRank(rOf(b)) - dipRank(rOf(a)) : rOf(b)[key] - rOf(a)[key]);
 }
 function toggleFav(sym) {
@@ -2504,7 +2526,8 @@ $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if 
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
-$('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
+$('#sigs').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (!b) return; const k = b.dataset.sg; S.sig = S.sig.includes(k) ? S.sig.filter(x => x !== k) : [...S.sig, k]; store.set('sig', S.sig); renderViews(); renderList(); renderDetail(); });
+$('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; if (v === 'tum') { S.sig = []; store.set('sig', S.sig); } S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
 $('#listTF').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.listTF = b.dataset.t; S.tcTF = S.listTF; store.set('listTF', S.listTF); store.set('tcTF', S.tcTF); loadTFAll(S.listTF); renderViews(); renderList(); renderDetail(); });
 $('#detail').addEventListener('click', e => {
   const fv = e.target.closest('[data-fav]'); if (fv) { toggleFav(fv.dataset.fav); return; }
