@@ -756,7 +756,23 @@ const HELP = {
 // ───────── Sinyal filtreleri (puandan bağımsız) ─────────
 const upX = (a, b, i, n) => { for (let q = i; q > i - n && q > 0; q--) { const p0 = a[q - 1] - b[q - 1], p1 = a[q] - b[q]; if (p0 <= 0 && p1 > 0) return true; } return false; };
 const dnX = (a, b, i, n) => { for (let q = i; q > i - n && q > 0; q--) { const p0 = a[q - 1] - b[q - 1], p1 = a[q] - b[q]; if (p0 >= 0 && p1 < 0) return true; } return false; };
+// Uyumsuzluk: fiyat yeni dip/tepe yaparken gösterge yapmıyor. Son iki pivot (sağ-sol 3 mum), ikincisi son 12 mum içinde.
+function pivs(arr, i, hi, k = 3, span = 45) { const o = []; for (let q = i - k; q > i - span && q > k; q--) { let ok = true; for (let m = 1; m <= k; m++) if (hi ? !(arr[q] > arr[q - m] && arr[q] >= arr[q + m]) : !(arr[q] < arr[q - m] && arr[q] <= arr[q + m])) { ok = false; break; } if (ok) { o.push(q); if (o.length === 2) break; } } return o; }
+function divOf(d, I, i, hi) {
+  const P = pivs(hi ? d.h : d.l, i, hi); if (P.length < 2) return null;
+  const [b, a] = P; if (b < i - 12 || b - a < 5) return null; const px = hi ? d.h : d.l;
+  if (hi ? !(px[b] > px[a] * 1.003) : !(px[b] < px[a] * 0.997)) return null;
+  const names = []; for (const [n, s] of [['RSI', I.rsi], ['MACD', I.macdHist], ['MFI', I.mfi]]) { const x1 = s[a], x2 = s[b]; if (isFinite(x1) && isFinite(x2) && (hi ? x2 < x1 : x2 > x1)) names.push(n); }
+  return names.length ? names : null;
+}
 const SIGS = {
+  divB: ['Dip uyumsuzluğu', 'Fiyat yeni dip yaptı ama RSI / MACD / MFI’den en az biri yapmadı (son 12 mumda): düşüş gücünü kaybediyor, dönüş habercisi.', (d, I, i) => !!divOf(d, I, i, false)],
+  divT: ['Tepe uyumsuzluğu', 'Fiyat yeni tepe yaptı ama RSI / MACD / MFI’den en az biri yapmadı (son 12 mumda): yükseliş gücünü kaybediyor, düşüş uyarısı.', (d, I, i) => !!divOf(d, I, i, true)],
+  rsi30: ['RSI aşırı satım', 'RSI 30 altında: aşırı satım bölgesi, dip arama yeri. 50 üstüne dönmeden işlem yok.', (d, I, i) => I.rsi[i] < 30],
+  wtDip: ['WT aşırı satımdan dönüş', 'WaveTrend −53 altındayken son 3 mumda yukarı kesişim yaptı.', (d, I, i) => { for (let q = i; q > i - 3 && q > 0; q--) if (I.wt1[q - 1] <= I.wt2[q - 1] && I.wt1[q] > I.wt2[q] && I.wt1[q] < -40) return true; return false; }],
+  ema510: ['EMA 5/10 yukarı kesişim', 'EMA5, EMA10’u son 3 mumda yukarı kesti: kısa vade dönüşü.', (d, I, i) => upX(I.ema5, I.ema10, i, 3)],
+  dizilim: ['Tam yükseliş dizilimi', 'SMA 9 > 20 > 50 > 100 > 200 ve fiyat 9’un üstünde: güçlü, oturmuş yükseliş.', (d, I, i) => { const s = [I.sma9[i], I.sma20[i], I.sma50[i], I.sma100[i], I.sma200[i]]; return s.every(isFinite) && s.every((v, q) => q === 0 || s[q - 1] > v) && d.c[i] > s[0]; }],
+  sikisma: ['Sıkışma', 'Oynaklık (ATR %) son 120 mumun en düşük %20’sinde: sıkışma, genelde sert bir hareketten önce görülür.', (d, I, i) => { const f = q => I.atr[q] / d.c[q]; const v = f(i); if (!isFinite(v) || i < 130) return false; let lo = 0, n = 0; for (let q = i - 120; q < i; q++) { const w = f(q); if (isFinite(w)) { n++; if (w < v) lo++; } } return n > 60 && lo / n <= 0.2; }],
   rsi50: ['RSI 50 üstü', 'RSI 50’nin üstünde: alıcılar kontrolde.', (d, I, i) => I.rsi[i] > 50],
   rsi50x: ['RSI 50’yi yeni geçti', 'RSI son 3 mumda 50’yi aşağıdan yukarı kesti: yükseliş habercisi.', (d, I, i) => { for (let q = i; q > i - 3; q--) if (I.rsi[q - 1] < 50 && I.rsi[q] >= 50) return true; return false; }],
   ma920: ['MA 9/20 yukarı kesişim', 'SMA9, SMA20’yi son 3 mumda yukarı kesti.', (d, I, i) => upX(I.sma9, I.sma20, i, 3)],
