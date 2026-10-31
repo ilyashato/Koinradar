@@ -1,5 +1,6 @@
 // Yahoo Finance günlük mumlarını (BIST) toplu çeker; tarayıcıdaki CORS engelini aşmak için aracı.
 // Kullanım: /.netlify/functions/yahoo?s=THYAO.IS,GARAN.IS,XU100.IS
+import { verify, cookieOf } from '../lib/session.mjs';
 const ok = /^[A-Z0-9]{2,12}\.IS$/;
 async function one(s, rng) {
   for (const host of ['query1', 'query2']) {
@@ -24,6 +25,8 @@ async function one(s, rng) {
   return null;
 }
 export default async (req) => {
+  const secret = process.env.AUTH_SECRET;
+  if (secret && !(await verify(cookieOf(req.headers.get('cookie'), 'rs'), secret))) return new Response('Giriş gerekli', { status: 401 });
   const sp = new URL(req.url).searchParams, rng = sp.get('r') === '5d' ? '5d' : '5y';
   const list = (sp.get('s') || '').split(',').filter(s => ok.test(s)).slice(0, 12);
   if (!list.length) return new Response('{}', { status: 400, headers: { 'content-type': 'application/json' } });

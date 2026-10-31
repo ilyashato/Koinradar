@@ -1,0 +1,33 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Giriş</title>
+<style>
+:root{--bg:#f2f4f8;--panel:#fff;--ink:#141a2c;--ink2:#4a5468;--line:#d9dee8;--accent:#2a56d6;--bad:#c0392b}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1420;--panel:#181f31;--ink:#eef1f8;--ink2:#a6b0c6;--line:#2c3550;--accent:#6c93ff;--bad:#ff7b6b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px}
+.card{background:var(--panel);border-radius:20px;padding:26px 22px;width:100%;max-width:380px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+h1{margin:0 0 4px;font-size:24px}p{margin:0 0 18px;color:var(--ink2);font-size:14px}
+label{display:block;font-weight:600;font-size:14px;margin:12px 0 6px}
+input{width:100%;border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:12px;padding:13px 14px;font-size:17px}
+input:focus{outline:2px solid var(--accent);border-color:transparent}
+button{margin-top:18px;width:100%;border:0;background:var(--accent);color:#fff;font-weight:700;font-size:17px;padding:14px;border-radius:12px}
+button:disabled{opacity:.6}.err{color:var(--bad);font-size:14px;min-height:20px;margin-top:12px}
+.fine{font-size:12px;color:var(--ink2);margin-top:16px}
+</style></head><body>
+<form class="card" id="f" autocomplete="on">
+  <h1>Giriş</h1><p>Sana verilen kullanıcı no ve şifre ile gir.</p>
+  <label for="u">Kullanıcı no</label><input id="u" name="username" inputmode="numeric" autocomplete="username" required>
+  <label for="p">Şifre</label><input id="p" name="password" type="password" autocomplete="current-password" required>
+  <button id="b" type="submit">Giriş yap</button><div class="err" id="e" role="alert"></div>
+  <div class="fine">Hesap kişiye özeldir. Şifre paylaşılırsa hesap kapatılabilir. Günlük giriş sayısı ve cihaz sayısı sınırlıdır.</div>
+</form>
+<script>
+document.getElementById('f').addEventListener('submit', async ev => {
+  ev.preventDefault(); const b = document.getElementById('b'), e = document.getElementById('e'); e.textContent = ''; b.disabled = true;
+  try {
+    const r = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ uid: document.getElementById('u').value, pw: document.getElementById('p').value }) });
+    const j = await r.json().catch(() => ({}));
+    if (r.ok) { const n = new URLSearchParams(location.search).get('next'); location.href = n && n[0] === '/' && n[1] !== '/' ? n : '/'; return; }
+    e.textContent = j.e || 'Giriş yapılamadı.';
+  } catch (x) { e.textContent = 'Bağlantı hatası. Tekrar dene.'; }
+  b.disabled = false;
+});
+</script></body></html>

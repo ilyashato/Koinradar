@@ -1,0 +1,45 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Yönetim</title>
+<style>
+:root{--bg:#f2f4f8;--panel:#fff;--ink:#141a2c;--ink2:#4a5468;--line:#d9dee8;--accent:#2a56d6;--bad:#c0392b;--good:#13875a}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1420;--panel:#181f31;--ink:#eef1f8;--ink2:#a6b0c6;--line:#2c3550;--accent:#6c93ff;--bad:#ff7b6b;--good:#4cd19b}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:16px;max-width:760px;margin:auto}
+h1{font-size:22px;margin:6px 0 12px}.card{background:var(--panel);border-radius:16px;padding:14px;margin:0 0 12px}
+input{border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:10px 12px;font-size:16px;width:100%}
+button{border:1.5px solid var(--line);background:transparent;color:var(--ink);border-radius:10px;padding:8px 11px;font-size:14px;font-weight:600}
+button.p{background:var(--accent);border-color:var(--accent);color:#fff}button.d{color:var(--bad)}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.u{border-top:1px solid var(--line);padding:12px 0}.u:first-child{border-top:0}
+.s{font-size:13px;color:var(--ink2)}.on{color:var(--good)}.off{color:var(--bad)}
+.pw{background:var(--bg);border:1.5px dashed var(--accent);border-radius:12px;padding:12px;margin:8px 0;font-size:16px}code{font-size:18px;font-weight:700}
+</style></head><body>
+<h1>Kullanıcı yönetimi</h1>
+<div class="card" id="kc"><div class="row"><input id="k" type="password" placeholder="Yönetici anahtarı" style="flex:1"><button class="p" id="go">Aç</button></div><div class="s" id="ke"></div></div>
+<div id="app" hidden>
+  <div class="card"><b>Yeni kullanıcı</b><div class="row" style="margin-top:8px"><input id="nm" placeholder="Kişi adı / not (isteğe bağlı)" style="flex:1"><button class="p" id="add">Ekle</button></div><div id="made"></div></div>
+  <div class="card"><div class="row" style="justify-content:space-between"><b>Kullanıcılar</b><button id="rf">Yenile</button></div><div id="ul"></div></div>
+</div>
+<script>
+const $ = s => document.querySelector(s); let KEY = '';
+async function api(b) { const r = await fetch('/api/admin', { method: 'POST', headers: { 'content-type': 'application/json', 'x-admin-key': KEY }, body: JSON.stringify(b) }); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.e || r.status); return j; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = t => t ? new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+async function load() {
+  const { users } = await api({ action: 'list' });
+  $('#ul').innerHTML = users.length ? users.map(u => `<div class="u"><div class="row" style="justify-content:space-between"><div><b>${esc(u.uid)}</b> ${esc(u.name)} <span class="${u.active ? 'on' : 'off'}">${u.active ? 'açık' : 'kapalı'}</span></div></div>
+    <div class="s">Cihaz ${u.devices}/${u.maxDevices} · Bugün giriş ${u.today}/${u.maxDaily} · Toplam ${u.total} · Son: ${fmt(u.last)}</div>
+    <div class="row" style="margin-top:8px"><button data-a="reset-pw" data-u="${u.uid}">Şifre sıfırla</button><button data-a="reset-devices" data-u="${u.uid}">Cihazları sıfırla</button><button data-a="toggle" data-u="${u.uid}">${u.active ? 'Kapat' : 'Aç'}</button><button data-a="limits" data-u="${u.uid}">Sınırlar</button><button class="d" data-a="delete" data-u="${u.uid}">Sil</button></div></div>`).join('') : '<div class="s">Henüz kullanıcı yok.</div>';
+}
+$('#go').onclick = async () => { KEY = $('#k').value; try { await load(); $('#kc').hidden = true; $('#app').hidden = false; } catch (e) { $('#ke').textContent = e.message; } };
+$('#rf').onclick = load;
+$('#add').onclick = async () => { try { const r = await api({ action: 'create', name: $('#nm').value }); $('#nm').value = ''; $('#made').innerHTML = `<div class="pw">Kullanıcı no: <code>${r.uid}</code><br>Şifre: <code>${esc(r.pw)}</code><div class="s">Şifre bir daha gösterilmez, şimdi kopyala.</div></div>`; load(); } catch (e) { alert(e.message); } };
+$('#ul').onclick = async ev => {
+  const b = ev.target.closest('button'); if (!b) return; const a = b.dataset.a, uid = b.dataset.u;
+  try {
+    if (a === 'delete' && !confirm(uid + ' silinsin mi?')) return;
+    let extra = {};
+    if (a === 'limits') { const d = prompt('En fazla kaç cihaz?', '2'), g = prompt('Günde en fazla kaç giriş?', '5'); if (!d || !g) return; extra = { maxDevices: +d, maxDaily: +g }; }
+    const r = await api({ action: a, uid, ...extra });
+    if (r.pw) $('#made').innerHTML = `<div class="pw">Kullanıcı no: <code>${uid}</code><br>Yeni şifre: <code>${esc(r.pw)}</code><div class="s">Bir daha gösterilmez, şimdi kopyala.</div></div>`;
+    load();
+  } catch (e) { alert(e.message); }
+};
+</script></body></html>
