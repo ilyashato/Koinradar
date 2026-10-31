@@ -2,6 +2,7 @@
 import { verify, cookieOf } from '../lib/session.mjs';
 export default async (req, context) => {
   const secret = Netlify.env.get('AUTH_SECRET');
+  if (new URL(req.url).pathname === '/__gate') return new Response('gate: çalışıyor · AUTH_SECRET: ' + (secret ? 'tanımlı' : 'YOK'), { headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' } });
   if (!secret) return context.next(); // yapılandırma yapılana kadar site açık kalır
   if (await verify(cookieOf(req.headers.get('cookie'), 'rs'), secret)) return context.next();
   const url = new URL(req.url);
