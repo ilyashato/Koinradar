@@ -15,6 +15,7 @@ const SWAP = [
   ['yeni coin listede yok', 'yeni hisse listede yok'], ['${n} coin ·', '${n} hisse ·'], ['gerçek coin değil', 'gerçek hisse değil'], ['${bt.symbols.length} coin ·', '${bt.symbols.length} hisse ·'],
   ['Bitcoin uzun vadeli', 'BIST 100 endeksi uzun vadeli'], ['${above}/${n.length} coin uzun', '${above}/${n.length} hisse uzun'],
   ['Bu sayfa Binance\'ten veri çeker.', 'Bu sayfa Yahoo Finance\'ten BIST verisi çeker.'],
+  ['Kripto varlık işlemleri anapara', 'Borsa işlemleri anapara'], ['Veri kaynağı: Binance.', 'Veri kaynağı: Yahoo Finance (yaklaşık 15 dakika gecikmeli).'],
   ['</style>', '.row:has(#topSeg){display:none}</style>'],
 ];
 let b2 = body; for (const [a, c] of SWAP) { if (!b2.includes(a)) console.warn('eksik:', a.slice(0, 50)); b2 = b2.split(a).join(c); }
