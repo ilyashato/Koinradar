@@ -561,7 +561,8 @@ const INFO = {
 };
 
 const ib = k => `<button type="button" class="ib" data-info="${k}" aria-label="Açıklama">i</button>`;
-const TFL = { '4h': '4 saatlik', '1d': 'günlük', '1w': 'haftalık', '1m': 'aylık' };
+const HRS = { '4h': 4, '6h': 6, '12h': 12 }, isH = tf => tf in HRS, seriesH = (x, tf) => tf === '4h' ? x.d4 : (x.dH && x.dH[tf]) || null, lazyTF = tf => tf === '1w' || tf === '1m' || tf === '6h' || tf === '12h';
+const TFL = { '4h': '4 saatlik', '6h': '6 saatlik', '12h': '12 saatlik', '1d': 'günlük', '1w': 'haftalık', '1m': 'aylık' };
 function showTip(k) {
   const el = $('#tip'); let title, ne, yo, badge = '';
   if (k[0] === '_') [title, ne, yo] = INFO[k] || [k, '', '']; else { const R = CR.RULE[k]; title = R ? R.label : k; [ne, yo] = INFO[k] || ['', '']; badge = R ? `<span class="muted small">${R.tier === 'K' ? 'Kesin kural' : 'Sezgisel kural'}</span>` : ''; }
@@ -792,7 +793,7 @@ function renderViews() {
   const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
   for (const v of ['guclu', 'dip', 'tum', 'fav']) $('#n-' + v).textContent = rs.filter(x => inView(x, v)).length;
   document.querySelectorAll('.view[data-v]').forEach(b => { const v = b.dataset.v; b.setAttribute('aria-pressed', v === 'tum' ? !eff.length && !S.sig.length : eff.includes(v)); if (v === 'dip') { b.disabled = !d1; b.title = d1 ? '' : 'Dip sıkışması yalnız günlük puanda'; } });
-  const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && k === '4h')).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
+  const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && isH(k))).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
   if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
   const sg = $('#sigs'), cnt = Object.fromEntries(Object.keys(SIGS).map(k => [k, rs.filter(x => sigOk(x, k)).length]));
   const sh = Object.entries(SIGS).map(([k, v]) => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(v[1])}">${esc(v[0])} <b>${cnt[k]}</b></button>`).join('');
@@ -843,7 +844,7 @@ function renderList() {
 // ───────── Zaman dilimine göre veri / puan ─────────
 function tfData(x, tf) {
   if (tf === '1d') return { d: x.d, I: x.I };
-  if (tf === '4h') return x.d4 && x.d4.c.length >= 60 ? { d: x.d4, I: x.J || (x.J4 = x.J4 || CR.indicators(x.d4)) } : null;
+  if (isH(tf)) { const s = seriesH(x, tf); if (!s || s.c.length < 60) return null; if (tf === '4h') return { d: s, I: x.J || (x.J4 = x.J4 || CR.indicators(s)) }; x.IH = x.IH || {}; if (!x.IH[tf] || x.IH[tf + 'n'] !== s) { x.IH[tf] = CR.indicators(s); x.IH[tf + 'n'] = s; } return { d: s, I: x.IH[tf] }; }
   const k = tf === '1w' ? 'dw' : 'dm';
   const d = x[k] || (x[k + 'r'] = x[k + 'r'] || (tf === '1w' ? CR.toWeekly(x.d) : CR.toMonthly(x.d)));
   const ik = 'I' + k; if (!x[ik] || x[ik + 'n'] !== d) { x[ik] = CR.indicators(d); x[ik + 'n'] = d; }
@@ -855,15 +856,16 @@ function evalTF(x, tf) {
   x.tfres = x.tfres || {}; const key = tf + (D.d === x.dw || D.d === x.dm ? 'R' : 'r');
   if (key in x.tfres) return x.tfres[key];
   const i = D.d.c.length - 2; let res = null;
-  if (i >= (tf === '4h' ? 100 : 30)) { try { res = new CR.Walker(D.d, D.I, opts()).evaluate(i, null); if (!res || !isFinite(res.score)) res = null; } catch (e) { res = null; } }
+  if (i >= (isH(tf) ? 100 : 30)) { try { res = new CR.Walker(D.d, D.I, opts()).evaluate(i, null); if (!res || !isFinite(res.score)) res = null; } catch (e) { res = null; } }
   return x.tfres[key] = res;
 }
 // Haftalık / aylık için Binance'ten gerçek geçmiş (MA200 için daha fazla mum); olmazsa günlükten türetilir
 let tfJob = null;
+const needTF = (x, tf) => tf === '1w' ? !x.dw : tf === '1m' ? !x.dm : !(x.dH && x.dH[tf]);
 async function loadTFAll(tf) {
   if (MODE === 'borsa') return;
-  if (S.source !== 'live' || (tf !== '1w' && tf !== '1m')) return;
-  const k = tf === '1w' ? 'dw' : 'dm', todo = S.coins.filter(x => !x[k] && !x[k + 'Try']); if (!todo.length) return;
+  if (S.source !== 'live' || !lazyTF(tf)) return;
+  const todo = S.coins.filter(x => needTF(x, tf) && !x['T' + tf]); if (!todo.length) return;
   const job = tfJob = { tf, done: 0, total: todo.length }; let q = 0, last = 0;
   const upd = () => { if (S.listTF === tf) { renderViews(); renderList(); } };
   await Promise.all(Array.from({ length: 6 }, async () => { while (q < todo.length && tfJob === job) { const x = todo[q++]; await ensureTF(x, tf); job.done++; const n = Date.now(); if (n - last > 2500) { last = n; upd(); } } }));
@@ -871,11 +873,15 @@ async function loadTFAll(tf) {
 }
 async function ensureTF(x, tf) {
   if (MODE === 'borsa') return;
-  if (S.source !== 'live' || (tf !== '1w' && tf !== '1m')) return;
-  const k = tf === '1w' ? 'dw' : 'dm'; if (x[k] || x[k + 'Try']) return; x[k + 'Try'] = true;
+  if (S.source !== 'live' || !lazyTF(tf)) return;
+  if (!needTF(x, tf) || x['T' + tf]) return; x['T' + tf] = true;
   try {
-    const rows = await get(`/api/v3/klines?symbol=${x.sym}&interval=${tf === '1w' ? '1w' : '1M'}&limit=1000`);
-    if (rows && rows.length > 10) { x[k] = toSeries(rows); if (x.models) delete x.models[tf]; if (S.sel === x.sym && S.tcTF === tf) renderDetail(); }
+    const rows = await get(`/api/v3/klines?symbol=${x.sym}&interval=${tf === '1m' ? '1M' : tf}&limit=1000`);
+    if (rows && rows.length > 10) {
+      const s = toSeries(rows); if (tf === '1w') x.dw = s; else if (tf === '1m') x.dm = s; else (x.dH = x.dH || {})[tf] = s;
+      if (x.models) delete x.models[tf]; if (x.tfres) for (const kk of Object.keys(x.tfres)) if (kk.startsWith(tf)) delete x.tfres[kk];
+      if (S.sel === x.sym && S.tcTF === tf) renderDetail();
+    }
   } catch (e) {}
 }
 
@@ -986,12 +992,12 @@ function renderDetail() {
   const el = $('#detail'), x = S.coins.find(c => c.sym === S.sel);
   if (!x || !x.res) { el.innerHTML = ''; return; }
   const keep = shownSym === x.sym ? el.scrollTop : 0; shownSym = x.sym;
-  let tf = TF[S.tcTF] ? S.tcTF : '1d'; if (!tfData(x, tf)) tf = '1d';
-  ensureTF(x, tf);
+  let tf = TF[S.tcTF] ? S.tcTF : '1d', waitTF = null; if (!tfData(x, tf)) { if (isH(tf) && MODE === 'kripto' && !x['T' + tf] && S.source === 'live') waitTF = tf; tf = '1d'; }
+  ensureTF(x, waitTF || tf);
   const D = tfData(x, tf), r = evalTF(x, tf), I = D.I, d = D.d;
   const has4 = !!(x.d4 && x.d4.c.length >= 60);
   const head = `<div class="sheethead"><button class="iconbtn close" type="button" id="btnClose" aria-label="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h2>${esc(x.sym.replace(/USDT$/, ''))}<span class="muted small" style="font-weight:500"> / USDT</span></h2><button type="button" class="star big ${isFav(x.sym) ? 'on' : ''}" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</button></div>
-    <div class="tfbar"><div class="seg" data-tcseg>${Object.entries(TF).map(([k, v]) => `<button type="button" data-tc="${k}" aria-pressed="${tf === k}" ${k === '4h' && !has4 ? 'disabled' : ''}>${v.t}</button>`).join('')}</div><span class="small muted">Puan ve yorumlar bu zaman dilimine göre</span></div>`;
+    <div class="tfbar"><div class="seg" data-tcseg>${Object.entries(TF).map(([k, v]) => `<button type="button" data-tc="${k}" aria-pressed="${(waitTF || tf) === k}" ${(k === '4h' && !has4) || (isH(k) && k !== '4h' && MODE === 'borsa') || (k === '4h' && MODE === 'borsa') ? 'disabled' : ''}>${v.t}</button>`).join('')}</div><span class="small muted">${waitTF ? TFL[waitTF] + ' veri yükleniyor…' : 'Puan ve yorumlar bu zaman dilimine göre'}</span></div>`;
   let body = '';
   const chartCard = `<div class="card">
       <div class="sect" style="display:flex;justify-content:space-between;align-items:center">Grafik · ${TF[tf].t} <button type="button" class="btn small" id="btnFS" style="padding:5px 10px">⤢ Tam ekran</button></div>
@@ -1020,7 +1026,7 @@ function renderDetail() {
     if (ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1), '_fibhedef']); }
     const fired = new Set(r.rules.map(z => z.id));
     const dt = new Date(r.t), L = { day: 'numeric', month: 'long' };
-    const when = tf === '4h' ? dt.toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' 4 saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
+    const when = isH(tf) ? dt.toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' ' + HRS[tf] + ' saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
     const noMA = !isFinite(I.sma200[i]) ? `<p class="small muted" style="margin:8px 0 0">Bu zaman diliminde MA200 için yeterli mum yok (${d.c.length}); ilgili kurallar devre dışı.</p>` : '';
     body = `
     <div class="card">
@@ -1058,7 +1064,7 @@ function closeSheet() { $('#detail').classList.remove('open'); document.body.sty
 
 function trendCard(x, tf) {
   const m = buildModel(x, tf, FS.fibSrc);
-  const i = m.last, lines = [], U = { '4h': ['saat', 4], '1d': ['gün', 1], '1w': ['hafta', 1], '1m': ['ay', 1] }[tf];
+  const i = m.last, lines = [], U = { '4h': ['saat', 4], '6h': ['saat', 6], '12h': ['saat', 12], '1d': ['gün', 1], '1w': ['hafta', 1], '1m': ['ay', 1] }[tf];
   const ago = k => i - k === 0 ? (tf === '1d' ? 'bugün' : 'bu mumda') : `${(i - k) * U[1]} ${U[0]} önce`;
   const say = (t, name, key) => {
     if (!t) return;
@@ -1086,7 +1092,7 @@ function trendCard(x, tf) {
 const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ['fib', 'Fib'], ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
 const LDEF = { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: true, vol: true };
 const FS = { open: false, x: null, m: null, tf: '1d', beg: 0, end: 0, cross: null, fibSrc: store.get('fibSrc', 'uzun'), layers: Object.assign({}, LDEF, store.get('layers2', {})) };
-const TF = { '4h': { t: '4S', look: 180, lookL: 240, day: 1 / 6 }, '1d': { t: '1G', look: 160, lookL: 200, day: 1 }, '1w': { t: '1H', look: 104, lookL: 156, day: 7 }, '1m': { t: '1Ay', look: 36, lookL: 60, day: 30 } };
+const TF = { '4h': { t: '4S', look: 180, lookL: 240, day: 1 / 6 }, '6h': { t: '6S', look: 170, lookL: 230, day: 1 / 4 }, '12h': { t: '12S', look: 165, lookL: 220, day: 1 / 2 }, '1d': { t: '1G', look: 160, lookL: 200, day: 1 }, '1w': { t: '1H', look: 104, lookL: 156, day: 7 }, '1m': { t: '1Ay', look: 36, lookL: 60, day: 30 } };
 // Kırılmış trendlerden en yenisinden fib; kaynak: 'uzun' ya da 'kisa' (yoksa diğerine düşer)
 function pickFib(m, src, maxAge) {
   const pick = T => { const c = [T.up, T.down].filter(t => t && t.brk > 0 && m.last - t.brk <= maxAge).sort((a, b) => b.brk - a.brk)[0]; return c ? CR.fibFromTrend(m.d, c, m.last) : null; };
@@ -1101,7 +1107,7 @@ function buildModel(x, tf, fibSrc) {
     if (tf === '1d') { const T = x.res.ctx.trend || {}; m = { tf, d: x.d, I: x.I, last: x.res.i, dip: x.res.ctx.dip }; }
     else if (tf === '1m') { const d = x.dm || CR.toMonthly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
     else if (tf === '1w') { const d = x.dw || CR.toWeekly(x.d); m = { tf, d, I: CR.indicators(d), last: d.c.length - 1 }; }
-    else { if (!x.d4 || x.d4.c.length < 60) return null; const I = x.J || CR.indicators(x.d4); m = { tf, d: x.d4, I, last: x.d4.c.length - 2 }; }
+    else { const D0 = tfData(x, tf); if (!D0) return null; m = { tf, d: D0.d, I: D0.I, last: D0.d.c.length - 2 }; }
     if (!m.tr) m.tr = m.last > 10 ? CR.trendShort(m.d, m.I, m.last, TF[tf].look) : {};
     m.trL = m.last > 10 ? CR.trendLong(m.d, m.I, m.last, Math.min(TF[tf].lookL, m.last - 2)) : {};
     m.zs = m.last > 10 ? CR.zonesOf(m.d, m.last, Math.min(m.last - 2, TF[tf].lookL * 2)) : [];
@@ -1238,7 +1244,7 @@ function renderChart(cv, m, view, opt) {
 }
 function dayText(m, i) {
   const d = m.d, I = m.I, dt = new Date(d.t[i]);
-  return `${dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${m.tf === '4h' ? ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === '1w' ? ' haftası' : m.tf === '1m' ? ' ayı' : ''} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
+  return `${dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })}${isH(m.tf) ? ' ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === '1w' ? ' haftası' : m.tf === '1m' ? ' ayı' : ''} · A ${fmt(d.o[i])} · Y ${fmt(d.h[i])} · D ${fmt(d.l[i])} · K ${fmt(d.c[i])} · ${pc(d.c[i] / d.c[i - 1] - 1)}${isFinite(I.rsi[i]) ? ' · RSI ' + I.rsi[i].toFixed(0) : ''}`;
 }
 // Küçük grafik (coin sayfasında). Dokununca tam ekran açılır.
 function drawChart(x) {
@@ -1259,7 +1265,7 @@ function openFS(x) {
 }
 function syncFsControls() {
   const has4 = !!(FS.x.d4 && FS.x.d4.c.length >= 60);
-  $('#fsTF').innerHTML = Object.entries(TF).map(([k, v]) => `<button type="button" data-tf="${k}" aria-pressed="${FS.tf === k}" ${k === '4h' && !has4 ? 'disabled title="4 saatlik veri yok"' : ''}>${v.t}</button>`).join('');
+  $('#fsTF').innerHTML = Object.entries(TF).map(([k, v]) => `<button type="button" data-tf="${k}" aria-pressed="${FS.tf === k}" ${(k === '4h' && !has4) || (isH(k) && k !== '4h' && !seriesH(FS.x, k)) ? 'disabled title="Bu saatlik veri için önce coin sayfasında zaman dilimini seç"' : ''}>${v.t}</button>`).join('');
   $('#fsLayers').innerHTML = LAYERS_DEF.filter(([k]) => FS.tf === '1d' || k !== 'dip').map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('')
     + `<button type="button" class="chipl src" id="fsFibSrc" aria-pressed="true">Fib: ${FS.fibSrc === 'uzun' ? 'uzun trendden' : 'kısa trendden'}</button>`;
 }
