@@ -89,7 +89,20 @@ h3{font-weight:700;font-size:15px;margin:0}
 .view{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 14px;font-weight:700;font-size:14px;white-space:nowrap;color:var(--ink2);display:inline-flex;gap:6px;align-items:center}
 .view b{font-family:var(--f-num);font-weight:600;font-size:12.5px;color:var(--mute)}
 .view[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
-.sighead{margin:2px 2px 6px}.sigs .view{padding:6px 11px;font-size:13px}.view[aria-pressed="true"]{border-color:var(--ink)}
+.sigbox{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;margin:0 0 12px;padding:2px 14px}
+.sigbox summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:11px 0;font-weight:700}
+.sigbox summary::-webkit-details-marker{display:none}
+.sigbox summary::after{content:'▾';margin-left:auto;color:var(--mute)}
+.sigbox[open] summary::after{content:'▴'}
+.sign{font-size:13px;color:var(--accent)}
+.sigsub{flex-basis:100%;font-weight:400}
+.sgg{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:6px 0 6px}
+.sgrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.sgrow .view{padding:6px 11px;font-size:13px}
+.fsleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink2);padding:2px 2px 0}
+.fsleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.fsleg i{display:inline-block;width:22px;height:0;border-top:3px solid}
+.fsleg b{color:var(--ink);font-weight:600}.view[aria-pressed="true"]{border-color:var(--ink)}
 .viewhelp{font-size:13px;color:var(--ink2);margin:0 0 12px}
 .search{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 12px;width:100%;margin-bottom:12px}
 
@@ -252,8 +265,7 @@ body.fs-on{overflow:hidden}
           <button class="view" type="button" data-v="dip" aria-pressed="false">Dipten dönüş adayları <b id="n-dip">0</b></button>
           <button class="view" type="button" data-v="fav" aria-pressed="false">★ Favoriler <b id="n-fav">0</b></button>
         </div>
-        <div class="sighead small muted">Sinyaller <span>(puandan bağımsız, seçili zaman dilimine göre)</span></div>
-        <div class="views sigs" id="sigs"></div>
+        <details class="sigbox" id="sigbox"><summary><span class="sigt">Sinyaller</span><span class="sign" id="sigN"></span><span class="small muted sigsub">puandan bağımsız · seçili zaman dilimine göre</span></summary><div id="sigs"></div></details>
         <p class="viewhelp" id="viewhelp"></p>
         <input class="search" id="q" type="search" placeholder="Coin ara (ör. SOL)" aria-label="Coin ara">
         <div class="list" id="list"></div>
@@ -321,6 +333,7 @@ body.fs-on{overflow:hidden}
     <button class="iconbtn" type="button" id="fsReset" aria-label="Görünümü sıfırla" title="Görünümü sıfırla"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 13a8 8 0 1 0 2.3-5.7"/><path d="M4 4v5h5"/></svg></button>
   </div>
   <div class="fsrow"><div class="seg" id="fsTF" aria-label="Zaman dilimi"></div><div class="fslayers" id="fsLayers"></div></div>
+  <div class="fsleg" id="fsLeg"></div>
   <div class="fsread num" id="fsRead"></div>
   <canvas id="fsChart" aria-label="Tam ekran grafik"></canvas>
   <div class="fshint">Kaydır: sürükle · Yakınlaştır: iki parmak ya da tekerlek · Gün: dokun · Telefonu yan çevirebilirsiniz</div>
@@ -796,8 +809,10 @@ function renderViews() {
   const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && isH(k))).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
   if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
   const sg = $('#sigs'), cnt = Object.fromEntries(Object.keys(SIGS).map(k => [k, rs.filter(x => sigOk(x, k)).length]));
-  const sh = Object.entries(SIGS).map(([k, v]) => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(v[1])}">${esc(v[0])} <b>${cnt[k]}</b></button>`).join('');
+  const SIGG = [['Dönüş ve uyumsuzluk', ['divB', 'divT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
+  const sh = SIGG.map(([g, ks]) => `<div class="sgg">${g}</div><div class="sgrow">${ks.map(k => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(SIGS[k][1])}">${esc(SIGS[k][0])} <b>${cnt[k]}</b></button>`).join('')}</div>`).join('');
   if (sg.dataset.h !== sh) { sg.innerHTML = sh; sg.dataset.h = sh; }
+  $('#sigN').textContent = S.sig.length ? S.sig.length + ' seçili: ' + S.sig.map(k => SIGS[k][0]).join(', ') : '';
   $('#viewhelp').textContent = (eff.length ? eff.map(v => HELP[v]).join(' ') + (eff.length > 1 ? ' Seçili filtreler birlikte uygulanır.' : '') : HELP.tum).replace('puana göre.', `${TFL[S.listTF]} puana göre.`) + S.sig.map(k => ' ' + SIGS[k][1]).join('');
 }
 function rows() {
@@ -1280,7 +1295,8 @@ function drawFS() {
   if (!FS.open) return;
   const lay = FS.tf === '1d' ? FS.layers : Object.assign({}, FS.layers, { dip: false });
   fsGeo = renderChart($('#fsChart'), FS.m, { beg: FS.beg, end: FS.end }, { big: true, layers: lay, cross: FS.cross });
-  const f = FS.m.fb;
+  const f = FS.m.fb, ix = Math.min(FS.cross != null ? FS.cross : FS.end, FS.m.last), In = FS.m.I;
+  $('#fsLeg').innerHTML = lay.ma ? [['MA20', 'sma20', 'var(--accent)', ''], ['MA50', 'sma50', 'var(--warn)', ''], ['MA100', 'sma100', 'var(--mute)', ''], ['MA200', 'sma200', 'var(--ink)', 'dashed']].map(([n, k, col, st]) => `<span><i style="border-top-color:${col};border-top-style:${st || 'solid'}"></i>${n} <b>${isFinite(In[k][ix]) ? fmt(In[k][ix]) : '—'}</b></span>`).join('') : '';
   $('#fsRead').textContent = dayText(FS.m, FS.cross != null ? FS.cross : Math.min(FS.end, FS.m.last)) + (FS.layers.fib ? (f ? ` · Fib: ${f.from.kind.toLowerCase()}` : ' · Fib yok: trend kırılmadı') : '');
 }
 const PERIODS = [['1A', 30], ['3A', 90], ['6A', 180], ['1Y', 365], ['Tümü', 0]];
@@ -1434,6 +1450,7 @@ $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if 
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
+$('#sigbox').open = !!store.get('sigOpen', false); $('#sigbox').addEventListener('toggle', () => store.set('sigOpen', $('#sigbox').open));
 $('#sigs').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (!b) return; const k = b.dataset.sg; S.sig = S.sig.includes(k) ? S.sig.filter(x => x !== k) : [...S.sig, k]; store.set('sig', S.sig); renderViews(); renderList(); renderDetail(); });
 $('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; if (v === 'tum') { S.sig = []; store.set('sig', S.sig); } S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
 $('#listTF').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.listTF = b.dataset.t; S.tcTF = S.listTF; store.set('listTF', S.listTF); store.set('tcTF', S.tcTF); loadTFAll(S.listTF); renderViews(); renderList(); renderDetail(); });
