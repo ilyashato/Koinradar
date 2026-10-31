@@ -2143,7 +2143,7 @@ function renderDetail() {
     if (ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1), '_fibhedef']); }
     const fired = new Set(r.rules.map(z => z.id));
     const dt = new Date(r.t), L = { day: 'numeric', month: 'long' };
-    const when = isH(tf) ? dt.toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' ' + HRS[tf] + ' saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
+    const when = isH(tf) ? new Date(r.t + HRS[tf] * 36e5).toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' ' + HRS[tf] + ' saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
     const noMA = !isFinite(I.sma200[i]) ? `<p class="small muted" style="margin:8px 0 0">Bu zaman diliminde MA200 için yeterli mum yok (${d.c.length}); ilgili kurallar devre dışı.</p>` : '';
     body = `
     <div class="card">
