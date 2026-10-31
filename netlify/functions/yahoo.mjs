@@ -29,5 +29,5 @@ export default async (req) => {
   if (!list.length) return new Response('{}', { status: 400, headers: { 'content-type': 'application/json' } });
   const out = {};
   await Promise.all(list.map(async s => { out[s] = await one(s, rng); }));
-  return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': rng === '5d' ? 'public, max-age=60' : 'public, max-age=900', 'access-control-allow-origin': '*' } });
+  return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': rng === '5d' ? 'public, max-age=60' : 'public, max-age=900', 'netlify-cdn-cache-control': rng === '5d' ? 'public, s-maxage=240, stale-while-revalidate=600' : 'public, s-maxage=900, stale-while-revalidate=3600', 'access-control-allow-origin': '*' } });
 };
