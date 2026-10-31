@@ -343,7 +343,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('cr_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('cr_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true), sig: store.get('sig', []) };
+const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true), sig: store.get('sig', []), liveT: 0, fullT: 0 };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -599,6 +599,7 @@ async function loadLive() {
     .sort((a, b) => +b.quoteVolume - +a.quoteVolume);
   if (S.top > 0) list = list.slice(0, S.top);
   const qv = Object.fromEntries(list.map(x => [x.symbol, +x.quoteVolume]));
+  const tk = Object.fromEntries(list.map(x => [x.symbol, { p: +x.lastPrice, chg: +x.priceChangePercent / 100 }]));
   const syms = list.map(x => x.symbol); const bi = syms.indexOf('BTCUSDT'); if (bi > 0) { syms.splice(bi, 1); syms.unshift('BTCUSDT'); }
   // Yeni liste: veriler geldikçe ekranda görünür
   S.coins = []; S.young = 0; S.total = syms.length; S.loading = true; S.source = 'live'; S.bt = null; S.useW = false;
@@ -612,7 +613,7 @@ async function loadLive() {
         if (a.length < 212) { S.young++; } // MA200 için en az ~7 aylık geçmiş gerekir
         else {
           const b = await get(`/api/v3/klines?symbol=${sym}&interval=4h&limit=400`).catch(() => null);
-          const x = { sym, d: toSeries(a), d4: b ? toSeries(b) : null, qv: qv[sym] };
+          const x = { sym, d: toSeries(a), d4: b ? toSeries(b) : null, qv: qv[sym], live: tk[sym] };
           x.I = CR.indicators(x.d); x.J = x.d4 && x.d4.c.length > 220 ? CR.indicators(x.d4) : null; x.res = evalCoin(x);
           if (x.res) S.coins.push(x);
         }
@@ -620,7 +621,7 @@ async function loadLive() {
       done++; setStatus(`Coinler taranıyor: ${done}/${syms.length}`, ''); flush(false);
     }
   }));
-  S.loading = false;
+  S.loading = false; S.fullT = Date.now(); S.liveT = Date.now();
   if (!S.coins.length) throw new Error('veri yok');
   flush(true); loadTFAll(S.listTF);
 }
@@ -638,10 +639,10 @@ function yCompact(j) { // Yahoo ham yanıtı → sade seri
   }
   return d;
 }
-async function yahooBatch(codes) {
-  try { const r = await fetch('/.netlify/functions/yahoo?s=' + codes.map(c => c === 'XU100' ? 'XU100.IS' : c + '.IS').join(',')); if (r.ok) { const j = await r.json(); if (j && typeof j === 'object') return j; } } catch (e) {}
+async function yahooBatch(codes, rng = '5y') {
+  try { const r = await fetch('/.netlify/functions/yahoo?r=' + rng + '&s=' + codes.map(c => c === 'XU100' ? 'XU100.IS' : c + '.IS').join(',')); if (r.ok) { const j = await r.json(); if (j && typeof j === 'object') return j; } } catch (e) {}
   const out = {};
-  await Promise.all(codes.map(async c => { try { const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${c}.IS?range=5y&interval=1d`); if (r.ok) out[c + '.IS'] = yCompact(await r.json()); } catch (e) {} }));
+  await Promise.all(codes.map(async c => { try { const r = await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/${c}.IS?range=${rng}&interval=1d`); if (r.ok) out[c + '.IS'] = yCompact(await r.json()); } catch (e) {} }));
   return out;
 }
 function closeBar(d) { // son bar tamamsa, motorun "oluşan mum" varsayımı için sentetik bir mum ekle
@@ -663,15 +664,16 @@ async function loadBorsa() {
       for (const c of codes) {
         const raw = res[c + '.IS']; let d = raw && raw.c ? raw : null; done++;
         if (!d) continue; got++;
+        if (d.c.length > 1) { const n0 = d.c.length; const lv = { p: d.c[n0 - 1], chg: d.c[n0 - 1] / d.c[n0 - 2] - 1 }; d.__lv = lv; }
         if (d.c.length < 212 || (Date.now() - d.t[d.t.length - 1]) > 12 * 864e5) { if (c !== 'XU100') S.young++; continue; }
         d = closeBar({ t: d.t.slice(), o: d.o.slice(), h: d.h.slice(), l: d.l.slice(), c: d.c.slice(), v: d.v.slice() });
         const n = d.c.length, k0 = Math.max(0, n - 22), qv = d.c.slice(k0, n - 1).reduce((s, v, q) => s + v * d.v[k0 + q], 0) / Math.max(1, n - 1 - k0);
-        const x = { sym: c, d, d4: null, qv }; x.I = CR.indicators(x.d); x.J = null; x.res = evalCoin(x); if (x.res) S.coins.push(x);
+        const x = { sym: c, d, d4: null, qv, live: raw.__lv }; x.I = CR.indicators(x.d); x.J = null; x.res = evalCoin(x); if (x.res) S.coins.push(x);
       }
       setStatus(`Hisseler taranıyor: ${done}/${syms.length}`, ''); flush(false);
     }
   }));
-  S.loading = false;
+  S.loading = false; S.fullT = Date.now(); S.liveT = Date.now();
   if (!got || !S.coins.length) throw new Error('veri yok');
   flush(true);
 }
@@ -721,7 +723,8 @@ function srcStatus() {
   const dt = last ? new Date(last).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' }) : '';
   const n = S.coins.filter(x => x.res).length;
   if (S.source === 'live' && S.loading) return;
-  if (S.source === 'live') setStatus(`Canlı · ${n} coin · ${dt} kapanışı`, 'live');
+  const lt = S.liveT ? ' · fiyat ' + new Date(S.liveT).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) + (MODE === 'borsa' ? ' (≈15 dk gecikmeli)' : '') : '';
+  if (S.source === 'live') setStatus(`Canlı · ${n} coin · ${dt} kapanışı${lt}`, 'live');
   else if (S.source === 'file') setStatus(`Kayıtlı veri · ${n} coin · ${dt} kapanışı`, 'file');
   else setStatus(`Örnek veri · gerçek coin değil`, 'demo');
 }
@@ -824,7 +827,7 @@ function renderList() {
       <span class="cmain"><span class="cname">${esc(x.sym.replace(/USDT$/, ''))}<span class="star ${isFav(x.sym) ? 'on' : ''}" role="button" tabindex="0" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</span>${tag}</span>
         <span class="verdict v-${S.view === 'dip' ? 'p' : r.label.k}">${S.view === 'dip' ? 'Dip kurulum puanı' : VERDICT[r.label.k]}</span>
         <span class="why">${esc(why)}</span></span>
-      <span class="cside"><span class="price">${fmt(r.close)}</span><span class="chg ${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></span>
+      <span class="cside"><span class="price lv-p">${fmt(x.live ? x.live.p : r.close)}</span><span class="chg lv-c ${(x.live ? x.live.chg : chg) >= 0 ? 'up' : 'dn'}">${pc(x.live ? x.live.chg : chg)}</span></span>
     </button>`;
   }).join('');
   const foot = [];
@@ -1022,7 +1025,7 @@ function renderDetail() {
     body = `
     <div class="card">
       <div class="hero"><span class="score ${scoreCls(r.label.k)}">${r.score.toFixed(0)}</span>
-        <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]} ${ib('_skor')}</div><div class="p">${fmt(r.close)} <span class="${chg >= 0 ? 'up' : 'dn'}">${pc(chg)}</span></div><div class="small muted">${when}</div></div></div>
+        <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]} ${ib('_skor')}</div><div class="p"><span class="lv-p">${fmt(x.live ? x.live.p : r.close)}</span> <span class="lv-c ${(x.live ? x.live.chg : chg) >= 0 ? 'up' : 'dn'}">${pc(x.live ? x.live.chg : chg)}</span></div><div class="small muted">${when}</div></div></div>
       <div class="meter"><i style="left:${Math.max(1, Math.min(99, r.score))}%"></i></div>
       <div class="meterlab"><span>Uzak dur</span><span>Zayıf</span><span>Kararsız</span><span>Olumlu</span></div>${noMA}
     </div>
@@ -1469,6 +1472,44 @@ function route() { const v = VIEWS.includes(location.hash.slice(1)) ? location.h
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { location.hash = t.dataset.view; }));
 window.addEventListener('hashchange', route); route();
 
+
+// ───────── Canlı fiyat ─────────
+function paintLive() {
+  document.querySelectorAll('.coin[data-sym]').forEach(el => {
+    const x = S.coins.find(c => c.sym === el.dataset.sym); if (!x || !x.live) return;
+    const pe = el.querySelector('.lv-p'), ce = el.querySelector('.lv-c'); if (pe) pe.textContent = fmt(x.live.p);
+    if (ce) { ce.textContent = pc(x.live.chg); ce.className = 'chg lv-c ' + (x.live.chg >= 0 ? 'up' : 'dn'); }
+  });
+  const x = S.coins.find(c => c.sym === S.sel);
+  if (x && x.live) { const pe = document.querySelector('#detail .lv-p'), ce = document.querySelector('#detail .lv-c'); if (pe) pe.textContent = fmt(x.live.p); if (ce) { ce.textContent = pc(x.live.chg); ce.className = 'lv-c ' + (x.live.chg >= 0 ? 'up' : 'dn'); } }
+  srcStatus(); renderMarketLive();
+}
+function renderMarketLive() {}
+const istNow = () => new Date(Date.now() + 108e5);
+function bistOpen() { const n = istNow(), wd = n.getUTCDay(), m = n.getUTCHours() * 60 + n.getUTCMinutes(); return wd >= 1 && wd <= 5 && m >= 9 * 60 + 55 && m <= 18 * 60 + 30; }
+let liveBusy = false;
+async function liveTick() {
+  if (liveBusy || S.loading || S.source !== 'live' || document.hidden || !S.coins.length) return; liveBusy = true;
+  try {
+    if (MODE === 'kripto') {
+      const t = await get('/api/v3/ticker/24hr'), m = new Map(t.map(z => [z.symbol, z]));
+      for (const x of S.coins) { const z = m.get(x.sym); if (!z) continue; x.live = { p: +z.lastPrice, chg: +z.priceChangePercent / 100 }; const n = x.d.c.length - 1; x.d.c[n] = x.live.p; x.d.h[n] = Math.max(x.d.h[n], x.live.p); x.d.l[n] = Math.min(x.d.l[n], x.live.p); }
+    } else if (bistOpen()) {
+      const syms = S.coins.map(x => x.sym), batches = []; for (let k = 0; k < syms.length; k += 10) batches.push(syms.slice(k, k + 10)); let b = 0;
+      await Promise.all(Array.from({ length: 4 }, async () => { while (b < batches.length) { const res = await yahooBatch(batches[b++], '5d'); for (const c of Object.keys(res)) { const d = res[c], x = S.coins.find(z => z.sym + '.IS' === c); if (!x || !d || !d.c || d.c.length < 2) continue; const n = d.c.length; x.live = { p: d.c[n - 1], chg: d.c[n - 1] / d.c[n - 2] - 1 }; } } }));
+    } else return;
+    S.liveT = Date.now(); paintLive();
+  } catch (e) {} finally { liveBusy = false; }
+}
+function needFull() {
+  if (S.loading || S.source !== 'live' || !S.coins.length) return false;
+  if (Date.now() - S.fullT < 5 * 60e3) return false;
+  if (MODE === 'kripto') { const c0 = S.coins[0], n = c0.d.t.length - 1; return Date.now() > c0.d.t[n] + 864e5 + 15e3; }
+  const n = istNow(), m = n.getUTCHours() * 60 + n.getUTCMinutes(), wd = n.getUTCDay(), dayStart = Date.now() - m * 6e4 - n.getUTCSeconds() * 1e3;
+  return wd >= 1 && wd <= 5 && m >= 18 * 60 + 20 && S.fullT < dayStart + (18 * 60 + 20) * 6e4;
+}
+setInterval(() => { if (document.hidden) return; if (needFull()) { start(); return; } liveTick(); }, MODE === 'borsa' ? 300e3 : 30e3);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - S.liveT > 20e3) { if (needFull()) start(); else liveTick(); } });
 document.querySelectorAll('.mkt a').forEach(a => { if (a.dataset.m === MODE) a.setAttribute('aria-current', 'page'); });
 // Başlat
 async function start() {

@@ -1,10 +1,10 @@
 // Yahoo Finance günlük mumlarını (BIST) toplu çeker; tarayıcıdaki CORS engelini aşmak için aracı.
 // Kullanım: /.netlify/functions/yahoo?s=THYAO.IS,GARAN.IS,XU100.IS
 const ok = /^[A-Z0-9]{2,12}\.IS$/;
-async function one(s) {
+async function one(s, rng) {
   for (const host of ['query1', 'query2']) {
     try {
-      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${s}?range=5y&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${s}?range=${rng}&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
       if (!r.ok) continue;
       const j = await r.json(), q = j.chart && j.chart.result && j.chart.result[0];
       if (!q || !q.timestamp) return null;
@@ -24,9 +24,10 @@ async function one(s) {
   return null;
 }
 export default async (req) => {
-  const list = (new URL(req.url).searchParams.get('s') || '').split(',').filter(s => ok.test(s)).slice(0, 12);
+  const sp = new URL(req.url).searchParams, rng = sp.get('r') === '5d' ? '5d' : '5y';
+  const list = (sp.get('s') || '').split(',').filter(s => ok.test(s)).slice(0, 12);
   if (!list.length) return new Response('{}', { status: 400, headers: { 'content-type': 'application/json' } });
   const out = {};
-  await Promise.all(list.map(async s => { out[s] = await one(s); }));
-  return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=900', 'access-control-allow-origin': '*' } });
+  await Promise.all(list.map(async s => { out[s] = await one(s, rng); }));
+  return new Response(JSON.stringify(out), { headers: { 'content-type': 'application/json', 'cache-control': rng === '5d' ? 'public, max-age=60' : 'public, max-age=900', 'access-control-allow-origin': '*' } });
 };
