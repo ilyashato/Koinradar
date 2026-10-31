@@ -253,7 +253,7 @@ body.fs-on{overflow:hidden}
 
   <nav class="tabs" role="tablist">
     <button class="tab" role="tab" data-view="radar" id="tab-radar" type="button">Radar</button>
-    <button class="tab" role="tab" data-view="test" id="tab-test" type="button">Geri test</button>
+    <button class="tab" role="tab" data-view="test" id="tab-test" type="button" hidden>Geri test</button>
     <button class="tab" role="tab" data-view="kurallar" id="tab-kurallar" type="button">Nasıl çalışır</button>
   </nav>
 
@@ -2611,7 +2611,7 @@ $('#fileIn').addEventListener('change', async e => {
 function showNotice(h) { const n = $('#notice'); n.innerHTML = h; n.hidden = false; }
 
 // Sekmeler
-const VIEWS = ['radar', 'test', 'kurallar'];
+const VIEWS = ['radar', 'kurallar']; // 'test' (geri test) şimdilik kapalı; sekme ve bölüm kodda duruyor
 function route() { const v = VIEWS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'radar'; for (const k of VIEWS) { $('#view-' + k).hidden = k !== v; $('#tab-' + k).setAttribute('aria-selected', k === v); } if (v !== 'radar') closeSheet(); else { const x = S.coins.find(c => c.sym === S.sel); if (x && x.res) drawChart(x); } }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => { location.hash = t.dataset.view; }));
 window.addEventListener('hashchange', route); route();
