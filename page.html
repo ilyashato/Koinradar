@@ -1082,7 +1082,7 @@ function renderDetail() {
 // ───────── Paylaşım kartı (X / sosyal medya için tek görsel) ─────────
 async function shareCard(x, tf) {
   const D = tfData(x, tf), r = evalTF(x, tf); if (!D || !r) { alert('Bu zaman diliminde kart için yeterli veri yok'); return; }
-  const I = D.I, d = D.d, i = r.i, ctx = r.ctx, W = 1080, H = 1880, P = 48;
+  const I = D.I, d = D.d, i = r.i, ctx = r.ctx, W = 1080, H = 1930, P = 48;
   const K = { bg1: '#0a0f1d', bg2: '#16203d', panel: 'rgba(255,255,255,.055)', line: 'rgba(255,255,255,.10)', ink: '#eef2fb', ink2: '#b2bcd2', mute: '#7f8aa0', good: '#41c78d', bad: '#f2786a', warn: '#e4ab43', acc: '#88a6ff' };
   const vk = r.label.k, vc = vk === 'gp' || vk === 'p' ? K.good : vk === 'n' ? K.warn : K.bad;
   const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
@@ -1112,7 +1112,7 @@ async function shareCard(x, tf) {
   g.fillStyle = vc + '28'; g.font = `800 30px ${F}`; const vt = VERDICT[vk], vw = g.measureText(vt).width + 40; rr(cx - vw / 2, 345, vw, 50, 25); g.fill(); txt(vt, cx, 380, 30, vc, 800, 'center');
   // üç bölüm: günlük / haftalık / aylık
   const root = document.documentElement, old = root.getAttribute('data-theme'); root.setAttribute('data-theme', 'dark');
-  const secs = [['1d', 'GÜNLÜK'], ['1w', 'HAFTALIK'], ['1m', 'AYLIK']], sh = 360, sy0 = 420, CW = W - 2 * P;
+  const secs = [['1d', 'GÜNLÜK'], ['1w', 'HAFTALIK'], ['1m', 'AYLIK']], sh = 440, sy0 = 420, CW = W - 2 * P;
   try {
     secs.forEach(([t, nm], n) => {
       const y1 = sy0 + n * (sh + 14), rt = t === '1d' ? r : evalTF(x, t), m = buildModel(x, t, FS.fibSrc);
@@ -1124,19 +1124,19 @@ async function shareCard(x, tf) {
       else txt('Yeterli geçmiş veri yok', P + CW - 28, y1 + 46, 22, K.mute, 600, 'right');
       if (m) {
         const wrapEl = document.createElement('div'); wrapEl.style.cssText = 'position:fixed;left:-3000px;top:0;width:984px;height:270px'; const c2 = document.createElement('canvas'); c2.style.cssText = 'width:984px;height:270px;display:block'; wrapEl.appendChild(c2); document.body.appendChild(wrapEl);
-        try { renderChart(c2, m, defaultWindow(m), { layers: { ma: true, zone: true } }); g.drawImage(c2, 0, 0, c2.width, c2.height, P + 16, y1 + 70, 984, 270); } finally { wrapEl.remove(); }
+        try { renderChart(c2, m, defaultWindow(m), { layers: { ma: true, zone: true }, zoneNums: true }); g.drawImage(c2, 0, 0, c2.width, c2.height, P + 16, y1 + 62, 984, 270); } finally { wrapEl.remove(); }
       }
+      const TD = tfData(x, t) || (m && { d: m.d, I: m.I }), ii = rt ? rt.i : (m ? m.last : 0);
+      if (TD) { let rw = []; try { rw = indRows(TD.I, TD.d, ii); } catch (e) {} const pick = ['RSI', 'MACD', 'SMI', 'MFI'].map(k => rw.find(z => z.t.startsWith(k))).filter(Boolean), tw3 = (CW - 32 - 3 * 10) / 4;
+        pick.forEach((z, q) => { const x0 = P + 16 + q * (tw3 + 10), yy = y1 + 342, col = z.st === 'p' ? K.good : z.st === 'n' ? K.bad : z.st === 'w' ? K.warn : K.ink2;
+          g.fillStyle = 'rgba(255,255,255,.05)'; rr(x0, yy, tw3, 80, 16); g.fill(); g.fillStyle = col; rr(x0 + 12, yy + 16, 5, 48, 2.5); g.fill();
+          g.save(); g.beginPath(); g.rect(x0, yy, tw3, 80); g.clip(); txt(z.t.replace(/ \(.*\)$/, '') + ' · ' + nm.toLowerCase(), x0 + 26, yy + 30, 17, K.mute, 600); txt(z.lab, x0 + 26, yy + 60, 22, col, 800); g.restore(); }); }
     });
   } finally { old == null ? root.removeAttribute('data-theme') : root.setAttribute('data-theme', old); }
   { const lg = [['MA20', K.acc], ['MA50', K.warn], ['MA100', K.mute], ['MA200', K.ink], ['Destek / direnç bölgeleri', K.bad]]; let lx = P; const ly0 = sy0 + 3 * (sh + 14) - 2; lg.forEach(([t, c]) => { g.fillStyle = c; g.fillRect(lx, ly0 + 12, 22, 5); txt(t, lx + 30, ly0 + 22, 18, K.ink2, 600); lx += t.length > 6 ? 330 : 112; }); }
-  // göstergeler (günlük)
-  const rows = indRows(I, d, i).slice(0, 8);
-  const ty = sy0 + 3 * (sh + 14) + 40, tw2 = (W - 2 * P - 3 * 14) / 4, th = 74;
-  rows.forEach((z, n) => { const x0 = P + (n % 4) * (tw2 + 14), y1 = ty + Math.floor(n / 4) * (th + 10); const col = z.st === 'p' ? K.good : z.st === 'n' ? K.bad : z.st === 'w' ? K.warn : K.ink2;
-    g.fillStyle = K.panel; rr(x0, y1, tw2, th, 18); g.fill(); g.fillStyle = col; rr(x0 + 14, y1 + 16, 6, th - 32, 3); g.fill();
-    g.save(); g.beginPath(); g.rect(x0, y1, tw2, th); g.clip(); txt(z.t.replace(/ \(.*\)$/, ''), x0 + 30, y1 + 28, 18, K.mute, 600); txt(z.lab, x0 + 30, y1 + 56, 22, col, 800); g.restore(); });
+  const ty = sy0 + 3 * (sh + 14) + 40, th = -10;
   const lv = []; if (ctx.support) lv.push(['Destek', fmt(ctx.support[1]), K.good]); if (ctx.resistance) lv.push(['Direnç', fmt(ctx.resistance[0]), K.bad]); if (isFinite(I.sma200[i])) lv.push(['MA200', fmt(I.sma200[i]), K.ink]);
-  let lxx = P; const ly = ty + 2 * (th + 10) + 4; lv.forEach(([k, v, c]) => { g.font = `600 20px ${F}`; const kw = g.measureText(k).width; g.font = `800 24px ${F}`; const w2 = g.measureText(v).width + kw + 52; g.fillStyle = K.panel; rr(lxx, ly, w2, 40, 20); g.fill(); txt(k, lxx + 18, ly + 28, 20, K.mute, 600); txt(v, lxx + 32 + kw, ly + 28, 24, c, 800); lxx += w2 + 12; });
+  let lxx = P; const ly = ty - 8; lv.forEach(([k, v, c]) => { g.font = `600 20px ${F}`; const kw = g.measureText(k).width; g.font = `800 24px ${F}`; const w2 = g.measureText(v).width + kw + 52; g.fillStyle = K.panel; rr(lxx, ly, w2, 40, 20); g.fill(); txt(k, lxx + 18, ly + 28, 20, K.mute, 600); txt(v, lxx + 32 + kw, ly + 28, 24, c, 800); lxx += w2 + 12; });
   // alt bilgi
   txt('Yatırım tavsiyesi değildir · Kişisel proje · Veri: ' + (MODE === 'borsa' ? 'Yahoo Finance' : 'Binance'), W / 2, H - 22, 19, K.mute, 500, 'center');
   const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
@@ -1250,6 +1250,7 @@ function renderChart(cv, m, view, opt) {
     const x0 = Math.max(0, X(Math.max(beg, z.j)) - bw / 2), col = z.res ? C.bad : C.good;
     g.fillStyle = z.res ? C.badS : C.goodS; g.fillRect(x0, y1, pw - x0, Math.max(2, y0 - y1));
     g.strokeStyle = col; g.globalAlpha = 0.7; g.lineWidth = 1; g.beginPath(); const ye = z.res ? y1 : y0; g.moveTo(x0, ye); g.lineTo(pw, ye); g.stroke(); g.globalAlpha = 1;
+    if (opt.zoneNums) { const tx = fmt(z.lo) + ' – ' + fmt(z.hi); g.font = '700 13px ui-monospace,monospace'; g.textAlign = 'right'; g.textBaseline = z.res ? 'bottom' : 'top'; const tw = g.measureText(tx).width; g.fillStyle = 'rgba(10,15,29,.75)'; g.fillRect(pw - tw - 10, z.res ? y1 - 17 : y0 + 1, tw + 8, 16); g.fillStyle = col; g.fillText(tx, pw - 6, z.res ? y1 - 2 : y0 + 2); }
   }
   // son mumun sağı: gelecek alanı ince çizgiyle ayrılır
   if (end > last) { g.strokeStyle = C.line; g.setLineDash([2, 4]); g.beginPath(); g.moveTo(X(last) + bw / 2, padT); g.lineTo(X(last) + bw / 2, padT + ph); g.stroke(); g.setLineDash([]); }
