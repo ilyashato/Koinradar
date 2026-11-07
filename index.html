@@ -2029,14 +2029,35 @@ function crossOf(a, b, i, max = 40) {
   return null;
 }
 const ago2 = c => c ? (c.age === 0 ? 'bu mumda' : c.age + ' mum önce') : '';
+// Gösterge üzerinde trend çizgisi: son iki tepe (düşen direnç) ya da son iki dip (yükselen destek); çizgiyi kıran mum bildirilir
+function trendOn(a, i, n = 90, k = 3) {
+  const beg = Math.max(k + 1, i - n + 1), hi = [], lo = [];
+  for (let q = i - k; q >= beg && !(hi.length === 2 && lo.length === 2); q--) {
+    let H = isFinite(a[q]), L = H;
+    for (let m = 1; m <= k && (H || L); m++) { if (!(a[q] > a[q - m] && a[q] >= a[q + m])) H = false; if (!(a[q] < a[q - m] && a[q] <= a[q + m])) L = false; }
+    if (H && hi.length < 2) hi.push(q); if (L && lo.length < 2) lo.push(q);
+  }
+  const lines = [], notes = [], mk = (pv, kind) => {
+    const [b, c] = pv; if (b - c < 5) return; const sl = (a[b] - a[c]) / (b - c), at = q => a[b] + sl * (q - b);
+    if (kind === 'res' ? !(a[b] < a[c]) : !(a[b] > a[c])) return;
+    lines.push({ x0: c, y0: a[c], x1: i, y1: at(i), kind });
+    for (let q = i; q > i - 3 && q > b; q--) {
+      const up = kind === 'res' && a[q] > at(q) && a[q - 1] <= at(q - 1), dn = kind === 'sup' && a[q] < at(q) && a[q - 1] >= at(q - 1);
+      if (up || dn) { notes.push(up ? `Düşen trend çizgisi ${q === i ? 'bu mumda' : (i - q) + ' mum önce'} yukarı kırıldı: dönüş sinyali.` : `Yükselen trend çizgisi ${q === i ? 'bu mumda' : (i - q) + ' mum önce'} aşağı kırıldı: zayıflama uyarısı.`); break; }
+    }
+  };
+  if (hi.length === 2) mk(hi, 'res'); if (lo.length === 2) mk(lo, 'sup');
+  return { lines, notes };
+}
 function spark(lines, o) {
   const W = 300, H = 54, end = o.end, beg = Math.max(0, end - (o.n || 90) + 1);
   let lo = o.min, hi = o.max;
-  if (lo == null || hi == null) { let mn = Infinity, mx = -Infinity; for (const s of lines) for (let q = beg; q <= end; q++) { const v = s.a[q]; if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); } } for (const r of (o.refs || [])) { mn = Math.min(mn, r); mx = Math.max(mx, r); } if (!isFinite(mn)) return ''; const pad = (mx - mn) * 0.08 || 1; lo = mn - pad; hi = mx + pad; }
+  if (lo == null || hi == null) { let mn = Infinity, mx = -Infinity; for (const s of lines) for (let q = beg; q <= end; q++) { const v = s.a[q]; if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); } } for (const r of (o.refs || [])) { mn = Math.min(mn, r); mx = Math.max(mx, r); } for (const t of (o.tl || [])) { mn = Math.min(mn, t.y0, t.y1); mx = Math.max(mx, t.y0, t.y1); } if (!isFinite(mn)) return ''; const pad = (mx - mn) * 0.08 || 1; lo = mn - pad; hi = mx + pad; }
   const X = q => ((q - beg) / Math.max(1, end - beg)) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
   let s = `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
   for (const r of (o.refs || [])) if (r >= lo && r <= hi) s += `<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`;
   for (const b of (o.bars || [])) { const bw = W / ((end - beg) + 1) * 0.7; for (let q = beg; q <= end; q++) { const v = b.a[q]; if (!isFinite(v)) continue; const y0 = Y(0), y1 = Y(v); s += `<rect x="${X(q) - bw / 2}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(0.5, Math.abs(y1 - y0))}" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" opacity=".45"/>`; } }
+  for (const t of (o.tl || [])) if (t.x0 >= beg) s += `<line x1="${X(t.x0)}" y1="${Y(t.y0)}" x2="${W}" y2="${Y(t.y1)}" stroke="${t.kind === 'res' ? 'var(--bad)' : 'var(--good)'}" stroke-width="1.6" stroke-dasharray="5 3" vector-effect="non-scaling-stroke"/>`;
   for (const l of lines) { let d = ''; for (let q = beg; q <= end; q++) { const v = l.a[q]; if (!isFinite(v)) continue; d += (d ? 'L' : 'M') + X(q).toFixed(1) + ' ' + Y(v).toFixed(1); } if (d) s += `<path d="${d}" fill="none" stroke="${l.col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`; }
   return s + '</svg>';
 }
@@ -2087,7 +2108,7 @@ function indRows(I, d, i) {
     else if (v >= 90) { st = 'w'; lab = '90 üstü'; note = '90 üstü: aşırı alım. Yükseliş yorulabilir.'; }
     else if (v >= 50) { st = 'p'; lab = 'para girişi'; note = '50 üstü: para girişi var.'; }
     else { st = 'n'; lab = 'para çıkışı'; note = '50 altı: para çıkışı var.'; }
-    add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90] }) }); }
+    const tr = trendOn(I.mfi, i); if (tr.notes.length) { note += ' ' + tr.notes.join(' '); } add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90], tl: tr.lines }) }); }
   // CMF
   { const v = I.cmf[i], rising = c[i] > c[Math.max(0, i - 10)]; let st, lab, note;
     if (v > 0.2) { st = 'p'; lab = 'güçlü alım'; note = '0,2 üstü: güçlü alım baskısı; kursa göre 3–4 gün rahat.'; }
@@ -2095,9 +2116,9 @@ function indRows(I, d, i) {
     else { st = 'n'; lab = 'para çıkışı'; note = '0 altı: para çıkışı var.'; }
     if (v < 0 && rising) note += ' Fiyat yükseliyor ama CMF 0 altı: yükseliş yanıltıcı olabilir.';
     const cr = crossOf(I.cmf, I.cmf.map(() => 0), i, 10); if (cr && cr.up) note += ` 0’ı yeni yukarı kesti (${ago2(cr)}): fiyatı iter.`;
-    add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2] }) }); }
+    const tr = trendOn(I.cmf, i); if (tr.notes.length) note += ' ' + tr.notes.join(' '); add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2], tl: tr.lines }) }); }
   // Demand Index
-  { const v = I.di[i]; if (isFinite(v)) add({ g: 'Para akışı', k: '_i_di', t: 'Demand Index', val: nf(v, 2), st: v > 0 ? 'p' : 'n', lab: v > 0 ? 'talep güçlü' : 'talep zayıf', note: v > 0 ? '0 üstü: talep güçlü.' : '0 altı: talep zayıf. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol.', sp: spark([{ a: I.di, col: A }], { end: i, refs: [0] }) }); }
+  { const v = I.di[i]; if (isFinite(v)) { const tr = trendOn(I.di, i); add({ g: 'Para akışı', k: '_i_di', t: 'Demand Index', val: nf(v, 2), st: v > 0 ? 'p' : 'n', lab: v > 0 ? 'talep güçlü' : 'talep zayıf', note: (v > 0 ? '0 üstü: talep güçlü.' : '0 altı: talep zayıf. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol.') + (tr.notes.length ? ' ' + tr.notes.join(' ') : ''), sp: spark([{ a: I.di, col: A }], { end: i, refs: [0], tl: tr.lines }) }); } }
   // Hacim
   { const vr = d.v[i] / I.volSma20[i - 1]; if (isFinite(vr)) add({ g: 'Para akışı', k: '_i_vol', t: 'Hacim / 20 ort.', val: nf(vr, 2) + '×', st: vr >= 1.5 ? 'p' : vr < 0.7 ? 'n' : 'z', lab: vr >= 1.5 ? 'hacimli' : vr < 0.7 ? 'düşük hacim' : 'normal', note: vr >= 1.5 ? 'Ortalamanın 1,5 katı ve üstü: kırılım için güvenilir hacim.' : vr < 0.7 ? 'Ortalamanın altında: kırılım olsa da sahte olabilir.' : 'Normal hacim: kırılım için 1,5 kat beklenir.', sp: spark([{ a: d.v.map((x, q) => x / I.volSma20[q - 1]), col: A }], { end: i, min: 0, refs: [1, 1.5] }) }); }
   // Ortalamalar
@@ -2121,7 +2142,7 @@ function indCard(I, d, i) {
     if (r.g !== g) { g = r.g; html += `<div class="ig">${esc(g)}</div>`; }
     html += `<div class="ind"><div class="ih"><span class="in1"><b>${esc(r.t)}</b> ${ib(r.k)}</span><span class="iv num">${esc(r.val)}</span></div><div class="ic2"><span class="chip ${CHIP[r.st]}">${esc(r.lab)}</span></div>${r.sp || ''}<p class="inote">${esc(r.note)}</p></div>`;
   }
-  return `<div class="card"><div class="sect">Göstergeler</div><p class="small muted" style="margin:0 0 4px">Son kapanmış mum (${dt}) değerleri. TradingView’da içinde bulunulan mumu görürsen küçük farklar olabilir. Grafiklerde son yaklaşık 90 mum var.</p>${html}</div>`;
+  return `<div class="card"><div class="sect">Göstergeler</div><p class="small muted" style="margin:0 0 4px">Son kapanmış mum (${dt}) değerleri. TradingView’da içinde bulunulan mumu görürsen küçük farklar olabilir. Grafiklerde son yaklaşık 90 mum var. MFI, CMF ve Demand Index grafiklerindeki <b style="color:var(--bad)">kırmızı kesikli</b> çizgi düşen trendi, <b style="color:var(--good)">yeşil kesikli</b> çizgi yükselen trendi gösterir; çizgi kırılınca altındaki yazıda belirtilir.</p>${html}</div>`;
 }
 
 function renderDetail() {
