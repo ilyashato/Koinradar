@@ -2262,8 +2262,6 @@ async function doShare(x) {
   const btn = $('#btnShare'); if (btn) btn.disabled = true;
   try {
     const tf = TF[S.tcTF] && tfData(x, S.tcTF) ? S.tcTF : '1d', o = await shareCard(x, tf); if (!o) return;
-    const f = new File([o.blob], o.name, { type: 'image/png' });
-    if (navigator.canShare && navigator.canShare({ files: [f] })) { try { await navigator.share({ files: [f] }); return; } catch (e) { if (e && e.name === 'AbortError') return; } }
     const u = URL.createObjectURL(o.blob), a = document.createElement('a'); a.href = u; a.download = o.name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
   } finally { if (btn) btn.disabled = false; }
 }
