@@ -1537,7 +1537,7 @@ function needFull() {
 }
 setInterval(() => { if (document.hidden) return; if (needFull()) { start(); return; } liveTick(); }, MODE === 'borsa' ? 300e3 : 30e3);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && Date.now() - S.liveT > 20e3) { if (needFull()) start(); else liveTick(); } });
-fetch('/api/login', { method: 'OPTIONS' }).then(r => { if (r.status !== 404) $('#logout').hidden = false; }).catch(() => {});
+fetch('/api/login', { method: 'OPTIONS' }).then(r => { if (r.status !== 404 && r.status !== 503) $('#logout').hidden = false; }).catch(() => {});
 $('#logout').addEventListener('click', e => { e.preventDefault(); fetch('/api/logout').finally(() => { location.href = '/login.html'; }); });
 document.querySelectorAll('.mkt a').forEach(a => { if (a.dataset.m === MODE) a.setAttribute('aria-current', 'page'); });
 // Başlat
