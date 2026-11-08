@@ -1221,7 +1221,7 @@ async function shareCard(x, tf, lang) {
         if (ws.length) { g.font = `600 20px ${F}`; txt('! ' + fit(ws[0], CW - 56), P + 28, y1 + 94 + 3 * 34 + 2, 20, K.warn, 600); } }
       if (m) {
         const wrapEl = document.createElement('div'); wrapEl.style.cssText = 'position:fixed;left:-3000px;top:0;width:984px;height:270px'; const c2 = document.createElement('canvas'); c2.style.cssText = 'width:984px;height:270px;display:block'; wrapEl.appendChild(c2); document.body.appendChild(wrapEl);
-        try { renderChart(c2, m, defaultWindow(m), { layers: { ma: true, zone: true }, zoneNums: true }); g.drawImage(c2, 0, 0, c2.width, c2.height, P + 16, y1 + 172, 984, 270); } finally { wrapEl.remove(); }
+        try { renderChart(c2, m, defaultWindow(m), { layers: { ma: true, zone: true }, zoneNums: true, logY: true }); g.drawImage(c2, 0, 0, c2.width, c2.height, P + 16, y1 + 172, 984, 270); } finally { wrapEl.remove(); }
       }
       const TD = tfData(x, t) || (m && { d: m.d, I: m.I }), ii = rt ? rt.i : (m ? m.last : 0);
       if (TD) { let rw = []; try { rw = indRows(TD.I, TD.d, ii); } catch (e) {} const pick = ['RSI', 'MACD', 'SMI', 'MFI'].map(k => rw.find(z => z.t.startsWith(k))).filter(Boolean), tw3 = (CW - 32 - 3 * 10) / 4;
@@ -1330,8 +1330,11 @@ function renderChart(cv, m, view, opt) {
   let lo = Infinity, hi = -Infinity;
   for (let i = beg; i <= dEnd; i++) { lo = Math.min(lo, d.l[i]); hi = Math.max(hi, d.h[i]); }
   if (Lh.ma) for (const k of ['sma20', 'sma50', 'sma100', 'sma200']) for (let i = beg; i <= dEnd; i++) { const v = I[k][i]; if (isFinite(v) && v > lo * 0.8 && v < hi * 1.2) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
-  const py = (hi - lo) * 0.06; lo -= py; hi += py;
-  const n = end - beg + 1, bw = pw / n, X = i => (i - beg + 0.5) * bw, Y = v => padT + (hi - v) / (hi - lo) * ph;
+  const py = (hi - lo) * 0.06; if (!(opt.logY && lo > 0 && hi / lo > 6)) { lo -= py; hi += py; }
+  const LOG = !!opt.logY && lo > 0 && hi / lo > 6; let LL = 0, LH = 0;
+  if (LOG) { LL = Math.log(lo) - 0.03; LH = Math.log(hi) + 0.03; }
+  const VAL = k => LOG ? Math.exp(LL + (LH - LL) * k / 4) : lo + (hi - lo) * k / 4;
+  const n = end - beg + 1, bw = pw / n, X = i => (i - beg + 0.5) * bw, Y = v => LOG ? padT + (LH - Math.log(Math.max(v, 1e-12))) / (LH - LL) * ph : padT + (hi - v) / (hi - lo) * ph;
   const C = { ink: css('--ink'), ink2: css('--ink2'), mute: css('--mute'), line: css('--line2'), good: css('--good'), bad: css('--bad'), goodS: css('--good-soft'), badS: css('--bad-soft'), acc: css('--accent'), warn: css('--warn'), panel: css('--panel'),
     fg: css('--fib-g'), fb: css('--fib-b'), fr: css('--fib-r'), fo: css('--fib-o'), fk: css('--fib-k') };
   const F = sz => `${sz}px "IBM Plex Mono", ui-monospace, monospace`;
@@ -1339,7 +1342,7 @@ function renderChart(cv, m, view, opt) {
   g.save(); g.beginPath(); g.rect(0, 0, pw, padT + ph); g.clip();
   // ızgara
   g.strokeStyle = C.line; g.lineWidth = 1;
-  for (let k = 0; k <= 4; k++) { const y = Y(lo + (hi - lo) * k / 4); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); }
+  for (let k = 0; k <= 4; k++) { const y = Y(VAL(k)); g.beginPath(); g.moveTo(0, y); g.lineTo(pw, y); g.stroke(); }
   // destek / direnç
   // pin mumunun iğnesi ↔ gövde ucu arası bant; pin mumundan sağ kenara uzanır (kırılana kadar)
   if (Lh.zone) for (const z of (m.zs || [])) {
@@ -1415,7 +1418,7 @@ function renderChart(cv, m, view, opt) {
   }
   // fiyat ekseni
   g.textAlign = 'left'; g.fillStyle = C.ink2;
-  for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4; g.fillText(fmt(v), pw + 6, Y(v)); }
+  for (let k = 0; k <= 4; k++) { const v = VAL(k); g.fillText(fmt(v), pw + 6, Y(v)); }
   if (last >= beg) { const yl = Y(d.c[last]); if (yl > padT && yl < padT + ph) { g.fillStyle = C.ink; g.fillRect(pw + 2, yl - 9, padR - 4, 18); g.fillStyle = C.panel; g.fillText(fmt(d.c[last]), pw + 6, yl); } }
   // tarih ekseni
   g.fillStyle = C.mute; const ty = H - (big ? 9 : 7);
