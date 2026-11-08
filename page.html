@@ -99,6 +99,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .sgg{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:6px 0 6px}
 .sgrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .sgrow .view{padding:6px 11px;font-size:13px}
+.sage{color:var(--accent);font-weight:600;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
 .sgcard>span{flex-basis:100%}
 .sgcard{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:4px 0 12px}
 .sgcard .btn{padding:6px 12px;font-size:13px}
@@ -808,6 +809,22 @@ const SIGS = {
   ma200: ['MA200’ü yeni geçti', 'Fiyat son 5 mumda 200’lük ortalamayı yukarı kesti.', (d, I, i) => { for (let q = i; q > i - 5 && q > 0; q--) if (isFinite(I.sma200[q]) && d.c[q - 1] <= I.sma200[q - 1] && d.c[q] > I.sma200[q]) return true; return false; }],
   hacim: ['Hacimli', 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ve üstü.', (d, I, i) => d.v[i] / I.volSma20[i - 1] >= 1.5],
 };
+const SAGE = new Map();
+function sigAge(x, keys, tf) {
+  const D = tfData(x, tf); if (!D || !keys.length) return null; const d = D.d, I = D.I, n = d.c.length, i = n - 2; if (i < 26) return null;
+  const ck = x.sym + '|' + tf + '|' + keys.join() + '|' + n; let c = SAGE.get(ck);
+  if (!c) { let start = -1, capped = false;
+    for (const k of keys) { let s = i; const lim = Math.max(25, i - 150); while (s - 1 >= lim) { let ok = false; try { ok = !!SIGS[k][2](d, I, s - 1); } catch (e) {} if (!ok) break; s--; } if (s === lim && s > 25) capped = true; start = Math.max(start, s); }
+    c = { start, capped }; if (SAGE.size > 6000) SAGE.clear(); SAGE.set(ck, c); }
+  const base = d.c[c.start]; if (!(base > 0)) return null; const cur = x.live ? x.live.p : d.c[n - 1]; let mx = -Infinity; for (let q = c.start; q < n; q++) mx = Math.max(mx, d.h[q]);
+  mx = Math.max(mx, cur); return { bars: i - c.start, capped: c.capped, gain: cur / base - 1, max: mx / base - 1 };
+}
+function sigAgeTxt(a, tf, short) {
+  const hrs = isH(tf) ? HRS[tf] : 0, u = tf === '1w' ? 'hafta' : tf === '1m' ? 'ay' : hrs ? 'saat' : 'gün', b = a.bars * (hrs || 1);
+  const when = a.bars === 0 ? 'son mumda başladı' : (a.capped ? b + '+ ' : b + ' ') + u + ' önce';
+  const sg = v => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1).replace('.', ',') + '%';
+  return `${when} · ${short ? '' : 'şu an '}${sg(a.gain)} · zirve ${sg(a.max)}`;
+}
 function sigOk(x, k, tf) { const D = tfData(x, tf || S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
 function renderViews() {
   const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
@@ -850,7 +867,7 @@ function renderList() {
       <span class="score ${scoreCls(k)}">${val.toFixed(0)}</span>
       <span class="cmain"><span class="cname">${esc(x.sym.replace(/USDT$/, ''))}<span class="star ${isFav(x.sym) ? 'on' : ''}" role="button" tabindex="0" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</span>${tag}</span>
         <span class="verdict v-${S.view === 'dip' ? 'p' : r.label.k}">${S.view === 'dip' ? 'Dip kurulum puanı' : VERDICT[r.label.k]}</span>
-        <span class="why">${esc(why)}</span></span>
+        <span class="why">${esc(why)}</span>${S.sig.length ? (() => { const a = sigAge(x, S.sig, S.listTF); return a ? `<span class="why sage">⏱ ${esc(sigAgeTxt(a, S.listTF, 1))}</span>` : ''; })() : ''}</span>
       <span class="cside"><span class="price lv-p">${fmt(x.live ? x.live.p : r.close)}</span><span class="chg lv-c ${(x.live ? x.live.chg : chg) >= 0 ? 'up' : 'dn'}">${pc(x.live ? x.live.chg : chg)}</span></span>
     </button>`;
   }).join('');
@@ -1108,7 +1125,7 @@ async function sigCard(tf) {
   const keys = S.sig.slice(); if (!keys.length) { alert('Önce yukarıdan bir sinyal seç'); return; }
   const list = S.coins.filter(x => x.res).filter(x => { try { return tfData(x, tf) && keys.every(k => sigOk(x, k, tf)); } catch (e) { return false; } })
     .map(x => { const r = evalTF(x, tf); return r ? { x, r } : null; }).filter(Boolean).sort((a, b) => b.r.score - a.r.score);
-  const W = 1080, P = 48, MAXR = 12, shown = list.slice(0, MAXR), RH = 84;
+  const W = 1080, P = 48, MAXR = 12, shown = list.slice(0, MAXR), RH = 106;
   const K = { bg1: '#0a0f1d', bg2: '#16203d', panel: 'rgba(255,255,255,.055)', line: 'rgba(255,255,255,.10)', ink: '#eef2fb', ink2: '#b2bcd2', mute: '#7f8aa0', good: '#41c78d', bad: '#f2786a', warn: '#e4ab43', acc: '#88a6ff' };
   const F = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', cv = document.createElement('canvas'), g = cv.getContext('2d');
   const measure = (s, size, wgt) => { g.font = `${wgt || 500} ${size}px ${F}`; return g.measureText(s).width; };
@@ -1135,15 +1152,16 @@ async function sigCard(tf) {
   y += 50 + 30;
   const box = (head, col, arr, key, h) => { g.fillStyle = K.panel; rr(P, y, CW, h, 26); g.fill(); g.strokeStyle = K.line; g.lineWidth = 2; rr(P, y, CW, h, 26); g.stroke(); txt(head, P + 28, y + 46, 24, col, 800); let yy = y + 90; arr.forEach(b => { if (b.n) { txt(b.n, P + 28, yy, 24, K.ink, 800); yy += 36; } b[key].forEach(l => { txt(l, P + 28, yy, 25, K.ink2, 500); yy += 36; }); yy += 12; }); y += h + 18; };
   box('NE DEMEK?', K.acc, blocks, 'd', dH); box('STRATEJİ', K.warn, blocks, 's', sH);
-  txt((MODE === 'borsa' ? 'BU SİNYALİ VEREN HİSSELER' : 'BU SİNYALİ VEREN COİNLER') + ' · puana göre', P + 4, y + 40, 22, K.mute, 800); y += 62;
+  txt((MODE === 'borsa' ? 'BU SİNYALİ VEREN HİSSELER' : 'BU SİNYALİ VEREN COİNLER') + ' · puana göre', P + 4, y + 40, 22, K.mute, 800); txt('⏱ sinyalin başladığı mumdan beri · şu an / zirve = o mumun kapanışına göre', P + 4, y + 74, 19, K.mute, 500); y += 102;
   if (!shown.length) txt('Şu an bu şartları sağlayan yok.', P + 8, y + 50, 28, K.mute, 600);
   shown.forEach(({ x, r }) => {
     const vk = r.label.k, vc = vk === 'gp' || vk === 'p' ? K.good : vk === 'n' ? K.warn : K.bad, live = x.live ? x.live.p : r.close, chg = x.live ? x.live.chg : null;
     g.fillStyle = K.panel; rr(P, y, CW, RH - 10, 22); g.fill();
-    txt(x.sym.replace(/USDT$/, ''), P + 26, y + 50, 34, K.ink, 800); txt(VERDICT[vk], P + 26 + measure(x.sym.replace(/USDT$/, ''), 34, 800) + 16, y + 49, 20, vc, 700);
-    txt(fmt(live), P + 560, y + 50, 30, K.ink, 700, 'right');
-    if (chg != null) txt(pc(chg), P + 720, y + 50, 26, chg >= 0 ? K.good : K.bad, 700, 'right');
-    g.fillStyle = vc + '2b'; rr(P + CW - 110, y + 10, 88, 54, 27); g.fill(); txt(r.score.toFixed(0), P + CW - 66, y + 49, 32, vc, 800, 'center');
+    txt(x.sym.replace(/USDT$/, ''), P + 26, y + 46, 34, K.ink, 800); txt(VERDICT[vk], P + 26 + measure(x.sym.replace(/USDT$/, ''), 34, 800) + 16, y + 45, 20, vc, 700);
+    const ag = sigAge(x, keys, tf); if (ag) { txt('⏱ ' + sigAgeTxt(ag, tf), P + 26, y + 82, 22, ag.gain >= 0.1 ? K.warn : K.ink2, 600); }
+    txt(fmt(live), P + 560, y + 46, 30, K.ink, 700, 'right');
+    if (chg != null) txt(pc(chg), P + 720, y + 46, 26, chg >= 0 ? K.good : K.bad, 700, 'right');
+    g.fillStyle = vc + '2b'; rr(P + CW - 110, y + 14, 88, 54, 27); g.fill(); txt(r.score.toFixed(0), P + CW - 66, y + 53, 32, vc, 800, 'center');
     y += RH;
   });
   if (list.length > MAXR) { txt('+ ' + (list.length - MAXR) + ' tane daha · sitede', P + 8, y + 30, 24, K.mute, 600); y += 52; }
