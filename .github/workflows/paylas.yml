@@ -1,0 +1,51 @@
+name: X'te paylaş
+# Elle çalıştırılır: GitHub uygulaması → Actions → "X'te paylaş" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      coin:
+        description: 'Coin kodu (örn. BTC, ETH, SOL)'
+        default: 'BTC'
+      dil:
+        description: 'Kart dili'
+        type: choice
+        options: [tr, en]
+        default: tr
+      mod:
+        description: 'gonder = X’te paylaş, dene = sadece kartı üret (paylaşma)'
+        type: choice
+        options: [dene, gonder]
+        default: dene
+      ek_metin:
+        description: 'Paylaşımın başına eklenecek kısa not (boş olabilir)'
+        default: ''
+jobs:
+  paylas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Araçları kur
+        run: |
+          npm i --no-save playwright twitter-api-v2
+          npx playwright install --with-deps chromium
+      - name: Kartı üret ve paylaş
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          COIN: ${{ inputs.coin }}
+          DIL: ${{ inputs.dil }}
+          MOD: ${{ inputs.mod }}
+          EK: ${{ inputs.ek_metin }}
+        run: node paylas.mjs "$COIN" "$DIL" "$MOD" "$EK"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: kart
+          path: kart.png
+          if-no-files-found: ignore
