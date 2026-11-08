@@ -97,8 +97,14 @@ h3{font-weight:700;font-size:15px;margin:0}
 .sigbox{background:var(--panel);border:1.5px solid var(--line);border-radius:16px;margin:0 0 12px;padding:2px 14px}
 .sigbox summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;padding:11px 0;font-weight:700}
 .sigbox summary::-webkit-details-marker{display:none}
-.sigbox summary::after{content:'▾';margin-left:auto;color:var(--mute)}
-.sigbox[open] summary::after{content:'▴'}
+.sigbox:not([open]){background:var(--accent-soft);border-color:var(--accent)}
+.sigbox summary::after{content:'Aç ▾';margin-left:auto;align-self:center;background:var(--accent);color:#fff;font-size:13px;font-weight:700;padding:6px 14px;border-radius:999px;animation:sgpulse 2.2s ease-in-out 3}
+.sigbox[open] summary::after{content:'Kapat ▴';background:transparent;color:var(--mute);border:1.5px solid var(--line);animation:none}
+.sigbox:not([open]) .sigsub{display:none}
+.sighint{flex-basis:100%;font-size:13px;font-weight:500;color:var(--ink2)}
+.sigbox[open] .sighint{display:none}
+@keyframes sgpulse{0%,100%{transform:scale(1)}50%{transform:scale(1.09)}}
+@media (prefers-reduced-motion:reduce){.sigbox summary::after{animation:none}}
 .sign{font-size:13px;color:var(--accent)}
 .sigsub{flex-basis:100%;font-weight:400}
 .sgg{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:6px 0 6px}
@@ -277,7 +283,7 @@ body.fs-on{overflow:hidden}
           <button class="view" type="button" data-v="dip" aria-pressed="false">Dipten dönüş adayları <b id="n-dip">0</b></button>
           <button class="view" type="button" data-v="fav" aria-pressed="false">★ Favoriler <b id="n-fav">0</b></button>
         </div>
-        <details class="sigbox" id="sigbox"><summary><span class="sigt">Sinyaller</span><span class="sign" id="sigN"></span><span class="small muted sigsub">puandan bağımsız · seçili zaman dilimine göre</span></summary><div id="sigs"></div><div class="sgcard" id="sgcard"><span class="small muted">Seçili sinyal için özet kartı indir:</span><button type="button" class="btn small" data-sc="1d">Günlük</button><button type="button" class="btn small" data-sc="1w">Haftalık</button><button type="button" class="btn small" data-sc="1m">Aylık</button></div></details>
+        <details class="sigbox" id="sigbox"><summary><span class="sigt">Sinyaller</span><span class="sign" id="sigN"></span><span class="small muted sigsub">puandan bağımsız · seçili zaman dilimine göre</span><span class="sighint">Dokun ve aç: MA 9/20 kesişimi, dip uyumsuzluğu, kırılım, para girişi gibi 17 hazır filtre</span></summary><div id="sigs"></div><div class="sgcard" id="sgcard"><span class="small muted">Seçili sinyal için özet kartı indir:</span><button type="button" class="btn small" data-sc="1d">Günlük</button><button type="button" class="btn small" data-sc="1w">Haftalık</button><button type="button" class="btn small" data-sc="1m">Aylık</button></div></details>
         <p class="viewhelp" id="viewhelp"></p>
         <input class="search" id="q" type="search" placeholder="Coin ara (ör. SOL)" aria-label="Coin ara">
         <div class="list" id="list"></div>
@@ -2861,7 +2867,7 @@ $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if 
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
-$('#sigbox').open = !!store.get('sigOpen', false); $('#sigbox').addEventListener('toggle', () => store.set('sigOpen', $('#sigbox').open));
+$('#sigbox').open = false; // her açılışta kapalı başlar; dokununca açılır
 $('#sgcard').addEventListener('click', async e => { const b = e.target.closest('[data-sc]'); if (!b || b.disabled) return; b.disabled = true; try { await sigCard(b.dataset.sc); } finally { b.disabled = !S.sig.length; } });
 $('#sigs').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (!b) return; const k = b.dataset.sg; S.sig = S.sig.includes(k) ? S.sig.filter(x => x !== k) : [...S.sig, k]; store.set('sig', S.sig); renderViews(); renderList(); renderDetail(); });
 $('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; if (v === 'tum') { S.sig = []; store.set('sig', S.sig); } S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
