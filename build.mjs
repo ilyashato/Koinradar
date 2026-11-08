@@ -6,7 +6,7 @@ if (process.env.ARTIFACT) writeFileSync('artifact.html', body);
 writeFileSync('index.html', wrap(body));
 // Borsa sürümü: aynı motor, Yahoo verisi, ayrı favori/ayar kayıtları
 const SWAP = [
-  ['<title>Coin Radarı</title>', '<title>Borsa Radarı</title>'], ['<h1>Coin Radarı</h1>', '<h1>Borsa Radarı</h1>'],
+  ['<title>Coin Radarı · hatofinancial</title>', '<title>Borsa Radarı · hatofinancial</title>'], ['<h1>Coin Radarı</h1>', '<h1>Borsa Radarı</h1>'],
   ["const MODE = /*MODE*/'kripto';", "const MODE = 'borsa';"], ["localStorage.getItem('cr_'", "localStorage.getItem('br_'"], ["localStorage.setItem('cr_'", "localStorage.setItem('br_'"],
   ['placeholder="Coin ara (ör. SOL)" aria-label="Coin ara"', 'placeholder="Hisse ara (ör. THYAO)" aria-label="Hisse ara"'],
   ['Tüm coinler, en yüksek', 'Tüm hisseler, en yüksek'], ['Puanı 60 ve üstü olan coinler.', 'Puanı 60 ve üstü olan hisseler.'],

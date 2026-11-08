@@ -1,4 +1,4 @@
-<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style></head><body><title>Coin Radarı</title>
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style></head><body><title>Coin Radarı · hatofinancial</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
@@ -21,6 +21,12 @@
   --accent:#88a6ff; --accent-soft:#1f2b4d; --good:#41c78d; --good-soft:#15342a; --bad:#f2786a; --bad-soft:#3b1e1b; --warn:#e4ab43; --warn-soft:#3a2d13; --hatch:#5c6881; --fib-g:#69db7c; --fib-b:#6e93ff; --fib-r:#ff6b6b; --fib-o:#ffa94d; --fib-k:#d1d6e0; color-scheme:dark}
 *{box-sizing:border-box}
 html,body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+.hf{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;margin:2px 0 14px}
+.hfm{flex:none;filter:drop-shadow(0 4px 10px rgba(47,107,255,.28))}
+.hft{display:flex;flex-direction:column;line-height:1.05}
+.hfw{font-size:26px;letter-spacing:-.04em;color:var(--accent);font-weight:400}
+.hfw b{font-weight:800;color:var(--ink)}
+.hfs{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-top:4px;font-weight:600}
 .wrap{max-width:1180px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 60px}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
@@ -254,6 +260,10 @@ body.fs-on{overflow:hidden}
 </style>
 
 <div class="wrap">
+  <a class="hf" href="/" aria-label="hatofinancial">
+    <svg class="hfm" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="hfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16213f"/><stop offset="1" stop-color="#2f6bff"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#hfg)"/><path d="M9 28 L16 19.5 L22 24 L31 11.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 11.5 H31 V17.5" fill="none" stroke="#7ce6b0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="hft"><span class="hfw"><b>hato</b>financial</span><span class="hfs">kişisel piyasa radarı</span></span>
+  </a>
   <nav class="mkt" aria-label="Piyasa"><a href="index.html" data-m="kripto">Kripto</a><a href="borsa.html" data-m="borsa">Borsa</a><a href="#" id="logout" class="lo" hidden>Çıkış</a></nav>
   <header class="top">
     <div class="brand">
@@ -2293,7 +2303,7 @@ async function sigCard(tf) {
   let gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, K.bg1); gr.addColorStop(1, K.bg2); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   gr = g.createRadialGradient(W - 100, 120, 10, W - 100, 120, 520); gr.addColorStop(0, K.acc + '44'); gr.addColorStop(1, K.acc + '00'); g.fillStyle = gr; g.fillRect(0, 0, W, 700);
   const brand = MODE === 'borsa' ? 'Borsa Radarı' : 'Coin Radarı', dt = new Date();
-  g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt(brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
+  g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt('HATOFINANCIAL · ' + brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
   txt(dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), W - P, 57, 22, K.mute, 500, 'right');
   txt('SİNYAL ÖZETİ', P, 130, 26, K.acc, 800);
   let y = 130; tLines.forEach(l => { y += 72; txt(l, P, y, 62, K.ink, 800); });
@@ -2426,7 +2436,7 @@ async function shareCard(x, tf, lang) {
   gr = g.createRadialGradient(W - 120, 150, 10, W - 120, 150, 520); gr.addColorStop(0, vc + '55'); gr.addColorStop(1, vc + '00'); g.fillStyle = gr; g.fillRect(0, 0, W, H);
   // üst şerit
   const brand = MODE === 'borsa' ? T('Borsa Radarı', 'Stock Radar') : T('Coin Radarı', 'Coin Radar');
-  g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt(brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
+  g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt('HATOFINANCIAL · ' + brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
   const dt = new Date(), LC = EN ? 'en-GB' : 'tr-TR'; txt(dt.toLocaleDateString(LC, { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + dt.toLocaleTimeString(LC, { hour: '2-digit', minute: '2-digit' }), W - P, 57, 22, K.mute, 500, 'right');
   // başlık
   const sym = MODE === 'borsa' && x.sym === 'XU100' ? 'BIST 100' : x.sym.replace(/USDT$/, ''), sub = MODE === 'borsa' ? (x.sym === 'XU100' ? 'ENDEKS' : 'BIST') : '/ USDT';
