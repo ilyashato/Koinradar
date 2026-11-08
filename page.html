@@ -1102,6 +1102,25 @@ function renderDetail() {
 }
 // ───────── Paylaşım kartı (X / sosyal medya için tek görsel) ─────────
 // ───────── Sinyal özet kartı: ne demek + strateji + uyan coinler ─────────
+const EXPL = {
+  divB: 'Fiyat yeni bir dip yaparken RSI, MACD ya da MFI gibi göstergelerden en az biri o dibi yapmıyor (son 12 mumda). Yani fiyat düşüyor ama düşüşün gücü azalıyor. Notlara göre uyumsuzluk her göstergede aranır, ama her dip uyumsuzluğu yükselişe götürmez; tek başına değil, onayla anlam kazanır.',
+  divT: 'Fiyat yeni bir tepe yaparken RSI, MACD ya da MFI’den en az biri o tepeyi yapmıyor. Fiyat çıkıyor ama yükselişin gücü azalıyor. Notlara göre RSI 70 üstüne çıktığında hep tepe uyumsuzluğu aranır; amaç iyi yerden satan olmaktır.',
+  rsi30: 'RSI 30’un altına indi: fiyat kısa sürede çok sattırılmış, aşırı satım bölgesi. Notlara göre RSI 50’nin altında işlemde durulmaz; bu bölge “dip arama” yeridir, dönüşü RSI’ın 50’ye doğru yukarı gelmesi ve uyumsuzluk teyit eder.',
+  wtDip: 'WaveTrend göstergesi −53’ün altındayken (aşırı satım) son 3 mumda yukarı kesişim yaptı. Düşüşün yorulup alıcının geri döndüğü erken dönüş sinyali. Tek başına değil, MACD ve ortalamalarla birlikte daha sağlam sonuç verir.',
+  ema510: 'Hızlı EMA5, EMA10’u son 3 mumda aşağıdan yukarı kesti. Notlara göre günlükte 5/10’un kestiği yön trend yönüdür: yukarı kestiyse piyasa yönü yukarıdır, aşağı döndüyse long kovalanmaz. Saatlik grafikler çok sinyal verir, günlük olan trendi gösterir.',
+  dizilim: 'Tüm ortalamalar alttan üste doğru sıralı: SMA 9 > 20 > 50 > 100 > 200 ve fiyat 9’un da üstünde. Notlara göre fiyat bütün ortalamaların üstüne çıkınca her ortalamadaki alıcı pozisyona girmiş olur, herkes aynı fikirde birleşir. Güçlü, oturmuş bir yükseliş.',
+  sikisma: 'Oynaklık (ATR %) son 120 mumun en düşük %20’lik diliminde: fiyat dar bir alanda sıkışmış. Böyle sakin dönemler genelde sert bir hareketten önce görülür; ama yön söylemez, yukarı da aşağı da kırılabilir.',
+  rsi50: 'RSI 50’nin üstünde: alıcılar kontrolde. Notlara göre RSI 50 trendin ayracıdır; 50’nin altında kesinlikle işlemde olunmaz, 70 üstüne çıkabilen yapılar güçlü sayılır.',
+  rsi50x: 'RSI son 3 mumda 50’yi aşağıdan yukarı kesti. Notlara göre 50’ye aşağıdan gelen yapılar yükseliş habercisidir; yukarıdan gelip 50’de tutunamayanlar ise işlem alanı değildir.',
+  ma920: 'Kısa ortalama SMA9, SMA20’yi son 3 mumda yukarı kesti. Notlara göre piyasanın dönüşünü erken yakalamak istiyorsan 9–20 arasına bakılır; 9 ve 20 birleştikten sonra fiyatı durdurmak zordur. Ama ortalamalar sık kesişiyorsa “kavga” başlamış, piyasa kararsızdır.',
+  ma920d: 'SMA9, SMA20’yi son 3 mumda aşağı kesti. Notlara göre yukarıdan aşağı gelen ortalama kendinden büyük ortalamayı aşağı zorlar ve hedef bir alttaki ortalamalar (50–100) olur. 200 kırılmadığı sürece bu genelde düzeltmedir; 200 kırılırsa trend döner.',
+  macd: 'MACD, sinyal çizgisini son 3 mumda yukarı kesti. Notlara göre MACD deyince akla gelecek tek şey fiyat yönüdür. 0 çizgisinin üstündeki kesişim daha güçlü, altındaki daha zayıf sayılır; diğer göstergelerle uyuşunca sonuç iyileşir.',
+  giris: 'Para akışı göstergeleri olumlu: CMF 0’ın üstünde ve MFI 50’nin üstünde. Yani fiyatı destekleyen gerçek bir para girişi var. Notlara göre CMF, MFI’dan farklı olarak parayı hacmin baskısıyla birlikte ölçer.',
+  cikis: 'CMF 0’ın altında ve MFI 50’nin altında: para fiyattan çıkıyor. Yükseliş sürüyor görünse bile arkasında para yoksa yanıltıcı olabilir.',
+  kirilim: 'Son 3 mumda kapanış, önceki 20 mumun en yükseğini aştı: yeni bir kırılım. Notlara göre her kırılımda işleme girilmez; hacim ve fraktal kontrolü gerekir. Hacimsiz kırılım sahte olabilir.',
+  ma200: 'Fiyat son 5 mumda 200’lük ortalamayı aşağıdan yukarı kesti. Notlara göre 200 geçilmeden işleme girilmez; geçildiğinde uzun vadeli trend lehine döner ve puan üzerindeki tavan kalkar.',
+  hacim: 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ya da fazlası: hareketin arkasında ilgi var. Notlara göre hacim, bir seviyenin tutacağını ya da kırılacağını anlamada en önemli teyittir.',
+};
 const STRAT = {
   divB: 'Tek başına al sinyali değil. RSI’ın 50 üstüne dönmesini ve yeşil mum onayını bekle; MA200 altındaysa puan tavanı (40) yüzünden temkinli ol.',
   divT: 'Yükseliş yoruluyor. Yeni alım için acele etme; destek kırılırsa uyarı güçlenir. Eldekiler için riski gözden geçirme zamanı.',
@@ -1132,7 +1151,7 @@ async function sigCard(tf) {
   const lines = (s, mw, size) => { const out = []; let line = ''; for (const w of s.split(' ')) { const t = line ? line + ' ' + w : w; if (measure(t, size) > mw && line) { out.push(line); line = w; } else line = t; } if (line) out.push(line); return out; };
   const title = keys.map(k => SIGS[k][0]).join(' + '), tl0 = TFL[tf] || tf, tl = tl0.charAt(0).toLocaleUpperCase('tr') + tl0.slice(1), CW = W - 2 * P;
   const tLines = lines(title, CW - 40, 62).slice(0, 3);
-  const blocks = keys.map(k => ({ n: keys.length > 1 ? SIGS[k][0] : '', d: lines(SIGS[k][1], CW - 56, 25), s: lines(STRAT[k] || '', CW - 56, 25) }));
+  const blocks = keys.map(k => ({ n: keys.length > 1 ? SIGS[k][0] : '', d: lines(EXPL[k] || SIGS[k][1], CW - 56, 24), s: lines(STRAT[k] || '', CW - 56, 25) }));
   let H = 330 + tLines.length * 72;
   const boxH = (arr) => 74 + arr.reduce((a, b) => a + (b.n ? 34 : 0) + 0, 0);
   const dH = 70 + blocks.reduce((a, b) => a + (b.n ? 36 : 0) + b.d.length * 36 + 12, 0), sH = 70 + blocks.reduce((a, b) => a + (b.n ? 36 : 0) + b.s.length * 36 + 12, 0);
