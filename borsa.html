@@ -76,7 +76,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .ic2{margin:3px 0 4px}
 .chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
 .c-p{background:var(--good-soft);color:var(--good)} .c-n{background:var(--bad-soft);color:var(--bad)} .c-z{background:var(--line2);color:var(--ink2)} .c-w{background:var(--warn-soft);color:var(--warn)}
-.spark{display:block;width:100%;height:54px;margin:2px 0 4px;background:var(--bg);border-radius:8px}
+.spw{position:relative;margin:2px 0 4px}.spw .spark{margin:0}.spw .sl{position:absolute;transform:translateY(-50%);font:600 10px/1 var(--mono,ui-monospace,monospace);color:var(--mute);padding:1px 3px;border-radius:4px;pointer-events:none;white-space:nowrap}.spw .sl.l{left:3px}.spw .sl.r{right:3px;background:var(--bg);border:1px solid currentColor}.spark{display:block;width:100%;height:54px;margin:2px 0 4px;background:var(--bg);border-radius:8px}
 .inote{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink2)}
 .ib{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--mute);background:none;color:var(--mute);font:italic 700 11px/1 Georgia,serif;padding:0;vertical-align:1px;margin-left:2px;cursor:pointer}
 .tfbar{position:sticky;top:62px;z-index:2;background:var(--bg);display:flex;align-items:center;gap:10px;padding:2px 0 8px;flex-wrap:wrap}
@@ -2083,7 +2083,12 @@ function spark(lines, o) {
   for (const r of (o.refs || [])) if (r >= lo && r <= hi) s += `<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`;
   for (const b of (o.bars || [])) { const bw = W / ((end - beg) + 1) * 0.7; for (let q = beg; q <= end; q++) { const v = b.a[q]; if (!isFinite(v)) continue; const y0 = Y(0), y1 = Y(v); s += `<rect x="${X(q) - bw / 2}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(0.5, Math.abs(y1 - y0))}" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" opacity=".45"/>`; } }
   for (const l of lines) { let d = ''; for (let q = beg; q <= end; q++) { const v = l.a[q]; if (!isFinite(v)) continue; d += (d ? 'L' : 'M') + X(q).toFixed(1) + ' ' + Y(v).toFixed(1); } if (d) s += `<path d="${d}" fill="none" stroke="${l.col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`; }
-  return s + '</svg>';
+  s += '</svg>';
+  const rg = hi - lo, dec = o.dec != null ? o.dec : rg < 1 ? 3 : rg < 12 ? 2 : rg < 120 ? 1 : 0, F = v => nf(v, dec), T = v => Math.max(9, Math.min(91, Y(v) / H * 100));
+  let lb = '';
+  let lastY = -99; for (const r of [...(o.refs || [])].filter(r => r >= lo && r <= hi).sort((a, b) => b - a)) { const y = Y(r); if (y - lastY < 11) continue; lastY = y; lb += `<span class="sl l" style="top:${T(r)}%">${r.toLocaleString('tr-TR', { maximumFractionDigits: dec })}</span>`; }
+  if (lines.length === 1) lines.forEach(l => { const v = l.a[end]; if (isFinite(v)) lb += `<span class="sl r" style="top:${T(v)}%;color:${l.col}">${F(v)}</span>`; });
+  return `<div class="spw">${s}${lb}</div>`;
 }
 // Göstergenin yönü: son 5 mumdaki değişim ve son 20 mumun dibine göre toparlanma (sadece gösterim; puanı etkilemez)
 function slopeOf(a, i, thr) {
