@@ -99,6 +99,9 @@ h3{font-weight:700;font-size:15px;margin:0}
 .sgg{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--mute);margin:6px 0 6px}
 .sgrow{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .sgrow .view{padding:6px 11px;font-size:13px}
+.sgcard>span{flex-basis:100%}
+.sgcard{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center;padding:4px 0 12px}
+.sgcard .btn{padding:6px 12px;font-size:13px}
 .fsleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;color:var(--ink2);padding:2px 2px 0}
 .fsleg span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .fsleg i{display:inline-block;width:22px;height:0;border-top:3px solid}
@@ -268,7 +271,7 @@ body.fs-on{overflow:hidden}
           <button class="view" type="button" data-v="dip" aria-pressed="false">Dipten dönüş adayları <b id="n-dip">0</b></button>
           <button class="view" type="button" data-v="fav" aria-pressed="false">★ Favoriler <b id="n-fav">0</b></button>
         </div>
-        <details class="sigbox" id="sigbox"><summary><span class="sigt">Sinyaller</span><span class="sign" id="sigN"></span><span class="small muted sigsub">puandan bağımsız · seçili zaman dilimine göre</span></summary><div id="sigs"></div></details>
+        <details class="sigbox" id="sigbox"><summary><span class="sigt">Sinyaller</span><span class="sign" id="sigN"></span><span class="small muted sigsub">puandan bağımsız · seçili zaman dilimine göre</span></summary><div id="sigs"></div><div class="sgcard" id="sgcard"><span class="small muted">Seçili sinyal için özet kartı indir:</span><button type="button" class="btn small" data-sc="1d">Günlük</button><button type="button" class="btn small" data-sc="1w">Haftalık</button><button type="button" class="btn small" data-sc="1m">Aylık</button></div></details>
         <p class="viewhelp" id="viewhelp"></p>
         <input class="search" id="q" type="search" placeholder="Hisse ara (ör. THYAO)" aria-label="Hisse ara">
         <div class="list" id="list"></div>
@@ -1922,7 +1925,7 @@ const SIGS = {
   ma200: ['MA200’ü yeni geçti', 'Fiyat son 5 mumda 200’lük ortalamayı yukarı kesti.', (d, I, i) => { for (let q = i; q > i - 5 && q > 0; q--) if (isFinite(I.sma200[q]) && d.c[q - 1] <= I.sma200[q - 1] && d.c[q] > I.sma200[q]) return true; return false; }],
   hacim: ['Hacimli', 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ve üstü.', (d, I, i) => d.v[i] / I.volSma20[i - 1] >= 1.5],
 };
-function sigOk(x, k) { const D = tfData(x, S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
+function sigOk(x, k, tf) { const D = tfData(x, tf || S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
 function renderViews() {
   const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
   for (const v of ['guclu', 'dip', 'tum', 'fav']) $('#n-' + v).textContent = rs.filter(x => inView(x, v)).length;
@@ -1933,6 +1936,7 @@ function renderViews() {
   const SIGG = [['Dönüş ve uyumsuzluk', ['divB', 'divT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
   const sh = SIGG.map(([g, ks]) => `<div class="sgg">${g}</div><div class="sgrow">${ks.map(k => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(SIGS[k][1])}">${esc(SIGS[k][0])} <b>${cnt[k]}</b></button>`).join('')}</div>`).join('');
   if (sg.dataset.h !== sh) { sg.innerHTML = sh; sg.dataset.h = sh; }
+  document.querySelectorAll('#sgcard [data-sc]').forEach(b => b.disabled = !S.sig.length);
   $('#sigN').textContent = S.sig.length ? S.sig.length + ' seçili: ' + S.sig.map(k => SIGS[k][0]).join(', ') : '';
   $('#viewhelp').textContent = (eff.length ? eff.map(v => HELP[v]).join(' ') + (eff.length > 1 ? ' Seçili filtreler birlikte uygulanır.' : '') : HELP.tum).replace('puana göre.', `${TFL[S.listTF]} puana göre.`) + S.sig.map(k => ' ' + SIGS[k][1]).join('');
 }
@@ -2197,6 +2201,73 @@ function renderDetail() {
   drawChart(x);
 }
 // ───────── Paylaşım kartı (X / sosyal medya için tek görsel) ─────────
+// ───────── Sinyal özet kartı: ne demek + strateji + uyan coinler ─────────
+const STRAT = {
+  divB: 'Tek başına al sinyali değil. RSI’ın 50 üstüne dönmesini ve yeşil mum onayını bekle; MA200 altındaysa puan tavanı (40) yüzünden temkinli ol.',
+  divT: 'Yükseliş yoruluyor. Yeni alım için acele etme; destek kırılırsa uyarı güçlenir. Eldekiler için riski gözden geçirme zamanı.',
+  rsi30: 'Aşırı satımda dip aranır ama düşen bıçak tutulmaz. RSI 50 üstüne dönene ve yeşil kapanış gelene kadar bekle.',
+  wtDip: 'Dipten erken dönüş sinyali. MA20 üstü kapanış ve hacim artışıyla birlikte değerlendir.',
+  ema510: 'Kısa vade dönüşü. MA200 üstündeyse daha güvenilir; altındaysa puan tavanı nedeniyle temkinli kal, hacimle teyit ara.',
+  dizilim: 'Güçlü trendin içindesin. Kovalamak yerine MA20/MA50 desteğine geri çekilmeleri izle.',
+  sikisma: 'Sıkışma sert harekete yakındır ama yönü söylemez. Yön, hacimli kırılım ve kapanışla netleşir; yön belli olmadan işlem yok.',
+  rsi50: 'Alıcılar kontrolde. Tek başına sinyal değil; MA200 üstü ve para girişiyle birleşirse anlam kazanır.',
+  rsi50x: 'Momentum yeni olumluya döndü. Fiyat MA20 üstündeyse ve hacim varsa takip edilebilir.',
+  ma920: 'Erken trend dönüşü. Kararsız (sık kesişen) piyasada yanıltır; hacim ve MA200 yönüyle teyit et.',
+  ma920d: 'Zayıflama uyarısı, MA20’ye kadar geri çekilme olabilir. Yeni giriş için bekle, eldekilerde riski gözden geçir.',
+  macd: 'Momentum al tarafına döndü. 0 çizgisinin üstündeyse daha güçlü, altındaysa zayıf kabul edilir.',
+  giris: 'Yükselişi destekleyen para girişi var. Direnç hacimle kırılırsa trend teyit olur.',
+  cikis: 'Para çıkıyor. Yeni alım için riskli; izleme listesine al, girişe dönmesini bekle.',
+  kirilim: 'Son 20 mumun zirvesi aşıldı. Hacimli kırılım sağlam, hacimsiz olan sahte olabilir; kırılan seviyenin üstünde kapanış ara.',
+  ma200: 'Uzun vadeli ortalama aşıldı, puan tavanı kalkar. MA200’e geri dönüp tutunması (geri test) daha güvenli giriş sayılır.',
+  hacim: 'Hareketin arkasında ilgi var. Yönü kapanış rengi ve kırılan seviyeler belirler.',
+};
+async function sigCard(tf) {
+  const keys = S.sig.slice(); if (!keys.length) { alert('Önce yukarıdan bir sinyal seç'); return; }
+  const list = S.coins.filter(x => x.res).filter(x => { try { return tfData(x, tf) && keys.every(k => sigOk(x, k, tf)); } catch (e) { return false; } })
+    .map(x => { const r = evalTF(x, tf); return r ? { x, r } : null; }).filter(Boolean).sort((a, b) => b.r.score - a.r.score);
+  const W = 1080, P = 48, MAXR = 12, shown = list.slice(0, MAXR), RH = 84;
+  const K = { bg1: '#0a0f1d', bg2: '#16203d', panel: 'rgba(255,255,255,.055)', line: 'rgba(255,255,255,.10)', ink: '#eef2fb', ink2: '#b2bcd2', mute: '#7f8aa0', good: '#41c78d', bad: '#f2786a', warn: '#e4ab43', acc: '#88a6ff' };
+  const F = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif', cv = document.createElement('canvas'), g = cv.getContext('2d');
+  const measure = (s, size, wgt) => { g.font = `${wgt || 500} ${size}px ${F}`; return g.measureText(s).width; };
+  const lines = (s, mw, size) => { const out = []; let line = ''; for (const w of s.split(' ')) { const t = line ? line + ' ' + w : w; if (measure(t, size) > mw && line) { out.push(line); line = w; } else line = t; } if (line) out.push(line); return out; };
+  const title = keys.map(k => SIGS[k][0]).join(' + '), tl0 = TFL[tf] || tf, tl = tl0.charAt(0).toLocaleUpperCase('tr') + tl0.slice(1), CW = W - 2 * P;
+  const tLines = lines(title, CW - 40, 62).slice(0, 3);
+  const blocks = keys.map(k => ({ n: keys.length > 1 ? SIGS[k][0] : '', d: lines(SIGS[k][1], CW - 56, 25), s: lines(STRAT[k] || '', CW - 56, 25) }));
+  let H = 330 + tLines.length * 72;
+  const boxH = (arr) => 74 + arr.reduce((a, b) => a + (b.n ? 34 : 0) + 0, 0);
+  const dH = 70 + blocks.reduce((a, b) => a + (b.n ? 36 : 0) + b.d.length * 36 + 12, 0), sH = 70 + blocks.reduce((a, b) => a + (b.n ? 36 : 0) + b.s.length * 36 + 12, 0);
+  H += dH + 18 + sH + 18 + 96 + Math.max(1, shown.length) * RH + (list.length > MAXR ? 52 : 0) + 90;
+  cv.width = W; cv.height = H;
+  const rr = (x0, y0, w, h, rad) => { g.beginPath(); g.roundRect(x0, y0, w, h, rad); };
+  const txt = (s, x0, y0, size, col, wgt, al) => { g.font = `${wgt || 500} ${size}px ${F}`; g.fillStyle = col; g.textAlign = al || 'left'; g.textBaseline = 'alphabetic'; g.fillText(s, x0, y0); };
+  let gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, K.bg1); gr.addColorStop(1, K.bg2); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+  gr = g.createRadialGradient(W - 100, 120, 10, W - 100, 120, 520); gr.addColorStop(0, K.acc + '44'); gr.addColorStop(1, K.acc + '00'); g.fillStyle = gr; g.fillRect(0, 0, W, 700);
+  const brand = MODE === 'borsa' ? 'Borsa Radarı' : 'Coin Radarı', dt = new Date();
+  g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt(brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
+  txt(dt.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + dt.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), W - P, 57, 22, K.mute, 500, 'right');
+  txt('SİNYAL ÖZETİ', P, 130, 26, K.acc, 800);
+  let y = 130; tLines.forEach(l => { y += 72; txt(l, P, y, 62, K.ink, 800); });
+  y += 28; const pw = measure(tl + ' grafik', 26, 700) + 40; g.fillStyle = 'rgba(136,166,255,.16)'; rr(P, y, pw, 50, 25); g.fill(); txt(tl + ' grafik', P + 20, y + 35, 26, K.acc, 700);
+  txt(list.length + ' ' + (MODE === 'borsa' ? 'hisse' : 'coin') + ' uyuyor', W - P, y + 36, 30, K.ink, 800, 'right');
+  y += 50 + 30;
+  const box = (head, col, arr, key, h) => { g.fillStyle = K.panel; rr(P, y, CW, h, 26); g.fill(); g.strokeStyle = K.line; g.lineWidth = 2; rr(P, y, CW, h, 26); g.stroke(); txt(head, P + 28, y + 46, 24, col, 800); let yy = y + 90; arr.forEach(b => { if (b.n) { txt(b.n, P + 28, yy, 24, K.ink, 800); yy += 36; } b[key].forEach(l => { txt(l, P + 28, yy, 25, K.ink2, 500); yy += 36; }); yy += 12; }); y += h + 18; };
+  box('NE DEMEK?', K.acc, blocks, 'd', dH); box('STRATEJİ', K.warn, blocks, 's', sH);
+  txt((MODE === 'borsa' ? 'BU SİNYALİ VEREN HİSSELER' : 'BU SİNYALİ VEREN COİNLER') + ' · puana göre', P + 4, y + 40, 22, K.mute, 800); y += 62;
+  if (!shown.length) txt('Şu an bu şartları sağlayan yok.', P + 8, y + 50, 28, K.mute, 600);
+  shown.forEach(({ x, r }) => {
+    const vk = r.label.k, vc = vk === 'gp' || vk === 'p' ? K.good : vk === 'n' ? K.warn : K.bad, live = x.live ? x.live.p : r.close, chg = x.live ? x.live.chg : null;
+    g.fillStyle = K.panel; rr(P, y, CW, RH - 10, 22); g.fill();
+    txt(x.sym.replace(/USDT$/, ''), P + 26, y + 50, 34, K.ink, 800); txt(VERDICT[vk], P + 26 + measure(x.sym.replace(/USDT$/, ''), 34, 800) + 16, y + 49, 20, vc, 700);
+    txt(fmt(live), P + 560, y + 50, 30, K.ink, 700, 'right');
+    if (chg != null) txt(pc(chg), P + 720, y + 50, 26, chg >= 0 ? K.good : K.bad, 700, 'right');
+    g.fillStyle = vc + '2b'; rr(P + CW - 110, y + 10, 88, 54, 27); g.fill(); txt(r.score.toFixed(0), P + CW - 66, y + 49, 32, vc, 800, 'center');
+    y += RH;
+  });
+  if (list.length > MAXR) { txt('+ ' + (list.length - MAXR) + ' tane daha · sitede', P + 8, y + 30, 24, K.mute, 600); y += 52; }
+  txt('Yatırım tavsiyesi değildir · Kişisel proje · Eğitim notlarındaki kurallara göre otomatik taranır', W / 2, H - 30, 19, K.mute, 500, 'center');
+  const blob = await new Promise(res => cv.toBlob(res, 'image/png'));
+  const u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = `${brand.replace(/ /g, '-')}-sinyal-${tf}.png`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 4000);
+}
 // ───────── Paylaşım kartı İngilizce metinleri ─────────
 const PLAIN_EN = {
   ma200: ['Above the long-term average (MA200)', 'Below the long-term average (MA200)'],
@@ -2744,6 +2815,7 @@ let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wS
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
 $('#sigbox').open = !!store.get('sigOpen', false); $('#sigbox').addEventListener('toggle', () => store.set('sigOpen', $('#sigbox').open));
+$('#sgcard').addEventListener('click', async e => { const b = e.target.closest('[data-sc]'); if (!b || b.disabled) return; b.disabled = true; try { await sigCard(b.dataset.sc); } finally { b.disabled = !S.sig.length; } });
 $('#sigs').addEventListener('click', e => { const b = e.target.closest('[data-sg]'); if (!b) return; const k = b.dataset.sg; S.sig = S.sig.includes(k) ? S.sig.filter(x => x !== k) : [...S.sig, k]; store.set('sig', S.sig); renderViews(); renderList(); renderDetail(); });
 $('#views').addEventListener('click', e => { const b = e.target.closest('.view'); if (!b || b.disabled) return; const v = b.dataset.v; if (v === 'tum') { S.sig = []; store.set('sig', S.sig); } S.flt = v === 'tum' ? [] : S.flt.includes(v) ? S.flt.filter(x => x !== v) : [...S.flt, v]; store.set('flt', S.flt); renderViews(); renderList(); renderDetail(); });
 $('#listTF').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; S.listTF = b.dataset.t; S.tcTF = S.listTF; store.set('listTF', S.listTF); store.set('tcTF', S.tcTF); loadTFAll(S.listTF); renderViews(); renderList(); renderDetail(); });
