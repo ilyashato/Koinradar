@@ -76,7 +76,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .ic2{margin:3px 0 4px}
 .chip{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700}
 .c-p{background:var(--good-soft);color:var(--good)} .c-n{background:var(--bad-soft);color:var(--bad)} .c-z{background:var(--line2);color:var(--ink2)} .c-w{background:var(--warn-soft);color:var(--warn)}
-.spw{position:relative;margin:2px 0 4px}.spw .spark{margin:0}.spw .sl{position:absolute;transform:translateY(-50%);font:600 10px/1 var(--mono,ui-monospace,monospace);color:var(--mute);padding:1px 3px;border-radius:4px;pointer-events:none;white-space:nowrap}.spw .sl.l{left:3px}.spw .sl.r{right:3px;background:var(--bg);border:1px solid currentColor}.spark{display:block;width:100%;height:54px;margin:2px 0 4px;background:var(--bg);border-radius:8px}
+.spw{position:relative;margin:2px 0 4px}.spw .spark{margin:0}.spw .sl{position:absolute;transform:translateY(-50%);font:600 10px/1 var(--mono,ui-monospace,monospace);color:var(--mute);padding:1px 3px;border-radius:4px;pointer-events:none;white-space:nowrap}.spw .sl.l{left:3px;color:var(--bad);opacity:.7}.spw .sl.l.k{opacity:1;font-weight:800}.spw .sl.r{right:3px;background:var(--bg);border:1px solid currentColor}.spark{display:block;width:100%;height:54px;margin:2px 0 4px;background:var(--bg);border-radius:8px}
 .inote{margin:0;font-size:13.5px;line-height:1.45;color:var(--ink2)}
 .ib{display:inline-grid;place-items:center;width:17px;height:17px;border-radius:50%;border:1px solid var(--mute);background:none;color:var(--mute);font:italic 700 11px/1 Georgia,serif;padding:0;vertical-align:1px;margin-left:2px;cursor:pointer}
 .tfbar{position:sticky;top:62px;z-index:2;background:var(--bg);display:flex;align-items:center;gap:10px;padding:2px 0 8px;flex-wrap:wrap}
@@ -2080,13 +2080,13 @@ function spark(lines, o) {
   if (lo == null || hi == null) { let mn = Infinity, mx = -Infinity; for (const s of lines) for (let q = beg; q <= end; q++) { const v = s.a[q]; if (isFinite(v)) { mn = Math.min(mn, v); mx = Math.max(mx, v); } } for (const r of (o.refs || [])) { mn = Math.min(mn, r); mx = Math.max(mx, r); } if (!isFinite(mn)) return ''; const pad = (mx - mn) * 0.08 || 1; lo = mn - pad; hi = mx + pad; }
   const X = q => ((q - beg) / Math.max(1, end - beg)) * W, Y = v => H - 2 - ((v - lo) / (hi - lo)) * (H - 4);
   let s = `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">`;
-  for (const r of (o.refs || [])) if (r >= lo && r <= hi) s += `<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" stroke="var(--line)" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>`;
+  for (const r of (o.refs || [])) if (r >= lo && r <= hi) s += `<line x1="0" x2="${W}" y1="${Y(r)}" y2="${Y(r)}" ${(o.key || []).includes(r) ? 'stroke="var(--bad)" stroke-width="1.4" opacity=".85"' : 'stroke="var(--bad)" opacity=".28" stroke-dasharray="3 3"'} vector-effect="non-scaling-stroke"/>`;
   for (const b of (o.bars || [])) { const bw = W / ((end - beg) + 1) * 0.7; for (let q = beg; q <= end; q++) { const v = b.a[q]; if (!isFinite(v)) continue; const y0 = Y(0), y1 = Y(v); s += `<rect x="${X(q) - bw / 2}" y="${Math.min(y0, y1)}" width="${bw}" height="${Math.max(0.5, Math.abs(y1 - y0))}" fill="${v >= 0 ? 'var(--good)' : 'var(--bad)'}" opacity=".45"/>`; } }
   for (const l of lines) { let d = ''; for (let q = beg; q <= end; q++) { const v = l.a[q]; if (!isFinite(v)) continue; d += (d ? 'L' : 'M') + X(q).toFixed(1) + ' ' + Y(v).toFixed(1); } if (d) s += `<path d="${d}" fill="none" stroke="${l.col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`; }
   s += '</svg>';
   const rg = hi - lo, dec = o.dec != null ? o.dec : rg < 1 ? 3 : rg < 12 ? 2 : rg < 120 ? 1 : 0, F = v => nf(v, dec), T = v => Math.max(9, Math.min(91, Y(v) / H * 100));
   let lb = '';
-  let lastY = -99; for (const r of [...(o.refs || [])].filter(r => r >= lo && r <= hi).sort((a, b) => b - a)) { const y = Y(r); if (y - lastY < 11) continue; lastY = y; lb += `<span class="sl l" style="top:${T(r)}%">${r.toLocaleString('tr-TR', { maximumFractionDigits: dec })}</span>`; }
+  let lastY = -99; for (const r of [...(o.refs || [])].filter(r => r >= lo && r <= hi).sort((a, b) => b - a)) { const y = Y(r); if (y - lastY < 11) continue; lastY = y; lb += `<span class="sl l${(o.key || []).includes(r) ? ' k' : ''}" style="top:${T(r)}%">${r.toLocaleString('tr-TR', { maximumFractionDigits: dec })}</span>`; }
   if (lines.length === 1) lines.forEach(l => { const v = l.a[end]; if (isFinite(v)) lb += `<span class="sl r" style="top:${T(v)}%;color:${l.col}">${F(v)}</span>`; });
   return `<div class="spw">${s}${lb}</div>`;
 }
@@ -2107,13 +2107,13 @@ function indRows(I, d, i) {
     else if (v >= 50) { if (mx >= 70 && v < 60) { st = 'n'; lab = '70’ten iniyor'; note = '70’ten gelip 50–60’ta: işlemde olma.'; } else { st = 'p'; lab = '50 üstü'; note = '50 üstü: alıcılar kontrolde. 70’i geçemeyen yapı zayıftır.' + k50; } }
     else if (v >= 30) { st = 'n'; lab = '50 altı'; note = '50 altında kesinlikle işlemde olunmaz (kurs). 50’ye aşağıdan gelip üstüne geçmek yükseliş habercisidir.'; const sl = slopeOf(I.rsi, i, 3); if (sl && sl.up) { st = 'z'; lab = '50 altı · yukarı dönüyor'; note += ` Ama son 5 mumda ${nf(sl.d, 1)} puan yükseldi (son 20 mumun dibi ${nf(sl.lo, 0)}): ivme yukarı, dipten toparlanma olabilir. 50’yi yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: ivme aşağı.`; }
     else { st = 'w'; lab = 'aşırı satım'; note = '30 altı: aşırı satım. Yine de 50 üstüne dönmeden işlem yok; dip uyumsuzluğu ara.'; }
-    add({ g: 'Momentum', k: '_i_rsi', t: 'RSI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.rsi, col: A }], { end: i, min: 0, max: 100, refs: [30, 50, 70] }) }); }
+    add({ g: 'Momentum', k: '_i_rsi', t: 'RSI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.rsi, col: A }], { end: i, min: 0, max: 100, refs: [30, 50, 70], key: [50] }) }); }
   // MACD
   { const m = I.macd[i], sg = I.macdSig[i], h = I.macdHist[i], h1 = I.macdHist[i - 1], cr = crossOf(I.macd, I.macdSig, i);
     const up = m > sg, z = m > 0; let st, lab;
     if (up && z) { st = 'p'; lab = 'sinyal üstü · 0 üstü'; } else if (up) { st = 'z'; lab = 'sinyal üstü · 0 altı'; } else if (z) { st = 'n'; lab = 'sinyal altı · 0 üstü'; } else { st = 'n'; lab = 'sinyal altı · 0 altı'; }
     const note = `MACD sinyalin ${up ? 'üstünde: fiyat yönü yukarı' : 'altında: fiyat yönü aşağı'}. ${z ? '0 üstü: tercih nedeni.' : '0 altı: riskli bölge.'} ${isFinite(h1) && Math.abs(h) > Math.abs(h1) ? 'Aradaki açı büyüyor: daha sert hareket gelebilir.' : 'Açı daralıyor.'}${cr ? ' Son kesişim ' + ago2(cr) + (cr.up ? ' (yukarı).' : ' (aşağı).') : ''} Gecikmelidir.`;
-    add({ g: 'Momentum', k: '_i_macd', t: 'MACD (12,26,9)', val: `${nf(m, 4)} / ${nf(sg, 4)}`, st, lab, note, sp: spark([{ a: I.macd, col: A }, { a: I.macdSig, col: B }], { end: i, bars: [{ a: I.macdHist }], refs: [0] }) }); }
+    add({ g: 'Momentum', k: '_i_macd', t: 'MACD (12,26,9)', val: `${nf(m, 4)} / ${nf(sg, 4)}`, st, lab, note, sp: spark([{ a: I.macd, col: A }, { a: I.macdSig, col: B }], { end: i, bars: [{ a: I.macdHist }], refs: [0], key: [0] }) }); }
   // SMI
   { const v = I.smi[i], sg = I.smiSig[i], cr = crossOf(I.smi, I.smiSig, i);
     let st, lab, note;
@@ -2121,29 +2121,29 @@ function indRows(I, d, i) {
     else if (v <= -0.5) { st = 'w'; lab = '−0,5 altı'; note = '−0,5 altı: aşırı bölge. Dip arama bölgesi; yukarı dönüşte SMI ile gir, MACD ile çık.'; }
     else { st = v > sg ? 'p' : 'n'; lab = v > sg ? 'sinyal üstü' : 'sinyal altı'; note = `Aşırı bölgede değil (±0,5 içinde). SMI sinyalin ${v > sg ? 'üstünde' : 'altında'}. Aşırı sinyal verir, MACD ile eşleştir.`; }
     if (cr) note += ` Son kesişim ${ago2(cr)} (${cr.up ? 'yukarı' : 'aşağı'}).`;
-    add({ g: 'Momentum', k: '_i_smi', t: 'SMI Ergodic', val: `${nf(v, 2)} / ${nf(sg, 2)}`, st, lab, note, sp: spark([{ a: I.smi, col: A }, { a: I.smiSig, col: B }], { end: i, refs: [-0.5, 0, 0.5] }) }); }
+    add({ g: 'Momentum', k: '_i_smi', t: 'SMI Ergodic', val: `${nf(v, 2)} / ${nf(sg, 2)}`, st, lab, note, sp: spark([{ a: I.smi, col: A }, { a: I.smiSig, col: B }], { end: i, refs: [-0.5, 0, 0.5], key: [0] }) }); }
   // Fisher
   { const f = I.fisher[i], tg = I.fisherTrig[i], cr = crossOf(I.fisher, I.fisherTrig, i), up = f > tg;
     let st = up ? 'p' : 'n', lab = up ? 'tetik üstü' : 'tetik altı';
     if (Math.abs(f) >= 1.5) { st = 'w'; lab = f > 0 ? '+1,5 üstü' : '−1,5 altı'; }
-    add({ g: 'Momentum', k: '_i_fisher', t: 'Fisher (9)', val: `${nf(f, 2)} / ${nf(tg, 2)}`, st, lab, note: `Fisher tetiğin ${up ? 'üstünde: yukarı yönlü' : 'altında: aşağı yönlü'}. Fiyatı düzeltmeye çalışır, daha az zigzag verir.${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}${Math.abs(f) >= 1.5 ? ' Uç bölgede: dönüş ihtimali.' : ''}`, sp: spark([{ a: I.fisher, col: A }, { a: I.fisherTrig, col: B }], { end: i, refs: [-1.5, 0, 1.5] }) }); }
+    add({ g: 'Momentum', k: '_i_fisher', t: 'Fisher (9)', val: `${nf(f, 2)} / ${nf(tg, 2)}`, st, lab, note: `Fisher tetiğin ${up ? 'üstünde: yukarı yönlü' : 'altında: aşağı yönlü'}. Fiyatı düzeltmeye çalışır, daha az zigzag verir.${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}${Math.abs(f) >= 1.5 ? ' Uç bölgede: dönüş ihtimali.' : ''}`, sp: spark([{ a: I.fisher, col: A }, { a: I.fisherTrig, col: B }], { end: i, refs: [-1.5, 0, 1.5], key: [0] }) }); }
   // WT
   { const a = I.wt1[i], b = I.wt2[i], cr = crossOf(I.wt1, I.wt2, i), up = a > b;
     let st = up ? 'p' : 'n', lab = up ? 'WT1 > WT2' : 'WT1 < WT2', note = `WT1 ${up ? 'üstte' : 'altta'}.`;
     if (a >= 53) { st = 'w'; lab = 'aşırı alım'; note += ' +53 üstü: aşırı alım; aşağı kesişim sat sinyali olur.'; } else if (a <= -53) { st = 'w'; lab = 'aşırı satım'; note += ' −53 altı: aşırı satım; yukarı kesişim al sinyali olur.'; }
     if (cr) note += ` Son kesişim ${ago2(cr)} (${cr.up ? 'yukarı' : 'aşağı'}${Math.abs(a) >= 53 ? ', uç bölgede' : ''}).`;
-    add({ g: 'Momentum', k: '_i_wt', t: 'WT Cross (10,21)', val: `${nf(a, 1)} / ${nf(b, 1)}`, st, lab, note, sp: spark([{ a: I.wt1, col: A }, { a: I.wt2, col: B }], { end: i, refs: [-53, 0, 53] }) }); }
+    add({ g: 'Momentum', k: '_i_wt', t: 'WT Cross (10,21)', val: `${nf(a, 1)} / ${nf(b, 1)}`, st, lab, note, sp: spark([{ a: I.wt1, col: A }, { a: I.wt2, col: B }], { end: i, refs: [-53, 0, 53], key: [0] }) }); }
   // Vortex
   { const p2 = I.viP[i], m2 = I.viM[i], up = p2 > m2, gap = p2 - m2, gap3 = I.viP[i - 3] - I.viM[i - 3], cr = crossOf(I.viP, I.viM, i);
     const opening = isFinite(gap3) && Math.abs(gap) > Math.abs(gap3) + 0.05;
-    add({ g: 'Momentum', k: '_i_vortex', t: 'Vortex VI (14)', val: `${nf(p2, 2)} / ${nf(m2, 2)}`, st: up ? 'p' : 'n', lab: up ? 'VI+ üstte' : 'VI− üstte', note: `${up ? 'VI+ üstte: yukarı trend gücü' : 'VI− üstte: aşağı trend gücü'}. ${opening ? 'Ağız açılıyor: trend güçleniyor.' : 'Ağız genişlemiyor.'}${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}`, sp: spark([{ a: I.viP, col: 'var(--good)' }, { a: I.viM, col: 'var(--bad)' }], { end: i, refs: [1] }) }); }
+    add({ g: 'Momentum', k: '_i_vortex', t: 'Vortex VI (14)', val: `${nf(p2, 2)} / ${nf(m2, 2)}`, st: up ? 'p' : 'n', lab: up ? 'VI+ üstte' : 'VI− üstte', note: `${up ? 'VI+ üstte: yukarı trend gücü' : 'VI− üstte: aşağı trend gücü'}. ${opening ? 'Ağız açılıyor: trend güçleniyor.' : 'Ağız genişlemiyor.'}${cr ? ' Son kesişim ' + ago2(cr) + '.' : ''}`, sp: spark([{ a: I.viP, col: 'var(--good)' }, { a: I.viM, col: 'var(--bad)' }], { end: i, refs: [1], key: [1] }) }); }
   // MFI
   { const v = I.mfi[i]; let st, lab, note;
     if (v <= 10) { st = 'w'; lab = '10’a değdi'; note = 'MFI 10’a değdi: kursa göre “kesin al” (sezgisel iddia). Para çıkışı bitmiş olabilir; fiyat teyidi bekle.'; }
     else if (v >= 90) { st = 'w'; lab = '90 üstü'; note = '90 üstü: aşırı alım. Yükseliş yorulabilir.'; }
     else if (v >= 50) { st = 'p'; lab = 'para girişi'; note = '50 üstü: para girişi var.'; const sl = slopeOf(I.mfi, i, 5); if (sl && sl.dn) { st = 'z'; lab = 'para girişi · zayıflıyor'; note += ` Ama son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: giriş yavaşlıyor.`; } }
     else { st = 'n'; lab = 'para çıkışı'; note = '50 altı: para çıkışı var.'; const sl = slopeOf(I.mfi, i, 5); if (sl && sl.up) { st = 'z'; lab = 'para çıkışı · toparlanıyor'; note += ` Ama son 5 mumda ${nf(sl.d, 1)} puan yükseldi (son 20 mumun dibi ${nf(sl.lo, 0)}): çıkış yavaşlıyor, dipten toplanma olabilir. 50’yi yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: çıkış hızlanıyor.`; }
-    add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90] }) }); }
+    add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90], key: [50] }) }); }
   // CMF
   { const v = I.cmf[i], rising = c[i] > c[Math.max(0, i - 10)]; let st, lab, note;
     if (v > 0.2) { st = 'p'; lab = 'güçlü alım'; note = '0,2 üstü: güçlü alım baskısı; kursa göre 3–4 gün rahat.'; }
@@ -2151,11 +2151,11 @@ function indRows(I, d, i) {
     else { st = 'n'; lab = 'para çıkışı'; note = '0 altı: para çıkışı var.'; const sl = slopeOf(I.cmf, i, 0.04); if (sl && sl.up) { st = 'z'; lab = 'para çıkışı · toparlanıyor'; note += ` Ama son 5 mumda ${nf(sl.d, 3)} yükseldi: çıkış azalıyor, toplanma başlıyor olabilir. 0’ı yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 3)} düştü: çıkış sürüyor.`; }
     if (v < 0 && rising) note += ' Fiyat yükseliyor ama CMF 0 altı: yükseliş yanıltıcı olabilir.';
     const cr = crossOf(I.cmf, I.cmf.map(() => 0), i, 10); if (cr && cr.up) note += ` 0’ı yeni yukarı kesti (${ago2(cr)}): fiyatı iter.`;
-    add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2] }) }); }
+    add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2], key: [0] }) }); }
   // Demand Index
-  { const v = I.di[i]; if (isFinite(v)) add({ g: 'Para akışı', k: '_i_di', t: 'Demand Index', val: nf(v, 2), st: v > 0 ? 'p' : 'n', lab: v > 0 ? 'talep güçlü' : 'talep zayıf', note: v > 0 ? '0 üstü: talep güçlü.' : '0 altı: talep zayıf. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol.', sp: spark([{ a: I.di, col: A }], { end: i, refs: [0] }) }); }
+  { const v = I.di[i]; if (isFinite(v)) add({ g: 'Para akışı', k: '_i_di', t: 'Demand Index', val: nf(v, 2), st: v > 0 ? 'p' : 'n', lab: v > 0 ? 'talep güçlü' : 'talep zayıf', note: v > 0 ? '0 üstü: talep güçlü.' : '0 altı: talep zayıf. 0 altında uyumsuzluğa dokunma; dokunuyorsan dikkatli ol.', sp: spark([{ a: I.di, col: A }], { end: i, refs: [0], key: [0] }) }); }
   // Hacim
-  { const vr = d.v[i] / I.volSma20[i - 1]; if (isFinite(vr)) add({ g: 'Para akışı', k: '_i_vol', t: 'Hacim / 20 ort.', val: nf(vr, 2) + '×', st: vr >= 1.5 ? 'p' : vr < 0.7 ? 'n' : 'z', lab: vr >= 1.5 ? 'hacimli' : vr < 0.7 ? 'düşük hacim' : 'normal', note: vr >= 1.5 ? 'Ortalamanın 1,5 katı ve üstü: kırılım için güvenilir hacim.' : vr < 0.7 ? 'Ortalamanın altında: kırılım olsa da sahte olabilir.' : 'Normal hacim: kırılım için 1,5 kat beklenir.', sp: spark([{ a: d.v.map((x, q) => x / I.volSma20[q - 1]), col: A }], { end: i, min: 0, refs: [1, 1.5] }) }); }
+  { const vr = d.v[i] / I.volSma20[i - 1]; if (isFinite(vr)) add({ g: 'Para akışı', k: '_i_vol', t: 'Hacim / 20 ort.', val: nf(vr, 2) + '×', st: vr >= 1.5 ? 'p' : vr < 0.7 ? 'n' : 'z', lab: vr >= 1.5 ? 'hacimli' : vr < 0.7 ? 'düşük hacim' : 'normal', note: vr >= 1.5 ? 'Ortalamanın 1,5 katı ve üstü: kırılım için güvenilir hacim.' : vr < 0.7 ? 'Ortalamanın altında: kırılım olsa da sahte olabilir.' : 'Normal hacim: kırılım için 1,5 kat beklenir.', sp: spark([{ a: d.v.map((x, q) => x / I.volSma20[q - 1]), col: A }], { end: i, min: 0, refs: [1, 1.5], key: [1.5] }) }); }
   // Ortalamalar
   { const px = c[i], m = [['9', I.sma9], ['20', I.sma20], ['50', I.sma50], ['100', I.sma100], ['200', I.sma200]].map(([n, a]) => [n, a[i]]);
     const ok = m.filter(([, v]) => isFinite(v)), above = ok.filter(([, v]) => px > v).length, ordered = ok.every(([, v], q) => q === 0 || ok[q - 1][1] > v);
