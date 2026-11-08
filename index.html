@@ -2166,7 +2166,7 @@ function renderDetail() {
   let body = '';
   const chartCard = `<div class="card">
       <div class="sect" style="display:flex;justify-content:space-between;align-items:center">Grafik · ${TF[tf].t} <button type="button" class="btn small" id="btnFS" style="padding:5px 10px">⤢ Tam ekran</button></div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:2px"></i>Kısa trend</span><span><i style="background:var(--bad);height:4px"></i>Uzun trend (kalın)</span><span><i style="background:var(--fib-o)"></i>Fib</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>MA20</span><span><i style="background:var(--warn)"></i>MA50</span><span><i style="background:var(--mute)"></i>MA100</span><span><i style="background:var(--ink)"></i>MA200</span><span><i style="background:var(--good);height:2px"></i>Kısa trend</span><span><i style="background:var(--bad);height:4px"></i>Uzun trend (kalın)</span>${SHOW_FIB ? '<span><i style="background:var(--fib-o)"></i>Fib</span>' : ''}</div>
       <canvas class="chart" id="chart" aria-label="${TFL[tf]} mum grafiği"></canvas>
       <div class="readout" id="readout">Tam ekran için grafiğe dokunun.</div>
     </div>`;
@@ -2188,7 +2188,7 @@ function renderDetail() {
     if (ctx.support) tiles.push(['En yakın destek', fmt(ctx.support[1]), pc(ctx.support[1] / r.close - 1) + ' aşağıda', '_destek']);
     if (ctx.resistance) tiles.push(['En yakın direnç', fmt(ctx.resistance[0]), pc(ctx.resistance[0] / r.close - 1) + ' yukarıda', '_direnc']);
     if (isFinite(I.sma200[i])) tiles.push(['MA200 (uzun vade)', fmt(I.sma200[i]), pc(I.sma200[i] / r.close - 1) + ' fark', '_ma200v']);
-    if (ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1), '_fibhedef']); }
+    if (SHOW_FIB && ctx.tfib && ctx.tfib.valid) { const t = ctx.tfib.targets.find(z => ctx.tfib.dir === 'up' ? z.price > r.close : z.price < r.close); if (t) tiles.push([`Sıradaki fib hedefi (${t.k})`, fmt(t.price), pc(t.price / r.close - 1), '_fibhedef']); }
     const fired = new Set(r.rules.map(z => z.id));
     const dt = new Date(r.t), L = { day: 'numeric', month: 'long' };
     const when = isH(tf) ? new Date(r.t + HRS[tf] * 36e5).toLocaleString('tr-TR', { ...L, hour: '2-digit', minute: '2-digit' }) + ' ' + HRS[tf] + ' saatlik mum kapanışı' : tf === '1w' ? dt.toLocaleDateString('tr-TR', L) + ' haftası kapanışı' : tf === '1m' ? dt.toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }) + ' ayı kapanışı' : dt.toLocaleDateString('tr-TR', L) + ' günlük kapanışı';
@@ -2505,13 +2505,15 @@ function trendCard(x, tf) {
       ${keys.map(k => `<div class="tile"><div class="k">Fib ${fibNum(k)}</div><div class="v">${fmt(f.levels.find(z => z.r === k).price)}</div></div>`).join('')}</div>`;
   } else fibHtml = '<p class="help" style="margin:10px 0 0">Trend kırılmadı: kurala göre fib çekilmez.</p>';
   const short = m.d.c.length < 60 ? '<p class="small muted" style="margin-top:8px">Bu zaman diliminde az mum var, çizgiler güvenilir olmayabilir.</p>' : '';
-  return `<div class="card say" id="tcard"><div class="sect">Trend çizgisi ve fib · ${TF[tf].t}</div><ul>${lines.join('')}</ul>${fibHtml}${short}<p class="small muted" style="margin-top:8px">Üstteki zaman dilimi düğmeleriyle 4S / 1G / 1H / 1Ay arasında geçebilirsin.</p></div>`;
+  return `<div class="card say" id="tcard"><div class="sect">Trend çizgisi${SHOW_FIB ? ' ve fib' : ''} · ${TF[tf].t}</div><ul>${lines.join('')}</ul>${SHOW_FIB ? fibHtml : ''}${short}<p class="small muted" style="margin-top:8px">Üstteki zaman dilimi düğmeleriyle 4S / 1G / 1H / 1Ay arasında geçebilirsin.</p></div>`;
 }
 
 // ───────── Grafik ─────────
-const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ['fib', 'Fib'], ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
-const LDEF = { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: true, vol: true };
+const SHOW_FIB = false; // Fib gösterimi şimdilik kapalı; true yapınca grafik, kutular ve düğmeler geri gelir
+const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ...(SHOW_FIB ? [['fib', 'Fib']] : []), ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
+const LDEF = { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, dip: true, vol: true };
 const FS = { open: false, x: null, m: null, tf: '1d', beg: 0, end: 0, cross: null, fibSrc: store.get('fibSrc', 'uzun'), layers: Object.assign({}, LDEF, store.get('layers2', {})) };
+if (!SHOW_FIB) FS.layers.fib = false;
 const TF = { '4h': { t: '4S', look: 180, lookL: 240, day: 1 / 6 }, '6h': { t: '6S', look: 170, lookL: 230, day: 1 / 4 }, '12h': { t: '12S', look: 165, lookL: 220, day: 1 / 2 }, '1d': { t: '1G', look: 160, lookL: 200, day: 1 }, '1w': { t: '1H', look: 104, lookL: 156, day: 7 }, '1m': { t: '1Ay', look: 36, lookL: 60, day: 30 } };
 // Kırılmış trendlerden en yenisinden fib; kaynak: 'uzun' ya da 'kisa' (yoksa diğerine düşer)
 function pickFib(m, src, maxAge) {
@@ -2674,7 +2676,7 @@ function dayText(m, i) {
 function drawChart(x) {
   const cv = $('#chart'); if (!cv) return;
   const tf = TF[S.tcTF] && buildModel(x, S.tcTF, FS.fibSrc) ? S.tcTF : '1d', m = buildModel(x, tf, FS.fibSrc);
-  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: true, zone: true, dip: tf === '1d' } });
+  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, dip: tf === '1d' } });
   if (!geo) return;
   cv.onpointermove = e => { if (e.pointerType !== 'mouse') return; const rc = cv.getBoundingClientRect(); const i = Math.min(geo.dEnd, Math.max(geo.beg, geo.beg + Math.floor((e.clientX - rc.left) / geo.bw))); $('#readout').textContent = dayText(m, i); };
   cv.onclick = () => openFS(x);
@@ -2691,7 +2693,7 @@ function syncFsControls() {
   const has4 = !!(FS.x.d4 && FS.x.d4.c.length >= 60);
   $('#fsTF').innerHTML = Object.entries(TF).map(([k, v]) => `<button type="button" data-tf="${k}" aria-pressed="${FS.tf === k}" ${(k === '4h' && !has4) || (isH(k) && k !== '4h' && !seriesH(FS.x, k)) ? 'disabled title="Bu saatlik veri için önce coin sayfasında zaman dilimini seç"' : ''}>${v.t}</button>`).join('');
   $('#fsLayers').innerHTML = LAYERS_DEF.filter(([k]) => FS.tf === '1d' || k !== 'dip').map(([k, t]) => `<button type="button" class="chipl" data-l="${k}" aria-pressed="${!!FS.layers[k]}">${t}</button>`).join('')
-    + `<button type="button" class="chipl src" id="fsFibSrc" aria-pressed="true">Fib: ${FS.fibSrc === 'uzun' ? 'uzun trendden' : 'kısa trendden'}</button>`;
+    + (SHOW_FIB ? `<button type="button" class="chipl src" id="fsFibSrc" aria-pressed="true">Fib: ${FS.fibSrc === 'uzun' ? 'uzun trendden' : 'kısa trendden'}</button>` : '');
 }
 function setTF(tf) {
   const m = buildModel(FS.x, tf, FS.fibSrc); if (!m) return;
