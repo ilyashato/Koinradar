@@ -1045,6 +1045,18 @@ function indRows(I, d, i) {
     add({ g: 'Trend', k: '_i_ema', t: 'EMA 5 / EMA 10', val: `${fmt(e5)} / ${fmt(e10)}`, st: up ? 'p' : 'n', lab: up ? 'yukarı' : 'aşağı', note: up ? 'EMA5 üstte: kısa vade yukarı.' : 'EMA5 altta: günlükte 5/10 aşağıysa long kovalama; puan tavanı 55.' + (cr ? ` Son kesişim ${ago2(cr)}.` : ''), sp: '' }); if (up && cr) R[R.length - 1].note += ` Son kesişim ${ago2(cr)}.`; }
   // ATR
   { const a = I.atr[i]; if (isFinite(a)) add({ g: 'Trend', k: '_i_atr', t: 'ATR (14)', val: nf((a / c[i]) * 100, 2) + '% (' + fmt(a) + ')', st: 'z', lab: 'oynaklık', note: 'Bir mumun tipik oynaklığı. Stop ve hedef mesafesini buna göre ayarla.', sp: spark([{ a: I.atr.map((x, q) => x / c[q] * 100), col: A }], { end: i, min: 0 }) }); }
+  // Yön bilgisi (sadece gösterim): seviye zayıf ama yukarı dönüyorsa "toparlanıyor", güçlü ama düşüyorsa "zayıflıyor"
+  { const fix = (key, a, thr, up, dn, nUp, nDn) => { const r = R.find(z => z.k === key); if (!r || r.st === 'w') return; const sl = slopeOf(a, i, typeof thr === 'function' ? thr(a) : thr); if (!sl) return;
+      if (r.st === 'n' && sl.up) { r.st = 'z'; r.lab += ' · ' + up; r.note += ' ' + nUp; } else if (r.st === 'p' && sl.dn) { r.st = 'z'; r.lab += ' · ' + dn; r.note += ' ' + nDn; } };
+    const rng = f => a => { let lo = Infinity, hi = -Infinity; for (let q = Math.max(0, i - 19); q <= i; q++) if (isFinite(a[q])) { lo = Math.min(lo, a[q]); hi = Math.max(hi, a[q]); } return f * (hi - lo) || 1e-9; };
+    fix('_i_macd', I.macdHist, rng(0.25), 'toparlanıyor', 'zayıflıyor', 'Ama histogram son 5 mumda yükseldi: satış baskısı azalıyor. Sinyali yukarı kesmesi teyit olur.', 'Ama histogram son 5 mumda düştü: yükseliş ivmesi azalıyor.');
+    fix('_i_smi', I.smi, 0.08, 'dönüyor', 'zayıflıyor', 'Ama SMI son 5 mumda yükseldi: momentum yukarı dönüyor. Sinyali yukarı kesmesi teyit olur.', 'Ama SMI son 5 mumda düştü: momentum zayıflıyor.');
+    fix('_i_fisher', I.fisher, 0.4, 'dönüyor', 'zayıflıyor', 'Ama Fisher son 5 mumda yükseldi: aşağı yön yavaşlıyor. Tetiği yukarı kesmesi teyit olur.', 'Ama Fisher son 5 mumda düştü: yükseliş zayıflıyor.');
+    fix('_i_wt', I.wt1, 4, 'dönüyor', 'zayıflıyor', 'Ama WT1 son 5 mumda yükseldi: momentum yukarı dönüyor. WT2’yi yukarı kesmesi teyit olur.', 'Ama WT1 son 5 mumda düştü: momentum zayıflıyor.');
+    fix('_i_di', I.di, rng(0.3), 'toparlanıyor', 'zayıflıyor', 'Ama talep son 5 mumda yükseldi: satıcı baskısı azalıyor. 0’ı yukarı kesmesi teyit olur.', 'Ama talep son 5 mumda düştü: alım iştahı azalıyor.');
+    const vx = R.find(z => z.k === '_i_vortex'), g0 = I.viP[i] - I.viM[i], g3 = I.viP[i - 3] - I.viM[i - 3];
+    if (vx && isFinite(g3) && Math.abs(g0) < Math.abs(g3) - 0.05) { if (g0 > 0) { vx.st = 'z'; vx.lab += ' · zayıflıyor'; vx.note += ' Ama aradaki fark daralıyor: yükseliş gücü azalıyor.'; } else { vx.st = 'z'; vx.lab += ' · zayıflıyor'; vx.note += ' Ama aradaki fark daralıyor: düşüş gücü azalıyor, dönüş yaklaşıyor olabilir.'; } }
+  }
   return R;
 }
 function indCard(I, d, i) {
