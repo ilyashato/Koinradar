@@ -51,6 +51,10 @@ h3{font-weight:700;font-size:15px;margin:0}
 .market{display:flex;gap:12px;align-items:center;background:var(--panel);border-radius:var(--r);padding:12px 14px;margin-bottom:14px}
 .market .light{width:12px;height:12px;border-radius:50%;flex:none}
 .market b{font-weight:700}
+.market:has(.mkidx){flex-direction:column;align-items:stretch;gap:8px}
+.mkmain{display:flex;gap:12px;align-items:center}
+.mkidx{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.mkrow{display:flex;gap:10px;align-items:baseline}.mkv{font-size:22px;font-family:ui-monospace,"IBM Plex Mono",monospace}
 
 /* Sekmeler */
 .tabs{display:flex;gap:4px;margin-bottom:14px;background:var(--line2);padding:4px;border-radius:12px}
@@ -1878,7 +1882,10 @@ function renderMarket() {
   const n = S.coins.filter(x => x.res), above = n.filter(x => x.res.close > x.I.sma200[x.res.i]).length;
   const [col, txt] = up && ema ? ['var(--good)', 'Piyasa ortamı olumlu'] : !up ? ['var(--bad)', 'Piyasa ortamı zayıf'] : ['var(--warn)', 'Piyasa kararsız'];
   el.hidden = false;
-  el.innerHTML = `<span class="light" style="background:${col}"></span><div><b>${txt}.</b> <span class="small" style="color:var(--ink2)">Bitcoin uzun vadeli ortalamasının ${up ? 'üstünde' : 'altında'}, kısa vadeli trendi ${ema ? 'yukarı' : 'aşağı'}. ${above}/${n.length} coin uzun vadeli ortalamasının üstünde.</span></div>`;
+  let idx = '';
+  if (MODE === 'borsa') { const d = S.btc.d, n = d.c.length - 1, lv = S.btc.live, p = lv ? lv.p : d.c[n], ch = lv ? lv.chg : d.c[n] / d.c[n - 1] - 1;
+    idx = `<div class="mkidx"><span class="small muted">BIST 100 endeksi</span><span class="mkrow"><b class="mkv">${fmt(p)}</b><span class="mkc chg ${ch >= 0 ? 'up' : 'dn'}">${pc(ch)}</span></span></div>`; }
+  el.innerHTML = idx + `<div class="mkmain"><span class="light" style="background:${col}"></span><div><b>${txt}.</b> <span class="small" style="color:var(--ink2)">Bitcoin uzun vadeli ortalamasının ${up ? 'üstünde' : 'altında'}, kısa vadeli trendi ${ema ? 'yukarı' : 'aşağı'}. ${above}/${n.length} coin uzun vadeli ortalamasının üstünde.</span></div></div>`;
 }
 
 // ───────── Görünümler ─────────
@@ -2907,6 +2914,7 @@ function paintLive() {
   });
   const x = S.coins.find(c => c.sym === S.sel);
   if (x && x.live) { const pe = document.querySelector('#detail .lv-p'), ce = document.querySelector('#detail .lv-c'); if (pe) pe.textContent = fmt(x.live.p); if (ce) { ce.textContent = pc(x.live.chg); ce.className = 'lv-c ' + (x.live.chg >= 0 ? 'up' : 'dn'); } }
+  if (MODE === 'borsa' && S.btc && S.btc.live) { const v = document.querySelector('.mkv'), c = document.querySelector('.mkc'); if (v) v.textContent = fmt(S.btc.live.p); if (c) { c.textContent = pc(S.btc.live.chg); c.className = 'mkc chg ' + (S.btc.live.chg >= 0 ? 'up' : 'dn'); } }
   srcStatus(); renderMarketLive();
 }
 function renderMarketLive() {}
