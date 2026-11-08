@@ -54,6 +54,7 @@ h3{font-weight:700;font-size:15px;margin:0}
 .market:has(.mkidx){flex-direction:column;align-items:stretch;gap:8px}
 .mkmain{display:flex;gap:12px;align-items:center}
 .mkidx{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:8px;margin-bottom:2px;border-bottom:1px solid var(--line)}
+.mkidx{cursor:pointer;align-items:center}.mkl{display:flex;gap:10px;align-items:center}.mkl .score{width:42px;height:42px;font-size:17px;flex:none}
 .mkrow{display:flex;gap:10px;align-items:baseline}.mkv{font-size:22px;font-family:ui-monospace,"IBM Plex Mono",monospace}
 
 /* Sekmeler */
@@ -767,7 +768,7 @@ function renderMarket() {
   el.hidden = false;
   let idx = '';
   if (MODE === 'borsa') { const d = S.btc.d, n = d.c.length - 1, lv = S.btc.live, p = lv ? lv.p : d.c[n], ch = lv ? lv.chg : d.c[n] / d.c[n - 1] - 1;
-    idx = `<div class="mkidx"><span class="small muted">BIST 100 endeksi</span><span class="mkrow"><b class="mkv">${fmt(p)}</b><span class="mkc chg ${ch >= 0 ? 'up' : 'dn'}">${pc(ch)}</span></span></div>`; }
+    idx = `<div class="mkidx" data-idx="1" role="button" tabindex="0"><span class="mkl"><span class="score s-${b.label.k}">${b.score.toFixed(0)}</span><span><span class="small muted">BIST 100 endeksi</span><br><span class="small" style="font-weight:700;color:var(--ink)">${VERDICT[b.label.k]} ›</span></span></span><span class="mkrow"><b class="mkv">${fmt(p)}</b><span class="mkc chg ${ch >= 0 ? 'up' : 'dn'}">${pc(ch)}</span></span></div>`; }
   el.innerHTML = idx + `<div class="mkmain"><span class="light" style="background:${col}"></span><div><b>${txt}.</b> <span class="small" style="color:var(--ink2)">Bitcoin uzun vadeli ortalamasının ${up ? 'üstünde' : 'altında'}, kısa vadeli trendi ${ema ? 'yukarı' : 'aşağı'}. ${above}/${n.length} coin uzun vadeli ortalamasının üstünde.</span></div></div>`;
 }
 
@@ -884,7 +885,7 @@ function renderList() {
   if (S.listTF !== '1d') { const miss = S.coins.filter(x => x.res && !rOf(x)).length; if (miss) foot.push(`${miss} coin bu zaman diliminde yeterli geçmişe sahip değil, listede yok.`); }
   if (S.young) foot.push(`${S.young} yeni coin listede yok: puan için en az 7 aylık geçmiş gerekir (MA200).`);
   if (foot.length) el.insertAdjacentHTML('beforeend', `<p class="small muted" style="margin:6px 4px 0">${foot.join(' ')}</p>`);
-  if (!S.sel || !rs.some(x => x.sym === S.sel)) S.sel = rs[0].sym;
+  if (!S.sel || (!rs.some(x => x.sym === S.sel) && !(MODE === 'borsa' && S.btc && S.sel === S.btc.sym))) S.sel = rs[0].sym;
   document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel));
 }
 
@@ -1043,7 +1044,7 @@ function renderDetail() {
   ensureTF(x, waitTF || tf);
   const D = tfData(x, tf), r = evalTF(x, tf), I = D.I, d = D.d;
   const has4 = !!(x.d4 && x.d4.c.length >= 60);
-  const head = `<div class="sheethead"><button class="iconbtn close" type="button" id="btnClose" aria-label="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h2>${esc(x.sym.replace(/USDT$/, ''))}${MODE === 'borsa' ? '' : '<span class="muted small" style="font-weight:500"> / USDT</span>'}</h2><button type="button" class="star big ${isFav(x.sym) ? 'on' : ''}" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</button><button type="button" class="btn small" id="btnShare" style="margin-left:6px">Paylaş</button><button type="button" class="btn small" id="btnShareEn" style="margin-left:4px">EN</button></div>
+  const head = `<div class="sheethead"><button class="iconbtn close" type="button" id="btnClose" aria-label="Kapat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></button><h2>${esc(MODE === 'borsa' && x.sym === 'XU100' ? 'BIST 100' : x.sym.replace(/USDT$/, ''))}${MODE === 'borsa' ? '' : '<span class="muted small" style="font-weight:500"> / USDT</span>'}</h2><button type="button" class="star big ${isFav(x.sym) ? 'on' : ''}" data-fav="${esc(x.sym)}" aria-label="Favori">${isFav(x.sym) ? '★' : '☆'}</button><button type="button" class="btn small" id="btnShare" style="margin-left:6px">Paylaş</button><button type="button" class="btn small" id="btnShareEn" style="margin-left:4px">EN</button></div>
     <div class="tfbar"><div class="seg" data-tcseg>${Object.entries(TF).map(([k, v]) => `<button type="button" data-tc="${k}" aria-pressed="${(waitTF || tf) === k}" ${(k === '4h' && !has4) || (isH(k) && k !== '4h' && MODE === 'borsa') || (k === '4h' && MODE === 'borsa') ? 'disabled' : ''}>${v.t}</button>`).join('')}</div><span class="small muted">${waitTF ? TFL[waitTF] + ' veri yükleniyor…' : 'Puan ve yorumlar bu zaman dilimine göre'}</span></div>`;
   let body = '';
   const chartCard = `<div class="card">
@@ -1305,7 +1306,7 @@ async function shareCard(x, tf, lang) {
   g.fillStyle = K.acc; rr(P, 44, 14, 14, 4); g.fill(); txt(brand.toUpperCase(), P + 26, 57, 22, K.ink2, 700);
   const dt = new Date(), LC = EN ? 'en-GB' : 'tr-TR'; txt(dt.toLocaleDateString(LC, { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + dt.toLocaleTimeString(LC, { hour: '2-digit', minute: '2-digit' }), W - P, 57, 22, K.mute, 500, 'right');
   // başlık
-  const sym = x.sym.replace(/USDT$/, ''), sub = MODE === 'borsa' ? 'BIST' : '/ USDT';
+  const sym = MODE === 'borsa' && x.sym === 'XU100' ? 'BIST 100' : x.sym.replace(/USDT$/, ''), sub = MODE === 'borsa' ? (x.sym === 'XU100' ? 'ENDEKS' : 'BIST') : '/ USDT';
   txt(sym, P, 160, 96, K.ink, 800); g.font = `800 96px ${F}`; const sw = g.measureText(sym).width; txt(sub, P + sw + 16, 160, 38, K.mute, 600);
   const tl = T('Günlük · Haftalık · Aylık', 'Daily · Weekly · Monthly'); g.font = `700 24px ${F}`; const tw = g.measureText(tl).width + 36; g.fillStyle = 'rgba(136,166,255,.16)'; rr(P, 186, tw, 44, 22); g.fill(); txt(tl, P + 18, 217, 24, K.acc, 700);
   const live = x.live ? x.live.p : r.close, chg = x.live ? x.live.chg : d.c[i] / d.c[i - 1] - 1;
@@ -1762,6 +1763,7 @@ $('#list').addEventListener('click', e => {
   document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel)); renderDetail();
   if (window.innerWidth < 960) openSheet();
 });
+$('#market').addEventListener('click', e => { if (!e.target.closest('[data-idx]') || !S.btc) return; S.sel = S.btc.sym; document.querySelectorAll('.coin').forEach(c => c.setAttribute('aria-current', c.dataset.sym === S.sel)); renderDetail(); if (window.innerWidth < 960) openSheet(); });
 $('#q').addEventListener('input', e => { S.q = e.target.value; renderList(); });
 $('#btnBT').addEventListener('click', runBT);
 $('#btHseg').addEventListener('click', e => { const b = e.target.closest('button'); if (!b || !S.bt) return; S.btH = +b.dataset.h; store.set('btH', S.btH); renderBT(); });
