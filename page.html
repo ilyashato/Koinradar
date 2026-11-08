@@ -968,6 +968,12 @@ function spark(lines, o) {
   for (const l of lines) { let d = ''; for (let q = beg; q <= end; q++) { const v = l.a[q]; if (!isFinite(v)) continue; d += (d ? 'L' : 'M') + X(q).toFixed(1) + ' ' + Y(v).toFixed(1); } if (d) s += `<path d="${d}" fill="none" stroke="${l.col}" stroke-width="1.6" vector-effect="non-scaling-stroke"/>`; }
   return s + '</svg>';
 }
+// Göstergenin yönü: son 5 mumdaki değişim ve son 20 mumun dibine göre toparlanma (sadece gösterim; puanı etkilemez)
+function slopeOf(a, i, thr) {
+  const v = a[i], p = a[i - 4]; if (!isFinite(v) || !isFinite(p)) return null;
+  let lo = Infinity, hi = -Infinity; for (let q = Math.max(0, i - 19); q <= i; q++) if (isFinite(a[q])) { lo = Math.min(lo, a[q]); hi = Math.max(hi, a[q]); }
+  const d = v - p; return { d, up: d >= thr, dn: d <= -thr, lo, hi, fromLow: v - lo, fromHigh: hi - v };
+}
 function indRows(I, d, i) {
   const c = d.c, R = [], A = 'var(--accent)', B = 'var(--warn)', M = 'var(--mute)';
   const add = (x) => R.push(x);
@@ -977,7 +983,7 @@ function indRows(I, d, i) {
     let st, lab, note;
     if (v >= 70) { st = 'w'; lab = '70 üstü'; note = '70 üzeri: kursa göre en az %7–8 getirili yapı. Çıkış için 70 üzerinde uyumsuzluk ara.'; }
     else if (v >= 50) { if (mx >= 70 && v < 60) { st = 'n'; lab = '70’ten iniyor'; note = '70’ten gelip 50–60’ta: işlemde olma.'; } else { st = 'p'; lab = '50 üstü'; note = '50 üstü: alıcılar kontrolde. 70’i geçemeyen yapı zayıftır.' + k50; } }
-    else if (v >= 30) { st = 'n'; lab = '50 altı'; note = '50 altında kesinlikle işlemde olunmaz (kurs). 50’ye aşağıdan gelip üstüne geçmek yükseliş habercisidir.'; }
+    else if (v >= 30) { st = 'n'; lab = '50 altı'; note = '50 altında kesinlikle işlemde olunmaz (kurs). 50’ye aşağıdan gelip üstüne geçmek yükseliş habercisidir.'; const sl = slopeOf(I.rsi, i, 3); if (sl && sl.up) { st = 'z'; lab = '50 altı · yukarı dönüyor'; note += ` Ama son 5 mumda ${nf(sl.d, 1)} puan yükseldi (son 20 mumun dibi ${nf(sl.lo, 0)}): ivme yukarı, dipten toparlanma olabilir. 50’yi yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: ivme aşağı.`; }
     else { st = 'w'; lab = 'aşırı satım'; note = '30 altı: aşırı satım. Yine de 50 üstüne dönmeden işlem yok; dip uyumsuzluğu ara.'; }
     add({ g: 'Momentum', k: '_i_rsi', t: 'RSI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.rsi, col: A }], { end: i, min: 0, max: 100, refs: [30, 50, 70] }) }); }
   // MACD
@@ -1013,14 +1019,14 @@ function indRows(I, d, i) {
   { const v = I.mfi[i]; let st, lab, note;
     if (v <= 10) { st = 'w'; lab = '10’a değdi'; note = 'MFI 10’a değdi: kursa göre “kesin al” (sezgisel iddia). Para çıkışı bitmiş olabilir; fiyat teyidi bekle.'; }
     else if (v >= 90) { st = 'w'; lab = '90 üstü'; note = '90 üstü: aşırı alım. Yükseliş yorulabilir.'; }
-    else if (v >= 50) { st = 'p'; lab = 'para girişi'; note = '50 üstü: para girişi var.'; }
-    else { st = 'n'; lab = 'para çıkışı'; note = '50 altı: para çıkışı var.'; }
+    else if (v >= 50) { st = 'p'; lab = 'para girişi'; note = '50 üstü: para girişi var.'; const sl = slopeOf(I.mfi, i, 5); if (sl && sl.dn) { st = 'z'; lab = 'para girişi · zayıflıyor'; note += ` Ama son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: giriş yavaşlıyor.`; } }
+    else { st = 'n'; lab = 'para çıkışı'; note = '50 altı: para çıkışı var.'; const sl = slopeOf(I.mfi, i, 5); if (sl && sl.up) { st = 'z'; lab = 'para çıkışı · toparlanıyor'; note += ` Ama son 5 mumda ${nf(sl.d, 1)} puan yükseldi (son 20 mumun dibi ${nf(sl.lo, 0)}): çıkış yavaşlıyor, dipten toplanma olabilir. 50’yi yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 1)} puan düştü: çıkış hızlanıyor.`; }
     add({ g: 'Para akışı', k: '_i_mfi', t: 'MFI (14)', val: nf(v, 1), st, lab, note, sp: spark([{ a: I.mfi, col: A }], { end: i, min: 0, max: 100, refs: [10, 50, 90] }) }); }
   // CMF
   { const v = I.cmf[i], rising = c[i] > c[Math.max(0, i - 10)]; let st, lab, note;
     if (v > 0.2) { st = 'p'; lab = 'güçlü alım'; note = '0,2 üstü: güçlü alım baskısı; kursa göre 3–4 gün rahat.'; }
-    else if (v > 0) { st = 'p'; lab = 'para girişi'; note = '0 üstü: para girişi var.'; }
-    else { st = 'n'; lab = 'para çıkışı'; note = '0 altı: para çıkışı var.'; }
+    else if (v > 0) { st = 'p'; lab = 'para girişi'; note = '0 üstü: para girişi var.'; const sl = slopeOf(I.cmf, i, 0.04); if (sl && sl.dn) { st = 'z'; lab = 'para girişi · zayıflıyor'; note += ` Ama son 5 mumda ${nf(Math.abs(sl.d), 3)} düştü: giriş azalıyor.`; } }
+    else { st = 'n'; lab = 'para çıkışı'; note = '0 altı: para çıkışı var.'; const sl = slopeOf(I.cmf, i, 0.04); if (sl && sl.up) { st = 'z'; lab = 'para çıkışı · toparlanıyor'; note += ` Ama son 5 mumda ${nf(sl.d, 3)} yükseldi: çıkış azalıyor, toplanma başlıyor olabilir. 0’ı yukarı kesmesi teyit olur.`; } else if (sl && sl.dn) note += ` Üstelik son 5 mumda ${nf(Math.abs(sl.d), 3)} düştü: çıkış sürüyor.`; }
     if (v < 0 && rising) note += ' Fiyat yükseliyor ama CMF 0 altı: yükseliş yanıltıcı olabilir.';
     const cr = crossOf(I.cmf, I.cmf.map(() => 0), i, 10); if (cr && cr.up) note += ` 0’ı yeni yukarı kesti (${ago2(cr)}): fiyatı iter.`;
     add({ g: 'Para akışı', k: '_i_cmf', t: 'CMF (20)', val: nf(v, 3), st, lab, note, sp: spark([{ a: I.cmf, col: A }], { end: i, refs: [-0.2, 0, 0.2] }) }); }
@@ -1359,7 +1365,7 @@ async function shareCard(x, tf, lang) {
       if (TD) { let rw = []; try { rw = indRows(TD.I, TD.d, ii); } catch (e) {} const pick = ['RSI', 'MACD', 'SMI', 'MFI'].map(k => rw.find(z => z.t.startsWith(k))).filter(Boolean), tw3 = (CW - 32 - 3 * 10) / 4;
         pick.forEach((z, q) => { const x0 = P + 16 + q * (tw3 + 10), yy = y1 + 452, col = z.st === 'p' ? K.good : z.st === 'n' ? K.bad : z.st === 'w' ? K.warn : K.ink2;
           g.fillStyle = 'rgba(255,255,255,.05)'; rr(x0, yy, tw3, 80, 16); g.fill(); g.fillStyle = col; rr(x0 + 12, yy + 16, 5, 48, 2.5); g.fill();
-          g.save(); g.beginPath(); g.rect(x0, yy, tw3, 80); g.clip(); txt(z.t.replace(/ \(.*\)$/, '') + ' · ' + nm.toLowerCase(), x0 + 26, yy + 30, 17, K.mute, 600); txt(EN ? labEn(z.lab) : z.lab, x0 + 26, yy + 60, 22, col, 800); g.restore(); }); }
+          g.save(); g.beginPath(); g.rect(x0, yy, tw3, 80); g.clip(); txt(z.t.replace(/ \(.*\)$/, '') + ' · ' + nm.toLowerCase(), x0 + 26, yy + 30, 17, K.mute, 600); { const lt = EN ? labEn(z.lab) : z.lab; let fs = 22; g.font = `800 ${fs}px ${F}`; while (fs > 14 && g.measureText(lt).width > tw3 - 38) { fs--; g.font = `800 ${fs}px ${F}`; } txt(lt, x0 + 26, yy + 60, fs, col, 800); } g.restore(); }); }
     });
   } finally { old == null ? root.removeAttribute('data-theme') : root.setAttribute('data-theme', old); }
   { const lg = [['MA20', K.acc], ['MA50', K.warn], ['MA100', K.mute], ['MA200', K.ink], [T('Destek / direnç bölgeleri', 'Support / resistance zones'), K.bad]]; let lx = P; const ly0 = sy0 + 3 * (sh + 14) - 2; lg.forEach(([t, c]) => { g.fillStyle = c; g.fillRect(lx, ly0 + 12, 22, 5); txt(t, lx + 30, ly0 + 22, 18, K.ink2, 600); lx += t.length > 6 ? 330 : 112; }); }
