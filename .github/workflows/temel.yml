@@ -1,0 +1,41 @@
+name: Temel veri
+# Borsa Temel sayfasının verisi: İş Yatırım mali tabloları + Yahoo fiyatı → data/temel.json
+# Elle: Actions → "Temel veri" → Run workflow. Hafta içi her akşam da otomatik çalışır.
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Yalnız bu hisseler (örn. THYAO,FROTO). Boş = hepsi'
+        default: ''
+      debug:
+        description: 'Ham kalem listesini yazdır (örn. THYAO). Boş = normal çalışma'
+        default: ''
+  schedule:
+    - cron: '40 15 * * 1-5'
+permissions:
+  contents: write
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Ham kalemler (debug)
+        if: ${{ github.event.inputs.debug != '' }}
+        run: node temel.mjs --debug "${{ github.event.inputs.debug }}"
+      - name: Veriyi çek
+        if: ${{ github.event.inputs.debug == '' }}
+        run: |
+          if [ -n "${{ github.event.inputs.only }}" ]; then node temel.mjs --only "${{ github.event.inputs.only }}"; else node temel.mjs; fi
+      - name: Kaydet
+        if: ${{ github.event.inputs.debug == '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898341+github-actions[bot]@users.noreply.github.com"
+          git add data/temel.json
+          git commit -m "Temel veri güncellendi: $(date -u +%Y-%m-%dT%H:%MZ)" || echo "değişiklik yok"
+          git pull --rebase origin ${GITHUB_REF_NAME} || true
+          git push

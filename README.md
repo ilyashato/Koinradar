@@ -51,3 +51,12 @@ Sert düşüşten sonra 20/50/100/200 ortalamaların iç içe geçtiği maliyetl
 Her gün, o güne kadarki veriyle skorlanır (ileriye bakılmaz); 3/7/14 günlük getiriye bakılır. Her kural için ateşlendiği günlerin ortalama getirisi tabanla karşılaştırılır; t değeri örtüşen pencereler için düzeltilir. Sonuçlara göre kural çarpanı önerilir (0.25–1.75), sayfada "Geri test ağırlıkları" ile uygulanır.
 
 Yatırım tavsiyesi değildir.
+
+## Borsa Temel (temel.html)
+Üç bölüm: Kripto, Borsa Teknik, Borsa Temel. Temel sayfa bilanço ve çarpan verisinden kendi 0-100 kart puanını üretir, dönem senaryosuna (enflasyon, kur şoku, sıkı para vb.) göre yeniden puanlar ve dayanıklılık filtreleri sunar.
+
+- Veri: `temel.mjs` mali tabloları İş Yatırım'dan, fiyatı Yahoo'dan çeker ve `data/temel.json` yazar. Bankalar ilk sürümde yok.
+- Çalıştırma: GitHub → Actions → **Temel veri** → Run workflow. Hafta içi her gün 15:40 UTC'de de çalışır.
+- İlk kurulumda `debug` alanına `THYAO` yazıp çalıştırın; ham kalemleri ve eşlenen değerleri gösterir. Alan eşlemesi canlı doğrulanmadı, gerekirse `temel.mjs` içindeki kalem adları düzeltilir.
+- Piyasa değeri fiyat × ödenmiş sermaye olarak yaklaşık hesaplanır. Sektör ve döviz işaretleri genel bilgiye dayanan başlangıç listesidir.
+- Yerelde: `node temel.mjs --only THYAO,ASELS`
