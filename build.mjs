@@ -3,7 +3,7 @@ const eng = readFileSync('engine.js', 'utf8'), page = readFileSync('page.html', 
 const body = page.replace('/*ENGINE*/', () => eng);
 const wrap = b => '<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}[hidden]{display:none!important}</style></head><body>' + b + '</body></html>';
 if (process.env.ARTIFACT) writeFileSync('artifact.html', body);
-writeFileSync('index.html', wrap(body));
+writeFileSync('index.html', wrap(body)); writeFileSync('kripto.html', wrap(body)); // Netlify "/index.html" adresini "/"e yönlendirebilir; Kripto için ayrı adres
 // Borsa sürümü: aynı motor, Yahoo verisi, ayrı favori/ayar kayıtları
 const SWAP = [
   ['<title>Coin Radarı · hatofinancial</title>', '<title>Borsa Radarı · hatofinancial</title>'], ['<h1>Coin Radarı</h1>', '<h1>Borsa Radarı</h1>'],

@@ -26,8 +26,8 @@ if (!out) throw new Error('Kart üretilemedi');
 const png = Buffer.from(out.png, 'base64'); writeFileSync('kart.png', png);
 const tag = sym.replace(/USDT$/, '');
 const text = (extra ? extra + '\n\n' : '') + (lang === 'en'
-  ? `$${tag} · daily radar score ${out.score}/100\n\nPersonal project, not investment advice.\nhatofinancial.netlify.app/index.html`
-  : `$${tag} · günlük radar puanı ${out.score}/100\n\nKişisel proje, yatırım tavsiyesi değildir.\nhatofinancial.netlify.app/index.html`);
+  ? `$${tag} · daily radar score ${out.score}/100\n\nPersonal project, not investment advice.\nhatofinancial.netlify.app/kripto.html`
+  : `$${tag} · günlük radar puanı ${out.score}/100\n\nKişisel proje, yatırım tavsiyesi değildir.\nhatofinancial.netlify.app/kripto.html`);
 console.log('Kart hazır:', out.name, '\n--- metin ---\n' + text);
 if (mod !== 'gonder') { console.log('DENEME: X\'e gönderilmedi (kart.png artifact olarak yüklenir).'); process.exit(0); }
 const k = ['X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'].map(n => process.env[n]);
