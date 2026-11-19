@@ -1931,9 +1931,40 @@ function divOf(d, I, i, hi) {
   const names = []; for (const [n, s] of [['RSI', I.rsi], ['MACD', I.macdHist], ['MFI', I.mfi]]) { const x1 = s[a], x2 = s[b]; if (isFinite(x1) && isFinite(x2) && (hi ? x2 < x1 : x2 > x1)) names.push(n); }
   return names.length ? names : null;
 }
+// Referans mumu formasyonu (eğitim notu çizimi). Sadece dip/tepede aranır: Ref mumu önceki 20 mumun en yükseği (tepe) ya da en düşüğü (dip) olmalı.
+// Tepe: Ref'te üst kılçık > gövde ve > alt kılçık; Ref-1 hem yüksek hem düşük değerde Ref'ten düşük; Ref+1 ve Ref+2'nin yüksekleri Ref'in yükseğinden düşük;
+// Ref+1 ya da Ref+2 kapanışı Ref-1'in düşüğünün altında. Dip için tam tersi.
+const REF_LB = 20;
+function refAt(d, r, dir) {
+  if (r < REF_LB + 1 || r + 2 >= d.c.length) return null;
+  const o = d.o[r], c = d.c[r], h = d.h[r], l = d.l[r], body = Math.abs(c - o), up = h - Math.max(o, c), lw = Math.min(o, c) - l;
+  if (!(h > l)) return null;
+  if (dir === 'T') {
+    if (!(up > body && up > lw)) return null;
+    for (let k = r - REF_LB; k < r; k++) if (d.h[k] > h) return null;
+    if (!(d.h[r - 1] < h && d.l[r - 1] < l)) return null;
+    if (!(d.h[r + 1] < h && d.h[r + 2] < h)) return null;
+    const lv = d.l[r - 1], cf = d.c[r + 1] < lv ? r + 1 : d.c[r + 2] < lv ? r + 2 : -1;
+    return cf < 0 ? null : { r, dir, conf: cf, level: lv };
+  }
+  if (!(lw > body && lw > up)) return null;
+  for (let k = r - REF_LB; k < r; k++) if (d.l[k] < l) return null;
+  if (!(d.l[r - 1] > l && d.h[r - 1] > h)) return null;
+  if (!(d.l[r + 1] > l && d.l[r + 2] > l)) return null;
+  const lv = d.h[r - 1], cf = d.c[r + 1] > lv ? r + 1 : d.c[r + 2] > lv ? r + 2 : -1;
+  return cf < 0 ? null : { r, dir, conf: cf, level: lv };
+}
+const refRecent = (d, i, dir) => !!(refAt(d, i - 2, dir) || refAt(d, i - 3, dir));
+function refList(m) {
+  const d = m.d, cl = Math.min(m.last, d.c.length - 2), key = cl + '|' + d.c[cl]; if (m._rf && m._rf.k === key) return m._rf.v;
+  const v = []; for (let r = REF_LB + 1; r + 2 <= cl; r++) for (const dir of ['T', 'D']) { const p = refAt(d, r, dir); if (p) v.push(p); }
+  m._rf = { k: key, v }; return v;
+}
 const SIGS = {
   divB: ['Dip uyumsuzluğu', 'Fiyat yeni dip yaptı ama RSI / MACD / MFI’den en az biri yapmadı (son 12 mumda): düşüş gücünü kaybediyor, dönüş habercisi.', (d, I, i) => !!divOf(d, I, i, false)],
   divT: ['Tepe uyumsuzluğu', 'Fiyat yeni tepe yaptı ama RSI / MACD / MFI’den en az biri yapmadı (son 12 mumda): yükseliş gücünü kaybediyor, düşüş uyarısı.', (d, I, i) => !!divOf(d, I, i, true)],
+  refD: ['Referans mumu · dip', 'Dipte referans mumu formasyonu: alt kılçık gövdeden ve üst kılçıktan uzun; sonraki iki mum dibi kırmadı ve biri Ref-1’in yükseğinin üstünde kapattı (son 2 mumda tamamlandı).', (d, I, i) => refRecent(d, i, 'D')],
+  refT: ['Referans mumu · tepe', 'Tepede referans mumu formasyonu: üst kılçık gövdeden ve alt kılçıktan uzun; sonraki iki mum tepeyi geçemedi ve biri Ref-1’in düşüğünün altında kapattı (son 2 mumda tamamlandı).', (d, I, i) => refRecent(d, i, 'T')],
   rsi30: ['RSI aşırı satım', 'RSI 30 altında: aşırı satım bölgesi, dip arama yeri. 50 üstüne dönmeden işlem yok.', (d, I, i) => I.rsi[i] < 30],
   wtDip: ['WT aşırı satımdan dönüş', 'WaveTrend −53 altındayken son 3 mumda yukarı kesişim yaptı.', (d, I, i) => { for (let q = i; q > i - 3 && q > 0; q--) if (I.wt1[q - 1] <= I.wt2[q - 1] && I.wt1[q] > I.wt2[q] && I.wt1[q] < -40) return true; return false; }],
   ema510: ['EMA 5/10 yukarı kesişim', 'EMA5, EMA10’u son 3 mumda yukarı kesti: kısa vade dönüşü.', (d, I, i) => upX(I.ema5, I.ema10, i, 3)],
@@ -1974,7 +2005,7 @@ function renderViews() {
   const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && isH(k))).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
   if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
   const sg = $('#sigs'), cnt = Object.fromEntries(Object.keys(SIGS).map(k => [k, rs.filter(x => sigOk(x, k)).length]));
-  const SIGG = [['Dönüş ve uyumsuzluk', ['divB', 'divT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
+  const SIGG = [['Dönüş ve uyumsuzluk', ['divB', 'divT', 'refD', 'refT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
   const sh = SIGG.map(([g, ks]) => `<div class="sgg">${g}</div><div class="sgrow">${ks.map(k => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(SIGS[k][1])}">${esc(SIGS[k][0])} <b>${cnt[k]}</b></button>`).join('')}</div>`).join('');
   if (sg.dataset.h !== sh) { sg.innerHTML = sh; sg.dataset.h = sh; }
   document.querySelectorAll('#sgcard [data-sc]').forEach(b => b.disabled = !S.sig.length);
@@ -2267,6 +2298,8 @@ function renderDetail() {
 // ───────── Paylaşım kartı (X / sosyal medya için tek görsel) ─────────
 // ───────── Sinyal özet kartı: ne demek + strateji + uyan coinler ─────────
 const EXPL = {
+  refD: 'Eğitim notlarındaki Referans mumu çizimi, dipte aranır. Ref mumunun alt kılçığı hem gövdesinden hem üst kılçığından uzundur: satıcılar aşağı itmiş ama alıcılar geri almış. Ref-1 mumu Ref’ten yukarıdadır (düşüşle gelinmiş). Sonraki iki mumun dipleri Ref’in dibini kırmaz ve en az biri Ref-1’in yükseğinin üstünde kapanır: dönüş teyidi. Aralarda değil, sadece önceki 20 mumun en düşüğünde aranır.',
+  refT: 'Eğitim notlarındaki Referans mumu çizimi, tepede aranır. Ref mumunun üst kılçığı hem gövdesinden hem alt kılçığından uzundur: alıcılar yukarı itmiş ama satıcılar geri almış. Ref-1 mumu Ref’ten aşağıdadır (yükselişle gelinmiş). Sonraki iki mumun tepeleri Ref’in tepesini geçemez ve en az biri Ref-1’in düşüğünün altında kapanır: dönüş teyidi. Aralarda değil, sadece önceki 20 mumun en yükseğinde aranır.',
   divB: 'Fiyat yeni bir dip yaparken RSI, MACD ya da MFI gibi göstergelerden en az biri o dibi yapmıyor (son 12 mumda). Yani fiyat düşüyor ama düşüşün gücü azalıyor. Notlara göre uyumsuzluk her göstergede aranır, ama her dip uyumsuzluğu yükselişe götürmez; tek başına değil, onayla anlam kazanır.',
   divT: 'Fiyat yeni bir tepe yaparken RSI, MACD ya da MFI’den en az biri o tepeyi yapmıyor. Fiyat çıkıyor ama yükselişin gücü azalıyor. Notlara göre RSI 70 üstüne çıktığında hep tepe uyumsuzluğu aranır; amaç iyi yerden satan olmaktır.',
   rsi30: 'RSI 30’un altına indi: fiyat kısa sürede çok sattırılmış, aşırı satım bölgesi. Notlara göre RSI 50’nin altında işlemde durulmaz; bu bölge “dip arama” yeridir, dönüşü RSI’ın 50’ye doğru yukarı gelmesi ve uyumsuzluk teyit eder.',
@@ -2286,6 +2319,8 @@ const EXPL = {
   hacim: 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ya da fazlası: hareketin arkasında ilgi var. Notlara göre hacim, bir seviyenin tutacağını ya da kırılacağını anlamada en önemli teyittir.',
 };
 const STRAT = {
+  refD: 'Dipten dönüş teyidi. Ref mumunun dibi stop seviyesi olur; kırılırsa formasyon bozulur. Hacim artışı ve RSI’ın 50’ye doğru dönmesiyle birlikte düşün.',
+  refT: 'Tepeden dönüş uyarısı. Yeni alım için acele etme; eldekiler için Ref mumunun tepesi üstünde kapanış gelirse uyarı geçersiz sayılır.',
   divB: 'Tek başına al sinyali değil. RSI’ın 50 üstüne dönmesini ve yeşil mum onayını bekle; MA200 altındaysa puan tavanı (40) yüzünden temkinli ol.',
   divT: 'Yükseliş yoruluyor. Yeni alım için acele etme; destek kırılırsa uyarı güçlenir. Eldekiler için riski gözden geçirme zamanı.',
   rsi30: 'Aşırı satımda dip aranır ama düşen bıçak tutulmaz. RSI 50 üstüne dönene ve yeşil kapanış gelene kadar bekle.',
@@ -2549,8 +2584,8 @@ function trendCard(x, tf) {
 
 // ───────── Grafik ─────────
 const SHOW_FIB = false; // Fib gösterimi şimdilik kapalı; true yapınca grafik, kutular ve düğmeler geri gelir
-const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ...(SHOW_FIB ? [['fib', 'Fib']] : []), ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['vol', 'Hacim']];
-const LDEF = { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, dip: true, vol: true };
+const LAYERS_DEF = [['ma', 'Ortalamalar'], ['trendK', 'Kısa trend'], ['trendU', 'Uzun trend'], ...(SHOW_FIB ? [['fib', 'Fib']] : []), ['zone', 'Destek/Direnç'], ['dip', 'Dip kutusu'], ['ref', 'Ref mumu'], ['vol', 'Hacim']];
+const LDEF = { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, dip: true, ref: true, vol: true };
 const FS = { open: false, x: null, m: null, tf: '1d', beg: 0, end: 0, cross: null, fibSrc: store.get('fibSrc', 'uzun'), layers: Object.assign({}, LDEF, store.get('layers2', {})) };
 if (!SHOW_FIB) FS.layers.fib = false;
 const TF = { '4h': { t: '4S', look: 180, lookL: 240, day: 1 / 6 }, '6h': { t: '6S', look: 170, lookL: 230, day: 1 / 4 }, '12h': { t: '12S', look: 165, lookL: 220, day: 1 / 2 }, '1d': { t: '1G', look: 160, lookL: 200, day: 1 }, '1w': { t: '1H', look: 104, lookL: 156, day: 7 }, '1m': { t: '1Ay', look: 36, lookL: 60, day: 30 } };
@@ -2683,6 +2718,20 @@ function renderChart(cv, m, view, opt) {
     const x0 = X(Math.max(beg, dp.start)) - bw / 2, x1 = X(Math.min(dEnd, dp.end)) + bw / 2, y0 = Y(dp.boxH), y1 = Y(dp.boxL);
     g.strokeStyle = C.acc; g.lineWidth = 1.5; g.setLineDash([5, 4]); g.strokeRect(x0, y0, x1 - x0, y1 - y0); g.setLineDash([]); g.fillStyle = C.acc; g.textAlign = 'left'; g.fillText('maliyetlenme', Math.max(2, x0 + 3), y0 - 8);
   }
+  // Referans mumu formasyonları (dip/tepe)
+  if (Lh.ref) {
+    const list = refList(m).filter(p => p.conf >= beg && p.r - 1 <= dEnd), show = big ? list.slice(-6) : list.slice(-3);
+    g.font = `600 ${big ? 11 : 9}px ui-monospace,monospace`;
+    for (const p of show) {
+      const top = p.dir === 'T', col = top ? C.bad : C.good, rx = X(p.r), ry = Y(top ? d.h[p.r] : d.l[p.r]), ly = Y(p.level);
+      g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1.5;
+      g.globalAlpha = 0.7; g.setLineDash([4, 3]); g.beginPath(); g.moveTo(X(p.r - 1) - bw / 2, ly); g.lineTo(X(p.conf) + bw, ly); g.stroke(); g.setLineDash([]); g.globalAlpha = 1;
+      g.beginPath(); g.arc(rx, ry, big ? 7 : 5, 0, 7); g.stroke();
+      g.textAlign = 'center'; g.fillText((top ? 'tepe ' : 'dip ') + 'Ref', rx, top ? ry - (big ? 12 : 9) : ry + (big ? 14 : 11));
+      if (big) for (const [q, t] of [[p.r - 1, 'Ref-1'], [p.r + 1, '+1'], [p.r + 2, '+2']]) g.fillText(t, X(q), top ? Y(d.h[q]) - 6 : Y(d.l[q]) + 12);
+      const cx = X(p.conf), cy = Y(d.c[p.conf]); g.lineWidth = 2; g.beginPath(); g.moveTo(cx - 4, cy + (top ? 12 : -12)); g.lineTo(cx - 1, cy + (top ? 16 : -8)); g.lineTo(cx + 5, cy + (top ? 8 : -16)); g.stroke();
+    }
+  }
   g.restore();
   // hacim paneli
   if (volH) {
@@ -2717,7 +2766,7 @@ function dayText(m, i) {
 function drawChart(x) {
   const cv = $('#chart'); if (!cv) return;
   const tf = TF[S.tcTF] && buildModel(x, S.tcTF, FS.fibSrc) ? S.tcTF : '1d', m = buildModel(x, tf, FS.fibSrc);
-  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, dip: tf === '1d' } });
+  const geo = renderChart(cv, m, defaultWindow(m), { layers: { ma: true, trendK: true, trendU: true, fib: SHOW_FIB, zone: true, ref: true, dip: tf === '1d' } });
   if (!geo) return;
   cv.onpointermove = e => { if (e.pointerType !== 'mouse') return; const rc = cv.getBoundingClientRect(); const i = Math.min(geo.dEnd, Math.max(geo.beg, geo.beg + Math.floor((e.clientX - rc.left) / geo.bw))); $('#readout').textContent = dayText(m, i); };
   cv.onclick = () => openFS(x);
