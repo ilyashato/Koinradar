@@ -159,6 +159,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
   <div class="seg" role="tablist" aria-label="Piyasa seçimi">
     <button id="m-borsa" role="tab" aria-selected="true">Borsa (BIST)</button>
     <button id="m-kripto" role="tab" aria-selected="false">Kripto</button>
+    <button id="m-makro" role="tab" aria-selected="false">Makro</button>
   </div>
 
   <div class="seg" role="tablist" aria-label="Vade" id="vade">
@@ -176,6 +177,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
     <div class="panel" id="ozet"></div>
     <div class="panel" id="scalp" hidden></div>
     <div class="panel">
+      <div id="grp-box" hidden><p class="ph">Makro <b>grubu</b></p><div class="chips" id="grp"></div><p class="ph" style="margin-top:14px"></p></div>
       <p class="ph">SAR <b>filtreleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· seçtiklerinin hepsi aynı anda</span></p>
       <div class="chips" id="chips"></div>
       <p class="ph" style="margin-top:14px">Durum</p>
@@ -199,6 +201,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
           <option value="lrc">Sırala: LRC alt banda en yakın</option>
           <option value="lrcd">Sırala: Seçili LRC bandına uzaklık</option>
           <option value="kod">Sırala: Kod</option>
+          <option value="grp">Sırala: Gruba göre</option>
         </select>
         <button class="btn small" id="clear">Temizle</button>
       </div>
@@ -229,7 +232,10 @@ const MK = {
     set: 'Lucid, Parabolic, Triple Fast, Triple Moderate', taraf: 'Fiyatın altındaki SAR\'lar (destek) daha etkili; en etkilisi Triple Moderate. En iyi zaman dilimi 3 ve 6 aylık.' },
   kripto: { ad: 'Kripto', birim: 'coin', tfs: ['G', 'H', 'A', '3A', '6A'], ana: ['H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: SOL',
     set: 'Triple Slow ve Linear (son iki SAR)', taraf: 'Fiyatın üstündeki SAR\'lar (direnç) daha etkili. Haftalık ve üstü zaman dilimleri; kesişmede en etkilisi günlük. USDT paritesi, normal ölçek.' },
+  makro: { ad: 'Makro', birim: 'enstrüman', tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: ALTIN, DXY, US10Y',
+    set: 'Triple Slow ve Linear (son iki SAR)', taraf: 'Onslar için sistemin kendi çalışması: yalnız Triple Slow, fiyatın üstündeki SAR\'lar daha etkili, haftalık ve üstü zaman dilimleri; altın ve gümüş platin/paladyumdan daha tutarlı. Diğer makro enstrümanlarda da aynı set kullanılır. VIX çıkışında gümüş-platin, Nasdaq, BTC/ETH ve gelişmekte olan ülke paraları olumsuz; altın ve BIST az; DXY ve altın rasyoları olumlu etkilenir (sistem sahibinin değerlendirmesi).' },
 };
+const GRP = { hepsi: 'Tümü', maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto', rasyo: 'Rasyolar' };
 // sinyal: etiket, ton, açıklama (kural kaynağı)
 const SIG = {
   alt_yana: ['Alttan yana atan SAR', 'pos', 'SAR fiyatın altında yatay kaldı (değeri önceki barla aynı). Destek; temas etmedikçe yükseliş beklenir. Sistemin verisi: 100 grafiğin 92\'sinde yana atan SAR\'a temas olmadan dönüş.'],
@@ -271,9 +277,13 @@ const PROF = {
     orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
     uzun: { ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Kriptoda 6 aylık SAR\'a temas coinin %90–95 düştüğünü gösterir: alım fırsatı.' } },
 };
+PROF.makro = {
+  kisa: { ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar, günlük LRC ve kesişme. Düzeltmede kısa vadeci alttaki günlük SAR\'lara bakar.' },
+  orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı (orta vadeci haftalık LRC\'yi izler). Onslarda haftalık SAR\'a temas olunca fiyat oyalanır; ilk SAR\'a temas olmadan diğerlerine gidilmez.' },
+  uzun: { ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A', '12A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Yana atan aylık/3 aylık SAR temassız kaldıkça o süre güvenli bölge; 3 ve 6 aylık SAR\'ların üst üste binmesi en sağlam destektir.' } };
 let V = LS.get('vade', 'orta'); if (!PROF.borsa[V]) V = 'orta';
 const PR = () => { const p = PROF[M][V]; return { ...p, ilk: p.ilk === 'dongu' ? ST.borsa.dongu : p.ilk, vade: V }; };
-const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' } };
+const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' }, makro: { chips: LS.get('chips_makro', []), durum: 'hepsi', sort: 'grp', grp: 'hepsi' } };
 const LF = Object.assign({ tf: 'H', band: 'alt', yon: 'alt', p: null }, LS.get('lrcf', {}));
 let shown = 60, curKod = null;
 // seçili LRC bandına yüzde uzaklık (+ üstünde, − altında)
@@ -356,8 +366,9 @@ function yorum(r) {
   if (ts.length) g += ` Linear TSI: ${ts.join(', ')}.`;
   if (tsi.H && tsi.H.renk === 'kirmizi') g += ' Haftalık momentum yavaşlıyor; yakındaki SAR\'a temas ihtimali artar.';
   if (tsi.G && tsi.G.deger != null && Math.abs(tsi.G.deger) >= 0.8) g += tsi.G.deger > 0 ? ' Günlük TSI +0,8 üstünde (aşırı alım bölgesi).' : ' Günlük TSI −0,8 altında (aşırı satım bölgesi).';
+  if (M === 'makro') { const dx = DATA.makro && DATA.makro.rows.find(z => z.k === 'DXY'); if (dx && r.k !== 'DXY' && ['maden', 'emtia', 'kripto', 'endeks'].includes(r.grp)) g += ` DXY görünümü ${({ olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' })[dx.durum]}: güçlü dolar genelde ${r.grp === 'maden' ? 'değerli madenleri' : r.grp === 'emtia' ? 'emtiayı' : r.grp === 'kripto' ? 'kriptoyu' : 'riskli varlıkları'} baskılar.`; if (r.grp === 'faiz') g += ' Faizlerde SAR yukarıysa faiz yükseliyor demektir; bu genelde hisse, altın ve kripto için olumsuz okunur.'; }
   if (M === 'kripto') { const b = DATA.kripto && DATA.kripto.piyasaOzet && DATA.kripto.piyasaOzet.BTCUSDT; if (b && r.k !== 'BTC') g += ` BTC görünümü ${({ olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' })[b.durum]}; coin kararında BTC trendi gözetilmeli.`; }
-  else if (V === 'uzun') { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
+  else if (M === 'borsa' && V === 'uzun') { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
   g += ` Değerlendirme ${({ kisa: 'kısa', orta: 'orta', uzun: 'uzun' })[V]} vadeye göre (${PR().ana.map(t => TFN[t].toLowerCase()).join(', ')} SAR'lar).`;
   out.push(g);
 
@@ -484,9 +495,10 @@ function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Mat
 function filtered() {
   const s = ST[M], q = $('#q').value.trim().toLocaleUpperCase('tr-TR');
   let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || r.durum === s.durum));
+  if (M === 'makro' && s.grp !== 'hepsi') L = L.filter(r => r.grp === s.grp);
   if (LF.p != null) L = L.filter(r => { const d = lrcDist(r); if (d == null) return false; return LF.yon === 'alt' ? d <= -LF.p : d >= LF.p; });
   const by = { puan: (a, b) => b.puan - a.puan || (b.chg || 0) - (a.chg || 0), chg: (a, b) => (b.chg || 0) - (a.chg || 0), kod: (a, b) => a.k.localeCompare(b.k, 'tr'),
-    sup: (a, b) => supDist(a) - supDist(b), lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999),
+    sup: (a, b) => supDist(a) - supDist(b), grp: (a, b) => Object.keys(GRP).indexOf(a.grp) - Object.keys(GRP).indexOf(b.grp) || b.puan - a.puan, lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999),
     lrcd: (a, b) => { const x = lrcDist(a), y = lrcDist(b); if (x == null) return 1; if (y == null) return -1; return LF.yon === 'alt' ? x - y : y - x; } }[s.sort];
   return L.sort(by);
 }
@@ -496,7 +508,7 @@ function sigChips(r, max = 6) {
 }
 function drawChips() {
   const s = ST[M], cnt = k => rows().filter(r => r.sig.includes(k)).length;
-  $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
+  $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : M === 'makro' ? k !== 'kes_btc' && k !== 'kes_usd' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
   $('#durum').innerHTML = [['hepsi', 'Tümü'], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
   const BN = { alt: 'Alt bant', orta: 'Orta', ust: 'Üst bant' };
   $('#lrc-tf').innerHTML = ['G', 'H'].map(t => `<button class="chip" data-lt="${t}" aria-pressed="${LF.tf === t}">${TFN[t]} LRC</button>`).join('');
@@ -506,6 +518,8 @@ function drawChips() {
   $('#lrc-note').textContent = LF.p == null ? 'Bir yüzde seçince liste, fiyatın seçili LRC bandına uzaklığına göre süzülür.' :
     `${TFN[LF.tf]} LRC ${BN[LF.band].toLowerCase()} seviyesinin en az %${LF.p} ${LF.yon === 'alt' ? 'altında' : 'üstünde'} olanlar. Uzaklık = fiyat / bant − 1.`;
   $('#dongu-box').hidden = !(M === 'borsa' && V === 'uzun');
+  $('#grp-box').hidden = M !== 'makro';
+  if (M === 'makro') { const cnt = g => g === 'hepsi' ? rows().length : rows().filter(r => r.grp === g).length; $('#grp').innerHTML = Object.keys(GRP).map(g => `<button class="chip" data-gr="${g}" aria-pressed="${ST.makro.grp === g}">${GRP[g]} <span class="mut">${cnt(g)}</span></button>`).join(''); }
   if (M === 'borsa') {
     $('#dongu').innerHTML = ['A', '3A', '6A'].map(t => `<button class="chip" data-g="${t}" aria-pressed="${ST.borsa.dongu === t}">${TFN[t]}</button>`).join('');
     $('#dongu-note').textContent = 'BIST\'in hangi SAR döngüsündeyse o zaman dilimine bakmak avantajlı (ör. seçim öncesi aylık, sonrası 3 aylık, Temmuz–Aralık 6 aylık). Yorumdaki "ilk SAR" ve kademeli alım seviyesi bu seçime göre yazılır.';
@@ -514,8 +528,8 @@ function drawChips() {
 }
 function drawOzet() {
   const d = DATA[M]; if (!d) return; const P = d.piyasaOzet || {};
-  const keys = M === 'borsa' ? ['XU100', 'XU030', 'XBANK'] : ['BTCUSDT', 'ETHUSDT'];
-  const it = keys.filter(k => P[k]).map(k => { const r = P[k]; return `<button class="krow" data-oz="${k}"><div class="t"><b>${k.replace('USDT', '')}</b><em><span class="num">${fmt(r.price)}</span> <span class="${sgn(r.chg)}">${pct(r.chg)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></em></div><div class="sigs">${sigChips(r, 5)}</div></button>`; }).join('');
+  const keys = M === 'borsa' ? ['XU100', 'XU030', 'XBANK'] : M === 'makro' ? ['DXY', 'US10Y', 'ALTIN'] : ['BTCUSDT', 'ETHUSDT'];
+  const it = keys.filter(k => P[k]).map(k => { const r = P[k]; return `<button class="krow" data-oz="${k}"><div class="t"><b>${k.replace('USDT', '')}${r.ad ? ` <span class="mut" style="font-weight:500">${esc(r.ad)}</span>` : ''}</b><em><span class="num">${fmt(r.price)}</span> <span class="${sgn(r.chg)}">${pct(r.chg)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></em></div><div class="sigs">${sigChips(r, 5)}</div></button>`; }).join('');
   $('#ozet').innerHTML = `<p class="ph">Piyasa <b>özeti</b></p>${it || '<p class="note">Özet verisi yok.</p>'}<p class="note">Aktif SAR seti: ${MK[M].set}. ${MK[M].taraf}</p>`;
 }
 function drawList() {
@@ -523,7 +537,7 @@ function drawList() {
   $('#count').textContent = `${L.length} ${cfg.birim} · ${rows().length} içinden`;
   $('#list').innerHTML = L.slice(0, shown).map(r => {
     const sp = nearest(r, 'alt', { noG: true }), rs = nearest(r, 'ust', { noG: true }), L2 = r.lrc && r.lrc.G, e = L2 && (L2.kesisme || []).at(-1);
-    return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div><span class="kod">${esc(r.k)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
+    return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div><span class="kod">${esc(r.k)}</span>${r.ad ? ` <span class="mut" style="font-size:12.5px">${esc(r.ad)}</span>` : ''} <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
       <div class="mini"><div><span>Destek</span><b>${sp ? fmt(sp.v) : '—'}</b></div><div><span>Uzaklık</span><b>${sp ? pct(sp.dist) : '—'}</b></div><div><span>Direnç</span><b>${rs ? fmt(rs.v) : '—'}</b></div><div><span>Kesişme</span><b>${e && e.ago <= 60 ? (e.tip === 'yesil' ? 'Yeşil' : 'Turuncu') + ' ' + e.ago + 'b' : '—'}</b></div></div>
       <div class="sigs">${(() => { const d = lrcDist(r); return d == null ? '' : `<span class="sg ${d < 0 ? 'neg' : 'pos'}">${TFN[LF.tf]} LRC ${({ alt: 'alt', orta: 'orta', ust: 'üst' })[LF.band]}: ${pct(d)}</span>`; })()}${sigChips(r)}</div></div>`; }).join('') || `<div class="panel note">Filtreye uyan ${cfg.birim} yok.</div>`;
   $('#more').hidden = L.length <= shown;
@@ -567,7 +581,7 @@ function openCard(k, src) {
   const ek = M === 'borsa' ? (r.usdKes ? `<p class="note">Dolar bazlı son kesişme: ${r.usdKes.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${r.usdKes.ago} bar önce.</p>` : '') :
     [['BTC', r.btcKes], ['ETH', r.ethKes]].filter(z => z[1]).map(([n, e]) => `<p class="note">${n} paritesinde son kesişme: ${e.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${e.ago} bar önce.</p>`).join('');
   const stats = DATA[M].stats || {}, stTxt = r.sig.map(k => { const s = stats[k]; const g = s && (s.g30 || s.g10); return g ? `<li>${esc(SIG[k][0])}: ${s.g30 ? '30' : '10'} günde ort. ${pct(g.ort)}, kazanma %${g.kaz} (${g.n} sinyal)</li>` : ''; }).join('');
-  $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad} · SAR</div><div class="nm">${esc(r.k)}</div><span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
+  $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad}${r.grp ? ' · ' + GRP[r.grp] : ''} · SAR</div><div class="nm">${esc(r.k)}</div>${r.ad ? `<div class="mut" style="font-size:13px;margin:-2px 0 6px">${esc(r.ad)}</div>` : ''}<span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
      <div class="row2"><div class="price num">${fmt(P)}</div><div class="num ${sgn(r.chg)}">${pct(r.chg)}</div></div><div class="sigs">${ORDER.filter(k => r.sig.includes(k)).map(k => `<button class="sg ${SIG[k][1]}" data-info="${k}">${esc(SIG[k][0])} ⓘ</button>`).join('')}</div></div>
    ${basit(r)}
    ${chartPanel()}
@@ -588,7 +602,7 @@ function drawRehber() {
   $('#rehber').innerHTML = `<div class="panel"><p class="ph">${cfg.ad} <b>ayarları</b></p><p class="note" style="margin-top:0">Aktif SAR'lar: ${cfg.set}. ${cfg.taraf}</p>
    <p class="note">SAR parametreleri (ULUDAĞ SAR kodu): Parabolic 0,02/0,02/0,2 · Linear 0,02/0,01/0,1 · Lucid 0,02/0,02/0,2 · Triple Slow 0,01/0,01/0,2 · Moderate 0,01/0,02/0,2 · Fast 0,01/0,03/0,2 · SAR Ort. = (Linear + Parabolic + Lucid)/3. LRC uzunluk 300 (sağlama 298). Linear TSI: TSI(3,9) üzerine 10 barlık regresyon; eğim artıyorsa yeşil.</p></div>
    <div class="panel"><p class="ph">Vade <b>profilleri</b></p>${['kisa', 'orta', 'uzun'].map(v => `<div class="krow" style="cursor:default"><div class="t"><b>${({ kisa: 'Kısa vade', orta: 'Orta vade', uzun: 'Uzun vade' })[v]}</b><em>${PROF[M][v].ana.map(t => TFN[t]).join(', ')}</em></div><p class="note" style="margin:4px 0 0">${PROF[M][v].not}</p></div>`).join('')}<p class="note">Seçtiğin vade; filtreleri, durum puanını, SAR merdivenini, yorumdaki "ilk SAR" zaman dilimini ve grafiğin açılış zaman dilimini belirler.</p></div>
-   <div class="panel"><p class="ph">Sinyaller</p>${ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<div class="krow" style="cursor:default"><div class="t"><b class="${SIG[k][1]}">${esc(SIG[k][0])}</b></div><p class="note" style="margin:4px 0 0">${esc(SIG[k][2])}</p></div>`).join('')}</div>
+   <div class="panel"><p class="ph">Sinyaller</p>${ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : M === 'makro' ? k !== 'kes_btc' && k !== 'kes_usd' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<div class="krow" style="cursor:default"><div class="t"><b class="${SIG[k][1]}">${esc(SIG[k][0])}</b></div><p class="note" style="margin:4px 0 0">${esc(SIG[k][2])}</p></div>`).join('')}</div>
    <div class="panel"><p class="ph">Temel <b>kurallar</b></p><ul class="note" style="padding-left:18px;display:flex;flex-direction:column;gap:6px;margin:0">
     <li>Asıl yükseliş SAR'dan düzeltme yapıp tekrar yükselince, asıl düşüş SAR'dan tepki alıp tekrar düşünce olur.</li>
     <li>İlk SAR'a temas olmazsa üstteki SAR'lar yana atar ve uzun düşüş gelir; temas olursa %80 ihtimalle son iki SAR'a kadar gider. İlk ve son SAR'ın yana atma olasılığı yüksek.</li>
@@ -622,7 +636,8 @@ $('#q').oninput = () => { shown = 60; drawList(); };
 $('#more').onclick = () => { shown += 60; drawList(); };
 $('#vade').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; V = b.dataset.v; LS.set('vade', V); CH.tf = PR().chart; applyProfile(); drawVade(); drawOzet(); drawChips(); drawList(); if (curKod && !$('#view-kart').hidden) openCard(curKod); };
 $('#scalp').onclick = e => { if (e.target.closest('#scalp-go')) scalpScan(); const c = e.target.closest('[data-sk]'); if (c && rows().some(r => r.k === c.dataset.sk)) openCard(c.dataset.sk); };
-$('#m-borsa').onclick = () => setM('borsa'); $('#m-kripto').onclick = () => setM('kripto');
+$('#m-borsa').onclick = () => setM('borsa'); $('#m-makro').onclick = () => setM('makro');
+$('#grp').onclick = e => { const b = e.target.closest('[data-gr]'); if (!b) return; ST.makro.grp = b.dataset.gr; shown = 60; drawChips(); drawList(); }; $('#m-kripto').onclick = () => setM('kripto');
 
 async function load(m) {
   if (DATA[m]) return DATA[m];
@@ -631,13 +646,13 @@ async function load(m) {
 }
 async function setM(m) {
   M = m; LS.set('m', m); shown = 60; curKod = null;
-  $('#m-borsa').setAttribute('aria-selected', m === 'borsa'); $('#m-kripto').setAttribute('aria-selected', m === 'kripto');
+  for (const x of ['borsa', 'kripto', 'makro']) $('#m-' + x).setAttribute('aria-selected', m === x);
   $('#q').placeholder = MK[m].ph; $('#q').value = ''; $('#kart').innerHTML = '<div class="panel note">Listeden bir satıra dokun.</div>';
   $('#list').innerHTML = ''; $('#ozet').innerHTML = ''; $('#status').textContent = 'Veri yükleniyor…'; setTab('tara');
   try {
     const d = await load(m); if (M !== m) return;
     const t = new Date(d.generated);
-    $('#status').textContent = `${d.rows.length} ${MK[m].birim} · veri: ${t.toLocaleDateString('tr-TR')} ${t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${m === 'borsa' ? 'Yahoo Finance günlük' : 'Binance günlük'}`;
+    $('#status').textContent = `${d.rows.length} ${MK[m].birim} · veri: ${t.toLocaleDateString('tr-TR')} ${t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${m === 'kripto' ? 'Binance günlük' : 'Yahoo Finance günlük'}`;
     applyProfile(); drawVade(); drawOzet(); drawChips(); drawList();
   } catch (e) {
     $('#status').textContent = '';
@@ -900,6 +915,54 @@ function analyze(daily, cfg) {
   return out;
 }
 
+/* ---------------- Makro: enstrüman listesi ve türetilmiş seriler ---------------- */
+// y: Yahoo sembolü; f: türetilmiş seri [işlem, A, B, çarpan] (A/B başka maddelerin anahtarı ya da Yahoo sembolü)
+const MAKRO = [
+  ['ALTIN', 'Altın (ons, $)', 'maden', { y: 'GC=F' }], ['GUMUS', 'Gümüş (ons, $)', 'maden', { y: 'SI=F' }],
+  ['PLATIN', 'Platin (ons, $)', 'maden', { y: 'PL=F' }], ['PALADYUM', 'Paladyum (ons, $)', 'maden', { y: 'PA=F' }],
+  ['GRAMALTIN', 'Gram altın (₺)', 'maden', { f: ['*', 'GC=F', 'USDTRY=X', 1 / 31.1035] }], ['GUMUSTL', 'Gümüş (ons, ₺)', 'maden', { f: ['*', 'SI=F', 'USDTRY=X', 1] }],
+  ['WTI', 'Ham petrol WTI', 'emtia', { y: 'CL=F' }], ['BRENT', 'Brent petrol', 'emtia', { y: 'BZ=F' }], ['DOGALGAZ', 'Doğalgaz', 'emtia', { y: 'NG=F' }],
+  ['BAKIR', 'Bakır', 'emtia', { y: 'HG=F' }], ['BUGDAY', 'Buğday', 'emtia', { y: 'ZW=F' }], ['MISIR', 'Mısır', 'emtia', { y: 'ZC=F' }],
+  ['DXY', 'Dolar endeksi (DXY)', 'fx', { y: 'DX-Y.NYB' }], ['EURUSD', 'Euro / Dolar', 'fx', { y: 'EURUSD=X' }], ['GBPUSD', 'Sterlin / Dolar', 'fx', { y: 'GBPUSD=X' }],
+  ['USDJPY', 'Dolar / Yen', 'fx', { y: 'USDJPY=X' }], ['USDCAD', 'Dolar / Kanada doları', 'fx', { y: 'USDCAD=X' }], ['CADUSD', 'Kanada doları / Dolar', 'fx', { y: 'CADUSD=X' }],
+  ['USDCHF', 'Dolar / Frank', 'fx', { y: 'USDCHF=X' }], ['AUDUSD', 'Avustralya doları / Dolar', 'fx', { y: 'AUDUSD=X' }],
+  ['CADJPY', 'Kanada doları / Yen', 'fx', { y: 'CADJPY=X' }], ['GBPJPY', 'Sterlin / Yen', 'fx', { y: 'GBPJPY=X' }], ['EURJPY', 'Euro / Yen', 'fx', { y: 'EURJPY=X' }],
+  ['USDTRY', 'Dolar / TL', 'fx', { y: 'USDTRY=X' }], ['EURTRY', 'Euro / TL', 'fx', { y: 'EURTRY=X' }], ['GBPTRY', 'Sterlin / TL', 'fx', { y: 'GBPTRY=X' }],
+  ['US3A', 'ABD 13 haftalık faiz', 'faiz', { y: '^IRX' }], ['US5Y', 'ABD 5 yıllık faiz', 'faiz', { y: '^FVX' }], ['US10Y', 'ABD 10 yıllık faiz', 'faiz', { y: '^TNX' }],
+  ['US30Y', 'ABD 30 yıllık faiz', 'faiz', { y: '^TYX' }], ['FEDFON', 'Fed fonları vadeli (ZQ)', 'faiz', { y: 'ZQ=F' }],
+  ['SP500', 'S&P 500', 'endeks', { y: '^GSPC' }], ['NASDAQ100', 'Nasdaq 100', 'endeks', { y: '^NDX' }], ['DOW', 'Dow Jones', 'endeks', { y: '^DJI' }],
+  ['DAX', 'DAX', 'endeks', { y: '^GDAXI' }], ['NIKKEI', 'Nikkei 225', 'endeks', { y: '^N225' }], ['VIX', 'VIX (korku endeksi)', 'endeks', { y: '^VIX' }],
+  ['BIST100USD', 'BIST 100 (dolar bazlı)', 'endeks', { f: ['/', 'XU100.IS', 'USDTRY=X', 1] }],
+  ['BTC', 'Bitcoin ($)', 'kripto', { y: 'BTC-USD' }], ['ETH', 'Ethereum ($)', 'kripto', { y: 'ETH-USD' }], ['BTCCME', 'Bitcoin CME vadeli', 'kripto', { y: 'BTC=F' }],
+  ['ETHCME', 'Ether CME vadeli', 'kripto', { y: 'ETH=F' }], ['BTCEUR', 'Bitcoin / Euro', 'kripto', { y: 'BTC-EUR' }], ['BTCJPY', 'Bitcoin / Yen', 'kripto', { y: 'BTC-JPY' }],
+  ['BTCTRY', 'Bitcoin / TL', 'kripto', { f: ['*', 'BTC-USD', 'USDTRY=X', 1] }],
+  ['ALTINGUMUS', 'Altın / Gümüş rasyosu', 'rasyo', { f: ['/', 'GC=F', 'SI=F', 1] }], ['BAKIRALTIN', 'Bakır / Altın rasyosu', 'rasyo', { f: ['/', 'HG=F', 'GC=F', 1] }],
+  ['XU100ALTIN', 'BIST 100 / Gram altın', 'rasyo', { f: ['/', 'XU100.IS', 'GC=F', 31.1035, 'USDTRY=X'] }], ['SP500ALTIN', 'S&P 500 / Altın', 'rasyo', { f: ['/', '^GSPC', 'GC=F', 1] }],
+  ['BTCALTIN', 'Bitcoin / Altın', 'rasyo', { f: ['/', 'BTC-USD', 'GC=F', 1] }],
+];
+const MAKRO_GRP = { maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto (makro)', rasyo: 'Rasyolar' };
+function makroSyms(def) { if (def.y) return [def.y]; return [def.f[1], def.f[2], def.f[4]].filter(Boolean); }
+// iki günlük seriyi tarihe göre eşle (Yahoo saat farklarını +2 saatle aynı güne toplar)
+function makroBuild(def, S) {
+  if (def.y) return S[def.y] || null;
+  const [op, A, B, k, C] = def.f, a = S[A], b = S[B], c = C ? S[C] : null; if (!a || !b || (C && !c)) return null;
+  const key = t => Math.floor((t + 72e5) / 864e5), mb = new Map(), mc = new Map();
+  b.t.forEach((t, i) => mb.set(key(t), i)); if (c) c.t.forEach((t, i) => mc.set(key(t), i));
+  const o = { t: [], o: [], h: [], l: [], c: [], v: [] };
+  for (let i = 0; i < a.t.length; i++) {
+    const j = mb.get(key(a.t[i])); if (j == null) continue; let q = null; if (c) { q = mc.get(key(a.t[i])); if (q == null) continue; }
+    // XU100/gram altın: A / (B × C / k)
+    const den = c ? (x, y) => (b[x][j] * c[y][q]) / k : null;
+    let O, H, L, Cl;
+    if (op === '*') { O = a.o[i] * b.o[j] * k; Cl = a.c[i] * b.c[j] * k; H = a.h[i] * b.h[j] * k; L = a.l[i] * b.l[j] * k; }
+    else if (c) { O = a.o[i] / den('o', 'o'); Cl = a.c[i] / den('c', 'c'); H = a.h[i] / den('l', 'l'); L = a.l[i] / den('h', 'h'); }
+    else { O = a.o[i] / b.o[j] * k; Cl = a.c[i] / b.c[j] * k; H = a.h[i] / b.l[j] * k; L = a.l[i] / b.h[j] * k; }
+    if (![O, H, L, Cl].every(isFinite)) continue;
+    o.t.push(a.t[i]); o.o.push(O); o.c.push(Cl); o.h.push(Math.max(H, O, Cl)); o.l.push(Math.min(L, O, Cl)); o.v.push(0);
+  }
+  return o.c.length ? o : null;
+}
+
 /* ---------- SAR Radar grafiği: mumlar + SAR noktaları + üst dilim SAR Ort. + LRC kanal ve kesişme ---------- */
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
 const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
@@ -921,7 +984,11 @@ async function intraData(k, tf) {
 async function chartData(k) {
   const key = M + ':' + k; if (CH.key === key && CH.daily) return CH.daily;
   let d = null;
-  if (M === 'borsa') {
+  if (M === 'makro') {
+    const row = rows().find(z => z.k === k); if (!row || !row.def) throw new Error('tanım yok');
+    const syms = makroSyms(row.def), r = await fetch('/.netlify/functions/yahoo?r=max&s=' + syms.map(encodeURIComponent).join(',')); if (!r.ok) throw new Error('Yahoo ' + r.status);
+    d = makroBuild(row.def, await r.json());
+  } else if (M === 'borsa') {
     const sym = k + '.IS';
     const r = await fetch('/.netlify/functions/yahoo?r=max&s=' + encodeURIComponent(sym)); if (!r.ok) throw new Error('Yahoo ' + r.status);
     d = (await r.json())[sym]; if (d && d.c) d = adjustSplits(d);

@@ -1,11 +1,12 @@
 // Yahoo Finance günlük mumlarını (BIST) toplu çeker; tarayıcıdaki CORS engelini aşmak için aracı.
 // Kullanım: /.netlify/functions/yahoo?s=THYAO.IS,GARAN.IS,XU100.IS
 import { verify, cookieOf } from '../lib/session.mjs';
-const ok = /^[A-Z0-9]{2,12}\.IS$/;
+const MAKRO = new Set(['GC=F', 'SI=F', 'PL=F', 'PA=F', 'CL=F', 'BZ=F', 'NG=F', 'HG=F', 'ZW=F', 'ZC=F', 'DX-Y.NYB', 'EURUSD=X', 'GBPUSD=X', 'USDJPY=X', 'USDCAD=X', 'CADUSD=X', 'USDCHF=X', 'AUDUSD=X', 'CADJPY=X', 'GBPJPY=X', 'EURJPY=X', 'USDTRY=X', 'EURTRY=X', 'GBPTRY=X', '^IRX', '^FVX', '^TNX', '^TYX', 'ZQ=F', '^GSPC', '^NDX', '^DJI', '^GDAXI', '^N225', '^VIX', 'BTC-USD', 'ETH-USD', 'BTC=F', 'ETH=F', 'BTC-EUR', 'BTC-JPY']);
+const ok = { test: s => /^[A-Z0-9]{2,12}\.IS$/.test(s) || MAKRO.has(s) }; // BIST hisseleri + SAR Radar makro listesi
 async function one(s, rng) {
   for (const host of ['query1', 'query2']) {
     try {
-      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${s}?${rng === 'max' ? `period1=946684800&period2=${Math.floor(Date.now() / 1000)}` : `range=${rng}`}&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(s)}?${rng === 'max' ? `period1=946684800&period2=${Math.floor(Date.now() / 1000)}` : `range=${rng}`}&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
       if (!r.ok) continue;
       const j = await r.json(), q = j.chart && j.chart.result && j.chart.result[0];
       if (!q || !q.timestamp) return null;

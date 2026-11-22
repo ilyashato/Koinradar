@@ -247,3 +247,51 @@ export function analyze(daily, cfg) {
   out.price = rnd(price); out.chg = n > 1 ? rnd((price / daily.c[n - 2] - 1) * 100, 2) : null; out.t = daily.t[n - 1];
   return out;
 }
+
+/* ---------------- Makro: enstrüman listesi ve türetilmiş seriler ---------------- */
+// y: Yahoo sembolü; f: türetilmiş seri [işlem, A, B, çarpan] (A/B başka maddelerin anahtarı ya da Yahoo sembolü)
+export const MAKRO = [
+  ['ALTIN', 'Altın (ons, $)', 'maden', { y: 'GC=F' }], ['GUMUS', 'Gümüş (ons, $)', 'maden', { y: 'SI=F' }],
+  ['PLATIN', 'Platin (ons, $)', 'maden', { y: 'PL=F' }], ['PALADYUM', 'Paladyum (ons, $)', 'maden', { y: 'PA=F' }],
+  ['GRAMALTIN', 'Gram altın (₺)', 'maden', { f: ['*', 'GC=F', 'USDTRY=X', 1 / 31.1035] }], ['GUMUSTL', 'Gümüş (ons, ₺)', 'maden', { f: ['*', 'SI=F', 'USDTRY=X', 1] }],
+  ['WTI', 'Ham petrol WTI', 'emtia', { y: 'CL=F' }], ['BRENT', 'Brent petrol', 'emtia', { y: 'BZ=F' }], ['DOGALGAZ', 'Doğalgaz', 'emtia', { y: 'NG=F' }],
+  ['BAKIR', 'Bakır', 'emtia', { y: 'HG=F' }], ['BUGDAY', 'Buğday', 'emtia', { y: 'ZW=F' }], ['MISIR', 'Mısır', 'emtia', { y: 'ZC=F' }],
+  ['DXY', 'Dolar endeksi (DXY)', 'fx', { y: 'DX-Y.NYB' }], ['EURUSD', 'Euro / Dolar', 'fx', { y: 'EURUSD=X' }], ['GBPUSD', 'Sterlin / Dolar', 'fx', { y: 'GBPUSD=X' }],
+  ['USDJPY', 'Dolar / Yen', 'fx', { y: 'USDJPY=X' }], ['USDCAD', 'Dolar / Kanada doları', 'fx', { y: 'USDCAD=X' }], ['CADUSD', 'Kanada doları / Dolar', 'fx', { y: 'CADUSD=X' }],
+  ['USDCHF', 'Dolar / Frank', 'fx', { y: 'USDCHF=X' }], ['AUDUSD', 'Avustralya doları / Dolar', 'fx', { y: 'AUDUSD=X' }],
+  ['CADJPY', 'Kanada doları / Yen', 'fx', { y: 'CADJPY=X' }], ['GBPJPY', 'Sterlin / Yen', 'fx', { y: 'GBPJPY=X' }], ['EURJPY', 'Euro / Yen', 'fx', { y: 'EURJPY=X' }],
+  ['USDTRY', 'Dolar / TL', 'fx', { y: 'USDTRY=X' }], ['EURTRY', 'Euro / TL', 'fx', { y: 'EURTRY=X' }], ['GBPTRY', 'Sterlin / TL', 'fx', { y: 'GBPTRY=X' }],
+  ['US3A', 'ABD 13 haftalık faiz', 'faiz', { y: '^IRX' }], ['US5Y', 'ABD 5 yıllık faiz', 'faiz', { y: '^FVX' }], ['US10Y', 'ABD 10 yıllık faiz', 'faiz', { y: '^TNX' }],
+  ['US30Y', 'ABD 30 yıllık faiz', 'faiz', { y: '^TYX' }], ['FEDFON', 'Fed fonları vadeli (ZQ)', 'faiz', { y: 'ZQ=F' }],
+  ['SP500', 'S&P 500', 'endeks', { y: '^GSPC' }], ['NASDAQ100', 'Nasdaq 100', 'endeks', { y: '^NDX' }], ['DOW', 'Dow Jones', 'endeks', { y: '^DJI' }],
+  ['DAX', 'DAX', 'endeks', { y: '^GDAXI' }], ['NIKKEI', 'Nikkei 225', 'endeks', { y: '^N225' }], ['VIX', 'VIX (korku endeksi)', 'endeks', { y: '^VIX' }],
+  ['BIST100USD', 'BIST 100 (dolar bazlı)', 'endeks', { f: ['/', 'XU100.IS', 'USDTRY=X', 1] }],
+  ['BTC', 'Bitcoin ($)', 'kripto', { y: 'BTC-USD' }], ['ETH', 'Ethereum ($)', 'kripto', { y: 'ETH-USD' }], ['BTCCME', 'Bitcoin CME vadeli', 'kripto', { y: 'BTC=F' }],
+  ['ETHCME', 'Ether CME vadeli', 'kripto', { y: 'ETH=F' }], ['BTCEUR', 'Bitcoin / Euro', 'kripto', { y: 'BTC-EUR' }], ['BTCJPY', 'Bitcoin / Yen', 'kripto', { y: 'BTC-JPY' }],
+  ['BTCTRY', 'Bitcoin / TL', 'kripto', { f: ['*', 'BTC-USD', 'USDTRY=X', 1] }],
+  ['ALTINGUMUS', 'Altın / Gümüş rasyosu', 'rasyo', { f: ['/', 'GC=F', 'SI=F', 1] }], ['BAKIRALTIN', 'Bakır / Altın rasyosu', 'rasyo', { f: ['/', 'HG=F', 'GC=F', 1] }],
+  ['XU100ALTIN', 'BIST 100 / Gram altın', 'rasyo', { f: ['/', 'XU100.IS', 'GC=F', 31.1035, 'USDTRY=X'] }], ['SP500ALTIN', 'S&P 500 / Altın', 'rasyo', { f: ['/', '^GSPC', 'GC=F', 1] }],
+  ['BTCALTIN', 'Bitcoin / Altın', 'rasyo', { f: ['/', 'BTC-USD', 'GC=F', 1] }],
+];
+export const MAKRO_GRP = { maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto (makro)', rasyo: 'Rasyolar' };
+export function makroSyms(def) { if (def.y) return [def.y]; return [def.f[1], def.f[2], def.f[4]].filter(Boolean); }
+// iki günlük seriyi tarihe göre eşle (Yahoo saat farklarını +2 saatle aynı güne toplar)
+export function makroBuild(def, S) {
+  if (def.y) return S[def.y] || null;
+  const [op, A, B, k, C] = def.f, a = S[A], b = S[B], c = C ? S[C] : null; if (!a || !b || (C && !c)) return null;
+  const key = t => Math.floor((t + 72e5) / 864e5), mb = new Map(), mc = new Map();
+  b.t.forEach((t, i) => mb.set(key(t), i)); if (c) c.t.forEach((t, i) => mc.set(key(t), i));
+  const o = { t: [], o: [], h: [], l: [], c: [], v: [] };
+  for (let i = 0; i < a.t.length; i++) {
+    const j = mb.get(key(a.t[i])); if (j == null) continue; let q = null; if (c) { q = mc.get(key(a.t[i])); if (q == null) continue; }
+    // XU100/gram altın: A / (B × C / k)
+    const den = c ? (x, y) => (b[x][j] * c[y][q]) / k : null;
+    let O, H, L, Cl;
+    if (op === '*') { O = a.o[i] * b.o[j] * k; Cl = a.c[i] * b.c[j] * k; H = a.h[i] * b.h[j] * k; L = a.l[i] * b.l[j] * k; }
+    else if (c) { O = a.o[i] / den('o', 'o'); Cl = a.c[i] / den('c', 'c'); H = a.h[i] / den('l', 'l'); L = a.l[i] / den('h', 'h'); }
+    else { O = a.o[i] / b.o[j] * k; Cl = a.c[i] / b.c[j] * k; H = a.h[i] / b.l[j] * k; L = a.l[i] / b.h[j] * k; }
+    if (![O, H, L, Cl].every(isFinite)) continue;
+    o.t.push(a.t[i]); o.o.push(O); o.c.push(Cl); o.h.push(Math.max(H, O, Cl)); o.l.push(Math.min(L, O, Cl)); o.v.push(0);
+  }
+  return o.c.length ? o : null;
+}

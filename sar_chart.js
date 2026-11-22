@@ -19,7 +19,11 @@ async function intraData(k, tf) {
 async function chartData(k) {
   const key = M + ':' + k; if (CH.key === key && CH.daily) return CH.daily;
   let d = null;
-  if (M === 'borsa') {
+  if (M === 'makro') {
+    const row = rows().find(z => z.k === k); if (!row || !row.def) throw new Error('tanım yok');
+    const syms = makroSyms(row.def), r = await fetch('/.netlify/functions/yahoo?r=max&s=' + syms.map(encodeURIComponent).join(',')); if (!r.ok) throw new Error('Yahoo ' + r.status);
+    d = makroBuild(row.def, await r.json());
+  } else if (M === 'borsa') {
     const sym = k + '.IS';
     const r = await fetch('/.netlify/functions/yahoo?r=max&s=' + encodeURIComponent(sym)); if (!r.ok) throw new Error('Yahoo ' + r.status);
     d = (await r.json())[sym]; if (d && d.c) d = adjustSplits(d);

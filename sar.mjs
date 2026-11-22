@@ -6,7 +6,7 @@
 //   node sar.mjs --list THYAO,ASELS   → deneme (borsa) / --list BTCUSDT,ETHUSDT (kripto)
 //   node sar.mjs --top 150       → kriptoda hacme göre ilk N parite (varsayılan 200)
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { analyze, resample, lrc, adjustSplits } from './sar_engine.mjs';
+import { analyze, resample, lrc, adjustSplits, MAKRO, makroSyms, makroBuild } from './sar_engine.mjs';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true) : d; };
@@ -26,6 +26,8 @@ export const CFG = {
     aktif: ['luc', 'psar', 'fast', 'mod'], derin: -70 },
   kripto: { tz: 0, tfs: ['G', 'H', 'A', '3A', '6A'], ana: ['H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
     aktif: ['slow', 'lin'], derin: -85 },
+  makro: { tz: 0, tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
+    aktif: ['slow', 'lin'], derin: -60 },
 };
 
 /* ---------------- veri çekme ---------------- */
@@ -38,7 +40,7 @@ async function getJson(url, tries = 3) {
   }
   throw last;
 }
-async function yahoo(sym) {
+async function yahoo(sym, adj = true) {
   for (const host of ['query1', 'query2']) {
     try {
       const j = await getJson(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=946684800&period2=${Math.floor(Date.now() / 1000)}&interval=1d&includePrePost=false`, 2);
@@ -53,7 +55,7 @@ async function yahoo(sym) {
         d.t.push(t); d.o.push(o); d.h.push(Math.max(h, o, c)); d.l.push(Math.min(l, o, c)); d.c.push(c); d.v.push(z.volume[k] || 0);
       }
       if (d.t.length > 20) { const g = []; for (let k = d.t.length - 20; k < d.t.length; k++) g.push(d.t[k] - d.t[k - 1]); g.sort((a, b) => a - b); if (g[10] > 4 * 864e5) { console.warn('günlük değil:', sym); continue; } }
-      return d.c.length ? adjustSplits(d) : null;
+      return d.c.length ? (adj ? adjustSplits(d) : d) : null;
     } catch (e) {}
   }
   return null;
@@ -205,14 +207,26 @@ async function runKripto() {
   return { kind: 'sar', piyasa: 'kripto', generated: Date.now(), piyasaOzet: piyasa, rows };
 }
 
+async function runMakro() {
+  const cfg = CFG.makro, syms = [...new Set(MAKRO.flatMap(([, , , def]) => makroSyms(def)))];
+  const got = await pool(syms, 4, s => yahoo(s, false)), S = {}; syms.forEach((s, i) => { if (got[i]) S[s] = got[i]; });
+  const rows = [];
+  for (const [k, ad, grp, def] of MAKRO) {
+    const d = makroBuild(def, S); if (!d || d.c.length < 60 || Date.now() - d.t[d.t.length - 1] > 10 * 864e5) { console.warn('makro veri yok:', k); continue; }
+    const a = compact(analyze(d, cfg), cfg); rows.push({ k, ad, grp, def, ...a, ...signals(a, cfg) });
+  }
+  const oz = {}; for (const r of rows) if (['DXY', 'US10Y', 'ALTIN'].includes(r.k)) oz[r.k] = r;
+  return { kind: 'sar', piyasa: 'makro', generated: Date.now(), piyasaOzet: oz, rows };
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
   mkdirSync('data', { recursive: true });
   const only = opt('only'), day = Math.floor(Date.now() / 864e5);
   const log = existsSync('data/sar_log.json') ? JSON.parse(readFileSync('data/sar_log.json', 'utf8')) : {};
-  for (const m of ['borsa', 'kripto']) {
+  for (const m of ['borsa', 'kripto', 'makro']) {
     if (only && only !== m) continue;
     try {
-      const j = m === 'borsa' ? await runBorsa() : await runKripto();
+      const j = m === 'borsa' ? await runBorsa() : m === 'kripto' ? await runKripto() : await runMakro();
       if (!j.rows.length) { console.error(m + ': veri gelmedi, dosya değiştirilmedi'); continue; }
       if (!opt('list')) j.stats = logUpdate(log, m, j.rows, day);
       writeFileSync(`data/sar_${m}.json`, JSON.stringify(j));
