@@ -5,7 +5,7 @@ const ok = /^[A-Z0-9]{2,12}\.IS$/;
 async function one(s, rng) {
   for (const host of ['query1', 'query2']) {
     try {
-      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${s}?range=${rng}&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
+      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${s}?${rng === 'max' ? `period1=946684800&period2=${Math.floor(Date.now() / 1000)}` : `range=${rng}`}&interval=1d`, { headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BorsaRadari/1.0)', Accept: 'application/json' } });
       if (!r.ok) continue;
       const j = await r.json(), q = j.chart && j.chart.result && j.chart.result[0];
       if (!q || !q.timestamp) return null;
@@ -27,7 +27,7 @@ async function one(s, rng) {
 export default async (req) => {
   const secret = process.env.AUTH_SECRET;
   if (secret && !(await verify(cookieOf(req.headers.get('cookie'), 'rs'), secret))) return new Response('Giriş gerekli', { status: 401 });
-  const sp = new URL(req.url).searchParams, rng = sp.get('r') === '5d' ? '5d' : '5y';
+  const sp = new URL(req.url).searchParams, rng = sp.get('r') === '5d' ? '5d' : sp.get('r') === 'max' ? 'max' : '5y'; // max: 2000'den beri günlük (SAR Radar grafiği)
   const list = (sp.get('s') || '').split(',').filter(s => ok.test(s)).slice(0, 12);
   if (!list.length) return new Response('{}', { status: 400, headers: { 'content-type': 'application/json' } });
   const out = {};

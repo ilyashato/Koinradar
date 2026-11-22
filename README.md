@@ -69,3 +69,4 @@ Yatırım tavsiyesi değildir.
 - Her satır için otomatik yorum (kural metinleri sabit kalıptan, rakamlar hesaptan). Medyan/denge/gerçek değer sistem sahibi paylaşmadığı için yok.
 - Veri: `sar.mjs` → GitHub → Actions → **SAR veri** → Run workflow. Her gün otomatik çalışır. `data/sar_log.json` sinyal günlüğüdür; 10/30 günlük sonuçlar sayfada "Sinyal geçmişi" olarak görünür.
 - Yerelde: `node sar.mjs --only borsa --list THYAO,ASELS` · `node sar.mjs --only kripto --top 50`
+- Kartta grafik: günlük/haftalık/aylık mumlar, aktif SAR'lar (yana atan = kalın yatay çizgi), üst dilim SAR Ort. katmanları (Hafta/1A/3A/6A/12A), LRC 300 orta üst/alt ve kanal, KESİŞME etiketleri. Veri tarayıcıda çekilir (BIST: `/.netlify/functions/yahoo?r=max`, kripto: Binance) ve `sar_engine.mjs` ile aynı hesapla çizilir. `sar_engine.mjs` ya da `sar_chart.js` değişirse: `node build_sar.mjs`.
