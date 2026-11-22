@@ -12,7 +12,7 @@ async function chartData(k) {
   if (M === 'borsa') {
     const sym = k + '.IS';
     const r = await fetch('/.netlify/functions/yahoo?r=max&s=' + encodeURIComponent(sym)); if (!r.ok) throw new Error('Yahoo ' + r.status);
-    d = (await r.json())[sym];
+    d = (await r.json())[sym]; if (d && d.c) d = adjustSplits(d);
   } else {
     const sym = k + 'USDT', hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
     for (const h of hosts) {

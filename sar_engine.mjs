@@ -84,6 +84,18 @@ export function devAt(src, len, i) {
   let d = 0; for (let k = i - len + 1; k <= i; k++) d += Math.abs(src[k] - m); return d / len;
 }
 
+
+// BIST bedelsiz/bölünme düzeltmesi: günlük fiyat limiti ±%10 olduğu için kapanıştan sonraki açılışta
+// %25'ten büyük düşüş ya da %35'ten büyük sıçrama şirket işlemidir; önceki tüm barlar o oranla ölçeklenir.
+export function adjustSplits(d) {
+  const n = d.c.length; let f = 1; const o = { t: d.t.slice(), o: [], h: [], l: [], c: [], v: d.v ? d.v.slice() : [] };
+  const fac = new Array(n).fill(1);
+  for (let i = n - 1; i > 0; i--) { fac[i] = f; const r = d.o[i] / d.c[i - 1]; if (r < 0.75 || r > 1.35) f *= r; }
+  fac[0] = f;
+  for (let i = 0; i < n; i++) { o.o.push(d.o[i] * fac[i]); o.h.push(d.h[i] * fac[i]); o.l.push(d.l[i] * fac[i]); o.c.push(d.c[i] * fac[i]); }
+  return o;
+}
+
 /* ---------------- zaman dilimleri ---------------- */
 // Günlük barları takvim dönemlerine toplar (TradingView gibi: hafta pazartesi, 3A ocak-nisan-temmuz-ekim, 6A ocak-temmuz, 12A ocak).
 export function resample(d, tf, tz = 0) {

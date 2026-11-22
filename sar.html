@@ -161,6 +161,12 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
       <div class="chips" id="chips"></div>
       <p class="ph" style="margin-top:14px">Durum</p>
       <div class="chips" id="durum"></div>
+      <p class="ph" style="margin-top:14px">LRC <b>uzaklığı</b></p>
+      <div class="chips" id="lrc-tf"></div>
+      <div class="chips" id="lrc-band" style="margin-top:6px"></div>
+      <div class="chips" id="lrc-yon" style="margin-top:6px"></div>
+      <div class="chips" id="lrc-pct" style="margin-top:6px"></div>
+      <p class="note" id="lrc-note"></p>
       <div id="dongu-box">
         <p class="ph" style="margin-top:14px">SAR <b>döngüsü</b></p>
         <div class="chips" id="dongu"></div>
@@ -172,6 +178,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
           <option value="chg">Sırala: Günlük değişim</option>
           <option value="sup">Sırala: Desteğe en yakın</option>
           <option value="lrc">Sırala: LRC alt banda en yakın</option>
+          <option value="lrcd">Sırala: Seçili LRC bandına uzaklık</option>
           <option value="kod">Sırala: Kod</option>
         </select>
         <button class="btn small" id="clear">Temizle</button>
@@ -234,7 +241,14 @@ const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'de
 /* ---------- durum ---------- */
 let M = LS.get('m', 'borsa'); if (!MK[M]) M = 'borsa';
 const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' } };
+const LF = Object.assign({ tf: 'H', band: 'alt', yon: 'alt', p: null }, LS.get('lrcf', {}));
 let shown = 60, curKod = null;
+// seçili LRC bandına yüzde uzaklık (+ üstünde, − altında)
+function lrcDist(r, tf = LF.tf, band = LF.band) {
+  const L = r.lrc && r.lrc[tf]; if (!L || L.yok || r.price == null) return null;
+  const v = band === 'alt' ? L.alt : band === 'ust' ? L.ust : (L.ortaUst + L.ortaAlt) / 2;
+  return v ? (r.price / v - 1) * 100 : null;
+}
 
 const fmt = (x, d) => { if (x == null || !isFinite(x)) return '—'; const a = Math.abs(x); const dd = d != null ? d : a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : a >= 0.01 ? 4 : 6; return (+x).toLocaleString('tr-TR', { minimumFractionDigits: dd, maximumFractionDigits: dd }); };
 const pct = x => (x == null ? '—' : (x > 0 ? '+' : '') + fmt(x, 1) + '%');
@@ -336,8 +350,10 @@ function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Mat
 function filtered() {
   const s = ST[M], q = $('#q').value.trim().toLocaleUpperCase('tr-TR');
   let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || r.durum === s.durum));
+  if (LF.p != null) L = L.filter(r => { const d = lrcDist(r); if (d == null) return false; return LF.yon === 'alt' ? d <= -LF.p : d >= LF.p; });
   const by = { puan: (a, b) => b.puan - a.puan || (b.chg || 0) - (a.chg || 0), chg: (a, b) => (b.chg || 0) - (a.chg || 0), kod: (a, b) => a.k.localeCompare(b.k, 'tr'),
-    sup: (a, b) => supDist(a) - supDist(b), lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999) }[s.sort];
+    sup: (a, b) => supDist(a) - supDist(b), lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999),
+    lrcd: (a, b) => { const x = lrcDist(a), y = lrcDist(b); if (x == null) return 1; if (y == null) return -1; return LF.yon === 'alt' ? x - y : y - x; } }[s.sort];
   return L.sort(by);
 }
 function sigChips(r, max = 6) {
@@ -348,6 +364,13 @@ function drawChips() {
   const s = ST[M], cnt = k => rows().filter(r => r.sig.includes(k)).length;
   $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
   $('#durum').innerHTML = [['hepsi', 'Tümü'], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
+  const BN = { alt: 'Alt bant', orta: 'Orta', ust: 'Üst bant' };
+  $('#lrc-tf').innerHTML = ['G', 'H'].map(t => `<button class="chip" data-lt="${t}" aria-pressed="${LF.tf === t}">${TFN[t]} LRC</button>`).join('');
+  $('#lrc-band').innerHTML = ['alt', 'orta', 'ust'].map(b => `<button class="chip" data-lb="${b}" aria-pressed="${LF.band === b}">${BN[b]}</button>`).join('');
+  $('#lrc-yon').innerHTML = [['alt', 'Fiyat bandın altında'], ['ust', 'Fiyat bandın üstünde']].map(([k, t]) => `<button class="chip" data-ly="${k}" aria-pressed="${LF.yon === k}">${t}</button>`).join('');
+  $('#lrc-pct').innerHTML = [null, 0, 5, 10, 20, 30, 50, 100].map(v => `<button class="chip" data-lp="${v}" aria-pressed="${LF.p === v}">${v == null ? 'Kapalı' : '%' + v + '+'}</button>`).join('');
+  $('#lrc-note').textContent = LF.p == null ? 'Bir yüzde seçince liste, fiyatın seçili LRC bandına uzaklığına göre süzülür.' :
+    `${TFN[LF.tf]} LRC ${BN[LF.band].toLowerCase()} seviyesinin en az %${LF.p} ${LF.yon === 'alt' ? 'altında' : 'üstünde'} olanlar. Uzaklık = fiyat / bant − 1.`;
   $('#dongu-box').hidden = M !== 'borsa';
   if (M === 'borsa') {
     $('#dongu').innerHTML = ['A', '3A', '6A'].map(t => `<button class="chip" data-g="${t}" aria-pressed="${ST.borsa.dongu === t}">${TFN[t]}</button>`).join('');
@@ -368,7 +391,7 @@ function drawList() {
     const sp = nearest(r, 'alt', { noG: true }), rs = nearest(r, 'ust', { noG: true }), L2 = r.lrc && r.lrc.G, e = L2 && (L2.kesisme || []).at(-1);
     return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div><span class="kod">${esc(r.k)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
       <div class="mini"><div><span>Destek</span><b>${sp ? fmt(sp.v) : '—'}</b></div><div><span>Uzaklık</span><b>${sp ? pct(sp.dist) : '—'}</b></div><div><span>Direnç</span><b>${rs ? fmt(rs.v) : '—'}</b></div><div><span>Kesişme</span><b>${e && e.ago <= 60 ? (e.tip === 'yesil' ? 'Yeşil' : 'Turuncu') + ' ' + e.ago + 'b' : '—'}</b></div></div>
-      <div class="sigs">${sigChips(r)}</div></div>`; }).join('') || `<div class="panel note">Filtreye uyan ${cfg.birim} yok.</div>`;
+      <div class="sigs">${(() => { const d = lrcDist(r); return d == null ? '' : `<span class="sg ${d < 0 ? 'neg' : 'pos'}">${TFN[LF.tf]} LRC ${({ alt: 'alt', orta: 'orta', ust: 'üst' })[LF.band]}: ${pct(d)}</span>`; })()}${sigChips(r)}</div></div>`; }).join('') || `<div class="panel note">Filtreye uyan ${cfg.birim} yok.</div>`;
   $('#more').hidden = L.length <= shown;
 }
 
@@ -454,8 +477,10 @@ $('#kart').onclick = e => { const b = e.target.closest('[data-info]'); if (b) { 
 $('#chips').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; const s = ST[M], k = b.dataset.c; s.chips = s.chips.includes(k) ? s.chips.filter(x => x !== k) : [...s.chips, k]; LS.set('chips_' + M, s.chips); shown = 60; drawChips(); drawList(); };
 $('#durum').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; ST[M].durum = b.dataset.d; shown = 60; drawChips(); drawList(); };
 $('#dongu').onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ST.borsa.dongu = b.dataset.g; LS.set('dongu', b.dataset.g); drawChips(); };
+for (const [id, key, conv] of [['#lrc-tf', 'lt', x => x], ['#lrc-band', 'lb', x => x], ['#lrc-yon', 'ly', x => x], ['#lrc-pct', 'lp', x => (x === 'null' ? null : +x)]])
+  $(id).onclick = e => { const b = e.target.closest('[data-' + key + ']'); if (!b) return; const f = { lt: 'tf', lb: 'band', ly: 'yon', lp: 'p' }[key]; LF[f] = conv(b.dataset[key]); LS.set('lrcf', LF); shown = 60; drawChips(); drawList(); };
 $('#sort').onchange = e => { ST[M].sort = e.target.value; drawList(); };
-$('#clear').onclick = () => { ST[M].chips = []; ST[M].durum = 'hepsi'; LS.set('chips_' + M, []); $('#q').value = ''; drawChips(); drawList(); };
+$('#clear').onclick = () => { LF.p = null; LS.set('lrcf', LF); ST[M].chips = []; ST[M].durum = 'hepsi'; LS.set('chips_' + M, []); $('#q').value = ''; drawChips(); drawList(); };
 $('#q').oninput = () => { shown = 60; drawList(); };
 $('#more').onclick = () => { shown += 60; drawList(); };
 $('#m-borsa').onclick = () => setM('borsa'); $('#m-kripto').onclick = () => setM('kripto');
@@ -570,6 +595,18 @@ function devAt(src, len, i) {
   if (i - len + 1 < 0) return null;
   let m = 0; for (let k = i - len + 1; k <= i; k++) m += src[k]; m /= len;
   let d = 0; for (let k = i - len + 1; k <= i; k++) d += Math.abs(src[k] - m); return d / len;
+}
+
+
+// BIST bedelsiz/bölünme düzeltmesi: günlük fiyat limiti ±%10 olduğu için kapanıştan sonraki açılışta
+// %25'ten büyük düşüş ya da %35'ten büyük sıçrama şirket işlemidir; önceki tüm barlar o oranla ölçeklenir.
+function adjustSplits(d) {
+  const n = d.c.length; let f = 1; const o = { t: d.t.slice(), o: [], h: [], l: [], c: [], v: d.v ? d.v.slice() : [] };
+  const fac = new Array(n).fill(1);
+  for (let i = n - 1; i > 0; i--) { fac[i] = f; const r = d.o[i] / d.c[i - 1]; if (r < 0.75 || r > 1.35) f *= r; }
+  fac[0] = f;
+  for (let i = 0; i < n; i++) { o.o.push(d.o[i] * fac[i]); o.h.push(d.h[i] * fac[i]); o.l.push(d.l[i] * fac[i]); o.c.push(d.c[i] * fac[i]); }
+  return o;
 }
 
 /* ---------------- zaman dilimleri ---------------- */
@@ -738,7 +775,7 @@ async function chartData(k) {
   if (M === 'borsa') {
     const sym = k + '.IS';
     const r = await fetch('/.netlify/functions/yahoo?r=max&s=' + encodeURIComponent(sym)); if (!r.ok) throw new Error('Yahoo ' + r.status);
-    d = (await r.json())[sym];
+    d = (await r.json())[sym]; if (d && d.c) d = adjustSplits(d);
   } else {
     const sym = k + 'USDT', hosts = ['https://data-api.binance.vision', 'https://api.binance.com'];
     for (const h of hosts) {

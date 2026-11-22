@@ -6,7 +6,7 @@
 //   node sar.mjs --list THYAO,ASELS   → deneme (borsa) / --list BTCUSDT,ETHUSDT (kripto)
 //   node sar.mjs --top 150       → kriptoda hacme göre ilk N parite (varsayılan 200)
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
-import { analyze, resample, lrc } from './sar_engine.mjs';
+import { analyze, resample, lrc, adjustSplits } from './sar_engine.mjs';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? (args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : true) : d; };
@@ -50,7 +50,7 @@ async function yahoo(sym) {
         d.t.push(t); d.o.push(o); d.h.push(Math.max(h, o, c)); d.l.push(Math.min(l, o, c)); d.c.push(c); d.v.push(z.volume[k] || 0);
       }
       if (d.t.length > 20) { const g = []; for (let k = d.t.length - 20; k < d.t.length; k++) g.push(d.t[k] - d.t[k - 1]); g.sort((a, b) => a - b); if (g[10] > 4 * 864e5) { console.warn('günlük değil:', sym); continue; } }
-      return d.c.length ? d : null;
+      return d.c.length ? adjustSplits(d) : null;
     } catch (e) {}
   }
   return null;
