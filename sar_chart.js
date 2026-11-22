@@ -2,10 +2,20 @@
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
 const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
-const OCOL = { H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
-const NBAR = { G: 180, H: 160, A: 120 };
+const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
+const NBAR = { '15m': 200, '4S': 180, G: 180, H: 160, A: 120 };
+const INTRA = { '15m': '15m', '4S': '4h' };
 const TZ = () => (M === 'borsa' ? 3 : 0);
 
+async function intraData(k, tf) {
+  const key = 'i:' + k + ':' + tf; CH.ic = CH.ic || {}; if (CH.ic[key] && Date.now() - CH.ic[key].at < 60e3) return CH.ic[key].d;
+  for (const h of ['https://data-api.binance.vision', 'https://api.binance.com']) {
+    try { const r = await fetch(`${h}/api/v3/klines?symbol=${k}USDT&interval=${INTRA[tf]}&limit=1000`); if (!r.ok) continue; const a = await r.json();
+      const o = { t: [], o: [], h: [], l: [], c: [], v: [] }; for (const x of a) { o.t.push(x[0]); o.o.push(+x[1]); o.h.push(+x[2]); o.l.push(+x[3]); o.c.push(+x[4]); o.v.push(+x[7]); }
+      if (o.c.length) { CH.ic[key] = { d: o, at: Date.now() }; return o; } } catch (e) {}
+  }
+  throw new Error('Binance ' + INTRA[tf]);
+}
 async function chartData(k) {
   const key = M + ':' + k; if (CH.key === key && CH.daily) return CH.daily;
   let d = null;
@@ -39,12 +49,12 @@ function pkey(t, tf, tz) {
   if (tf === 'A') return y * 12 + m; if (tf === '3A') return y * 4 + Math.floor(m / 3); if (tf === '6A') return y * 2 + Math.floor(m / 6); return y;
 }
 
-function chartModel(daily, tf) {
-  const tz = TZ(), b = resample(daily, tf, tz), n = b.c.length, N = Math.min(NBAR[tf], n), from = n - N;
+function chartModel(daily, tf, intra) {
+  const tz = TZ(), b = intra || resample(daily, tf, tz), n = b.c.length, N = Math.min(NBAR[tf], n), from = n - N;
   const S = sarSet(b), cfg = MK[M];
   const sars = [...cfg.aktif, 'ort'].map(k => ({ k, v: S[k].s.slice(from) }));
   // üst zaman dilimi SAR Ort. (Pine: request.security, lookahead kapalı → o dönemin canlı değeri)
-  const order = ['G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => (M === 'borsa' || x !== '12A'));
+  const order = ['15m', '4S', 'G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x]).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
   const orts = up.map(ht => {
     const hb = resample(daily, ht, tz), hs = sarSet(hb).ort.s, mp = new Map(); hb.t.forEach((t, i) => mp.set(pkey(t, ht, tz), hs[i]));
     return { tf: ht, v: b.t.slice(from).map(t => mp.get(pkey(t, ht, tz)) ?? null) };
@@ -89,7 +99,7 @@ function drawChart(m) {
   for (let k = 0; k <= 5; k++) { const v = lo + (hi - lo) * k / 5, yy = y(v); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - padR, yy); g.stroke(); g.fillText(fmt(v), W - padR + 4, yy + 3); }
   // tarih etiketleri
   const step = Math.max(1, Math.round(N / 5));
-  for (let i = 0; i < N; i += step) { const d = new Date(m.t[i] + TZ() * 3600e3); g.fillText(m.tf === 'G' ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : d.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' }), x(i) - 14, H - 4); }
+  for (let i = 0; i < N; i += step) { const d = new Date(m.t[i] + TZ() * 3600e3); g.fillText(INTRA[m.tf] ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === 'G' ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : d.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' }), x(i) - 14, H - 4); }
   g.save(); g.beginPath(); g.rect(0, 0, W - padR, H - padB); g.clip();
   // LRC
   if (CH.on.lrc && m.lrc) {
@@ -141,7 +151,7 @@ function drawChart(m) {
 
 function readout(m, i) {
   if (!m || i == null) return '';
-  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleDateString('tr-TR');
+  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', year: 'numeric' });
   const s = m.sars.filter(z => z.v[i] != null).map(z => `<span style="color:${SCOL[z.k]}">■</span> ${SN[z.k]} <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
   const o = m.orts.filter(z => z.v[i] != null).map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort. <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
   const L = m.lrc && m.lrc.mh[i] != null ? ` · LRC orta <b class="num">${fmt(m.lrc.mh[i])} / ${fmt(m.lrc.ml[i])}</b>, kanal <b class="num">${fmt(m.lrc.up[i])} / ${fmt(m.lrc.lo[i])}</b>` : '';
@@ -150,7 +160,7 @@ function readout(m, i) {
 
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
-    <div class="chips" id="chtf">${['G', 'H', 'A'].map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
+    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
@@ -191,7 +201,8 @@ async function renderChart(k) {
   const msg = $('#chmsg'); CH.pick = null;
   try {
     const d = await chartData(k); if (!$('#sarcv')) return;
-    const m = chartModel(d, CH.tf); CH.model = m; msg.style.display = 'none';
+    if (INTRA[CH.tf] && M !== 'kripto') CH.tf = 'G';
+    const m = chartModel(d, CH.tf, INTRA[CH.tf] ? await intraData(k, CH.tf) : null); CH.model = m; msg.style.display = 'none';
     const age = (Date.now() - d.t[d.t.length - 1]) / 864e5;
     if (age > 5) CH.uy = [['⚠ Veri ' + new Date(d.t[d.t.length - 1]).toLocaleDateString('tr-TR') + ' tarihinde bitiyor: işlem görmüyor olabilir', '#dc2626'], ...(CH.uy || []).filter(u => !u[0].startsWith('⚠ Veri'))];
     drawChart(m); $('#chleg').innerHTML = legend(m); $('#chread').innerHTML = readout(m, m.c.length - 1);
@@ -205,3 +216,28 @@ function bindChart(k, r) {
   renderChart(k);
 }
 window.addEventListener('resize', () => { if (CH.model && $('#sarcv')) drawChart(CH.model); });
+
+/* ---------- kısa vade: 15 dk yana atan SAR taraması (canlı, Binance) ---------- */
+async function scalpScan() {
+  const out = $('#scalp-out'); out.innerHTML = '<p class="note">Taranıyor…</p>';
+  try {
+    let t = null;
+    for (const h of ['https://data-api.binance.vision', 'https://api.binance.com']) { try { const r = await fetch(h + '/api/v3/ticker/24hr'); if (r.ok) { t = await r.json(); break; } } catch (e) {} }
+    if (!t) throw new Error('Binance erişilemedi');
+    const bad = /^(USDC|FDUSD|TUSD|BUSD|DAI|USDP|EUR|TRY|USDE|XUSD|USD1|RLUSD|PAXG|WBTC)USDT$|(UP|DOWN|BULL|BEAR)USDT$/;
+    const top = t.filter(x => x.symbol.endsWith('USDT') && !bad.test(x.symbol) && +x.quoteVolume > 5e6).sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 5);
+    const res = await Promise.all(top.map(async x => {
+      const k = x.symbol.replace(/USDT$/, ''), b = await intraData(k, '15m'), S = sarSet(b), n = b.c.length;
+      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next) })).filter(z => z.v != null);
+      const yA = st.filter(z => z.flatRecent && z.side === 'alt'), yU = st.filter(z => z.flatRecent && z.side === 'ust');
+      return { k, chg: +x.priceChangePercent, px: b.c[n - 1], st, yA, yU };
+    }));
+    out.innerHTML = res.map(r => {
+      const v = r.yA.length ? ['pos', `Alttan yana atıyor → yükseliş beklenir. Stop: ${SN[r.yA[0].key]} ${fmt(r.yA[0].v)} (${pct(r.yA[0].dist)})`] :
+        r.yU.length ? ['neg', `Üstten yana atıyor → düşüş beklenir. Stop: ${SN[r.yU[0].key]} ${fmt(r.yU[0].v)} (${pct(r.yU[0].dist)})`] : ['', 'Şu an yana atan SAR yok, bekle.'];
+      return `<div class="krow" data-sk="${esc(r.k)}"><div class="t"><b>${esc(r.k)}</b><em><span class="num">${fmt(r.px)}</span> <span class="pos">${pct(r.chg)}</span></em></div>
+        <p class="note ${v[0]}" style="margin:4px 0 0;font-weight:600">${v[1]}</p>
+        <p class="note" style="margin:2px 0 0">${r.st.map(z => `${SN[z.key]} ${fmt(z.v)} ${z.side === 'alt' ? '↓' : '↑'}${z.flatRecent ? ' yana' : ''}`).join(' · ')}</p></div>`; }).join('') +
+      `<p class="note">Kural: SAR yana attıktan 1–2 mum (15–30 dk) sonra pozisyon kapatılır, stop SAR noktasına konur. Tarama ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} itibarıyla; kaldıraç yüksek risk taşır.</p>`;
+  } catch (e) { out.innerHTML = `<p class="err">15 dk taraması yapılamadı: ${esc(e.message)}</p>`; }
+}

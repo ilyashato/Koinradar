@@ -147,6 +147,10 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
     <button id="m-kripto" role="tab" aria-selected="false">Kripto</button>
   </div>
 
+  <div class="seg" role="tablist" aria-label="Vade" id="vade">
+    <button data-v="kisa" role="tab">Kısa vade</button><button data-v="orta" role="tab">Orta vade</button><button data-v="uzun" role="tab">Uzun vade</button>
+  </div>
+  <p class="note" id="vade-note" style="margin:-4px 2px 12px"></p>
   <input class="search" id="q" type="search" placeholder="Ara: THYAO" autocomplete="off" aria-label="Ara">
   <div class="tabs" role="tablist">
     <button class="tab" id="tab-tara" role="tab" aria-selected="true">Tarama</button>
@@ -156,6 +160,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 
   <section id="view-tara">
     <div class="panel" id="ozet"></div>
+    <div class="panel" id="scalp" hidden></div>
     <div class="panel">
       <p class="ph">SAR <b>filtreleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· seçtiklerinin hepsi aynı anda</span></p>
       <div class="chips" id="chips"></div>
@@ -240,6 +245,20 @@ const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'de
 
 /* ---------- durum ---------- */
 let M = LS.get('m', 'borsa'); if (!MK[M]) M = 'borsa';
+TFN['15m'] = '15 dk'; TFN['4S'] = '4 saatlik'; TFK['15m'] = '15dk'; TFK['4S'] = '4S';
+// Vade profilleri (notlardan): hangi zaman dilimlerine bakılacağı
+const PROF = {
+  borsa: {
+    kisa: { ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar ve günlük LRC/kesişme. Yükselen hisse günlük SAR\'a kadar düzeltme yapabilir; son günlük SAR\'ın altında kalırsa haftalık SAR\'ın çekimine girer. Düzeltmede alttaki günlük SAR\'a bakılır.' },
+    orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı. Haftalık SAR\'a temas olunca fiyat bir süre oyalanır; fiyat 3–6 aylık SAR\'a gitmeden haftalık/aylık SAR\'larda zig-zag yapar.' },
+    uzun: { ana: ['3A', '6A', '12A'], lv: ['A', '3A', '6A', '12A'], ilk: 'dongu', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: 3 ve 6 aylık SAR\'lar (BIST\'te en etkilisi, en etkili SAR Triple Moderate). 6 aylık SAR hissenin dibi olur. SAR döngüsüne göre aylık/3 aylık/6 aylık seç.' } },
+  kripto: {
+    kisa: { ana: ['G'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: '15m', not: 'Kısa vade: 15 dk yana atan SAR (Binance\'te en çok yükselen 4–5 coin; alttan yana atıyorsa yükselir, üstten düşer; 15–30 dk\'lık kaldıraçlı pozisyon, stop SAR noktasına, SAR yana attıktan 1–2 mum sonra kapat) ve günlük kesişme (kriptoda en etkilisi).' },
+    orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
+    uzun: { ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Kriptoda 6 aylık SAR\'a temas coinin %90–95 düştüğünü gösterir: alım fırsatı.' } },
+};
+let V = LS.get('vade', 'orta'); if (!PROF.borsa[V]) V = 'orta';
+const PR = () => { const p = PROF[M][V]; return { ...p, ilk: p.ilk === 'dongu' ? ST.borsa.dongu : p.ilk, vade: V }; };
 const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' } };
 const LF = Object.assign({ tf: 'H', band: 'alt', yon: 'alt', p: null }, LS.get('lrcf', {}));
 let shown = 60, curKod = null;
@@ -257,7 +276,8 @@ const sgn = x => (x == null ? '' : x > 0 ? 'pos' : x < 0 ? 'neg' : '');
 /* ---------- yardımcı: seviye merdiveni ---------- */
 function levels(r, opts = {}) {
   const cfg = MK[M], out = [];
-  for (const tf of cfg.tfs) { const row = r.tf && r.tf[tf]; if (!row) continue; if (opts.noG && tf === 'G') continue;
+  const lv = opts.all ? cfg.tfs : PR().lv;
+  for (const tf of cfg.tfs) { const row = r.tf && r.tf[tf]; if (!row) continue; if (!lv.includes(tf)) continue; if (opts.noG && tf === 'G' && lv.length > 1) continue;
     for (const k of [...cfg.aktif, 'ort']) { const x = row.s[k]; if (!x || x.v == null) continue; if (opts.noOrt && k === 'ort') continue; out.push({ ...x, tf, k }); } }
   return out;
 }
@@ -275,7 +295,8 @@ function yorum(r) {
   if (tsi.H && tsi.H.renk === 'kirmizi') g += ' Haftalık momentum yavaşlıyor; yakındaki SAR\'a temas ihtimali artar.';
   if (tsi.G && tsi.G.deger != null && Math.abs(tsi.G.deger) >= 0.8) g += tsi.G.deger > 0 ? ' Günlük TSI +0,8 üstünde (aşırı alım bölgesi).' : ' Günlük TSI −0,8 altında (aşırı satım bölgesi).';
   if (M === 'kripto') { const b = DATA.kripto && DATA.kripto.piyasaOzet && DATA.kripto.piyasaOzet.BTCUSDT; if (b && r.k !== 'BTC') g += ` BTC görünümü ${({ olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' })[b.durum]}; coin kararında BTC trendi gözetilmeli.`; }
-  else { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
+  else if (V === 'uzun') { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
+  g += ` Değerlendirme ${({ kisa: 'kısa', orta: 'orta', uzun: 'uzun' })[V]} vadeye göre (${PR().ana.map(t => TFN[t].toLowerCase()).join(', ')} SAR'lar).`;
   out.push(g);
 
   // 2) SAR merdiveni ve yana atmalar
@@ -293,7 +314,7 @@ function yorum(r) {
   if (has('tek')) s2.push('TEK SAR var: yükselişte tek barlık başarısız dönüş, yükseliş işareti.');
   if (has('birlesme')) s2.push('SAR birleşmesi var (Parabolic = Moderate = Fast).');
   // ilk SAR kuralı (döngü zaman diliminde)
-  const dtf = M === 'borsa' ? ST.borsa.dongu : 'H', row = r.tf && r.tf[dtf];
+  const dtf = PR().ilk, row = r.tf && r.tf[dtf];
   if (row) {
     const alt = cfg.aktif.map(k => row.s[k] && { ...row.s[k], k, tf: dtf }).filter(x => x && x.side === 'alt').sort((a, b) => b.v - a.v);
     const ust = cfg.aktif.map(k => row.s[k] && { ...row.s[k], k, tf: dtf }).filter(x => x && x.side === 'ust').sort((a, b) => a.v - b.v);
@@ -344,6 +365,57 @@ function yorum(r) {
   return out;
 }
 
+/* ---------- vade profiline göre sinyaller ---------- */
+function clustersP(levels, price) {
+  const out = [];
+  for (const side of ['alt', 'ust']) {
+    const L = levels.filter(x => x.side === side).sort((a, b) => a.v - b.v);
+    for (let i = 0; i < L.length; i++) { let j = i; while (j + 1 < L.length && L[j + 1].v <= L[i].v * 1.03) j++;
+      if (j - i + 1 >= 3) { const g = L.slice(i, j + 1); out.push({ side, lo: g[0].v, hi: g[g.length - 1].v, n: g.length, tfs: [...new Set(g.map(x => x.tf))], dist: +((g[0].v / price - 1) * 100).toFixed(2) }); i = j; } }
+  }
+  return out;
+}
+const POSP = ['alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'], NEGP = ['ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
+function profSig(r) {
+  if (r.sig0 == null) r.sig0 = r.sig || [];
+  const p = PR(), act = MK[M].aktif, s = new Set(), P = r.price;
+  const each = (tfs, fn) => { for (const tf of tfs) { const row = r.tf && r.tf[tf]; if (!row) continue; for (const k of act) { const x = row.s[k]; if (x) fn(x, tf, k, row); } } };
+  each(p.ana, x => { if (x.flatRecent && x.side === 'alt') s.add('alt_yana'); if (x.flatRecent && x.side === 'ust') s.add('ust_yana'); if (x.igne) s.add('igne');
+    if (x.flipped && x.side === 'alt') s.add('direnc_asildi'); if (x.flipped && x.side === 'ust') s.add('destek_kayip'); if (x.tek) s.add('tek'); });
+  for (const tf of p.ana) if (r.tf && r.tf[tf] && r.tf[tf].birlesme) s.add('birlesme');
+  const lv = []; each(p.lv, (x, tf, k) => lv.push({ ...x, tf, k })); each(['ort'].length ? [] : [], () => {});
+  r.kume = clustersP(lv, P);
+  if (r.kume.some(k => k.side === 'alt' && k.tfs.includes('3A') && k.tfs.includes('6A') && k.dist > -25)) s.add('cakisma');
+  if (p.ana.includes('6A')) each(['6A'], x => { if (x.side === 'alt' && x.dist > -5) s.add('dip6a'); });
+  const m = r.tf && r.tf.A;
+  if (V !== 'kisa' && m && r.ema21g) { const up = act.concat('ort').map(k => m.s[k]).filter(x => x && x.side === 'ust' && x.dist < 25); if (up.length >= 3 && up.filter(x => x.v < r.ema21g).length >= 3) s.add('aylik_tepki'); }
+  const g = r.tf && r.tf.G; if (V !== 'uzun' && g && act.every(k => g.s[k] && g.s[k].side === 'ust')) s.add('trend_bozuk');
+  const LA = (r.lrc || {})[p.lrcAlt] || {}, LK = (r.lrc || {})[p.kes] || {}, LH = (r.lrc || {}).H || {};
+  if (LA.konum === 'alt') s.add('lrc_alt');
+  if (LH.ortaKat >= 2) s.add('lrc_pahali');
+  const kes = LK.kesisme || [], lastK = kes[kes.length - 1], lim = p.kes === 'G' ? 20 : 8;
+  if (lastK && lastK.ago <= lim) s.add(lastK.tip === 'yesil' ? 'kes_yesil' : 'kes_turuncu');
+  const yor = LK.yorum || [];
+  if (lastK && lastK.ago <= lim + 10 && yor.includes('ideal')) s.add('kes_ideal');
+  if (lastK && lastK.ago <= lim + 10 && yor.some(y => ['tehlikeli', 'arka_arkaya', 'coklu', 'yeni_bant', 'kacti'].includes(y))) s.add('kes_risk');
+  for (const k of ['kes_usd', 'kes_btc', 'derin']) if (r.sig0.includes(k)) s.add(k);
+  if (p.tsi.every(t => r.tsi && r.tsi[t] && r.tsi[t].renk === 'yesil')) s.add('tsi_yesil');
+  r.sig = [...s]; r.puan = r.sig.filter(x => POSP.includes(x)).length - r.sig.filter(x => NEGP.includes(x)).length;
+  r.durum = r.puan >= 2 ? 'olumlu' : r.puan <= -2 ? 'olumsuz' : 'notr';
+}
+function applyProfile() {
+  const d = DATA[M]; if (!d) return; MK[M].ana = PR().ana;
+  d.rows.forEach(profSig); Object.values(d.piyasaOzet || {}).forEach(profSig);
+  SIG.tsi_yesil[0] = 'Linear TSI yeşil (' + PR().tsi.map(t => TFK[t]).join('+') + ')';
+}
+function drawVade() {
+  $('#vade').querySelectorAll('[data-v]').forEach(b => b.setAttribute('aria-selected', b.dataset.v === V));
+  $('#vade-note').textContent = PR().not;
+  $('#dongu-box').hidden = !(M === 'borsa' && V === 'uzun');
+  $('#scalp').hidden = !(M === 'kripto' && V === 'kisa');
+  if (M === 'kripto' && V === 'kisa' && !$('#scalp').innerHTML) $('#scalp').innerHTML = `<p class="ph">15 dk <b>yana atan SAR</b></p><p class="note" style="margin-top:0">Binance'te son 24 saatte en çok yükselen 5 coinin 15 dakikalık grafiği canlı taranır. Bu coinler genelde alttan yana atar (short açanları avlamak için). Kaldıraçlı, anlık takip gerektiren bir yöntemdir; yatırım tavsiyesi değildir.</p><button class="btn" id="scalp-go" style="width:100%">Şimdi tara</button><div id="scalp-out"></div>`;
+}
+
 /* ---------- tarama ---------- */
 function rows() { const d = DATA[M]; return d ? d.rows : []; }
 function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Math.abs(x.dist) : 999; }
@@ -371,7 +443,7 @@ function drawChips() {
   $('#lrc-pct').innerHTML = [null, 0, 5, 10, 20, 30, 50, 100].map(v => `<button class="chip" data-lp="${v}" aria-pressed="${LF.p === v}">${v == null ? 'Kapalı' : '%' + v + '+'}</button>`).join('');
   $('#lrc-note').textContent = LF.p == null ? 'Bir yüzde seçince liste, fiyatın seçili LRC bandına uzaklığına göre süzülür.' :
     `${TFN[LF.tf]} LRC ${BN[LF.band].toLowerCase()} seviyesinin en az %${LF.p} ${LF.yon === 'alt' ? 'altında' : 'üstünde'} olanlar. Uzaklık = fiyat / bant − 1.`;
-  $('#dongu-box').hidden = M !== 'borsa';
+  $('#dongu-box').hidden = !(M === 'borsa' && V === 'uzun');
   if (M === 'borsa') {
     $('#dongu').innerHTML = ['A', '3A', '6A'].map(t => `<button class="chip" data-g="${t}" aria-pressed="${ST.borsa.dongu === t}">${TFN[t]}</button>`).join('');
     $('#dongu-note').textContent = 'BIST\'in hangi SAR döngüsündeyse o zaman dilimine bakmak avantajlı (ör. seçim öncesi aylık, sonrası 3 aylık, Temmuz–Aralık 6 aylık). Yorumdaki "ilk SAR" ve kademeli alım seviyesi bu seçime göre yazılır.';
@@ -443,6 +515,7 @@ function openCard(k, src) {
    <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
    ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
   window.scrollTo({ top: 0 });
+  if (CH.vade !== V || CH.m !== M) { CH.tf = PR().chart; CH.vade = V; CH.m = M; }
   bindChart(r.k, r);
 }
 
@@ -451,6 +524,7 @@ function drawRehber() {
   const cfg = MK[M];
   $('#rehber').innerHTML = `<div class="panel"><p class="ph">${cfg.ad} <b>ayarları</b></p><p class="note" style="margin-top:0">Aktif SAR'lar: ${cfg.set}. ${cfg.taraf}</p>
    <p class="note">SAR parametreleri (ULUDAĞ SAR kodu): Parabolic 0,02/0,02/0,2 · Linear 0,02/0,01/0,1 · Lucid 0,02/0,02/0,2 · Triple Slow 0,01/0,01/0,2 · Moderate 0,01/0,02/0,2 · Fast 0,01/0,03/0,2 · SAR Ort. = (Linear + Parabolic + Lucid)/3. LRC uzunluk 300 (sağlama 298). Linear TSI: TSI(3,9) üzerine 10 barlık regresyon; eğim artıyorsa yeşil.</p></div>
+   <div class="panel"><p class="ph">Vade <b>profilleri</b></p>${['kisa', 'orta', 'uzun'].map(v => `<div class="krow" style="cursor:default"><div class="t"><b>${({ kisa: 'Kısa vade', orta: 'Orta vade', uzun: 'Uzun vade' })[v]}</b><em>${PROF[M][v].ana.map(t => TFN[t]).join(', ')}</em></div><p class="note" style="margin:4px 0 0">${PROF[M][v].not}</p></div>`).join('')}<p class="note">Seçtiğin vade; filtreleri, durum puanını, SAR merdivenini, yorumdaki "ilk SAR" zaman dilimini ve grafiğin açılış zaman dilimini belirler.</p></div>
    <div class="panel"><p class="ph">Sinyaller</p>${ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<div class="krow" style="cursor:default"><div class="t"><b class="${SIG[k][1]}">${esc(SIG[k][0])}</b></div><p class="note" style="margin:4px 0 0">${esc(SIG[k][2])}</p></div>`).join('')}</div>
    <div class="panel"><p class="ph">Temel <b>kurallar</b></p><ul class="note" style="padding-left:18px;display:flex;flex-direction:column;gap:6px;margin:0">
     <li>Asıl yükseliş SAR'dan düzeltme yapıp tekrar yükselince, asıl düşüş SAR'dan tepki alıp tekrar düşünce olur.</li>
@@ -476,13 +550,15 @@ $('#ozet').onclick = e => { const c = e.target.closest('[data-oz]'); if (!c) ret
 $('#kart').onclick = e => { const b = e.target.closest('[data-info]'); if (b) { const s = SIG[b.dataset.info]; sheet('Sinyal', s[0], `<div class="sh-sec"><p>${esc(s[2])}</p></div>`); } };
 $('#chips').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; const s = ST[M], k = b.dataset.c; s.chips = s.chips.includes(k) ? s.chips.filter(x => x !== k) : [...s.chips, k]; LS.set('chips_' + M, s.chips); shown = 60; drawChips(); drawList(); };
 $('#durum').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; ST[M].durum = b.dataset.d; shown = 60; drawChips(); drawList(); };
-$('#dongu').onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ST.borsa.dongu = b.dataset.g; LS.set('dongu', b.dataset.g); drawChips(); };
+$('#dongu').onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ST.borsa.dongu = b.dataset.g; LS.set('dongu', b.dataset.g); applyProfile(); drawChips(); drawList(); };
 for (const [id, key, conv] of [['#lrc-tf', 'lt', x => x], ['#lrc-band', 'lb', x => x], ['#lrc-yon', 'ly', x => x], ['#lrc-pct', 'lp', x => (x === 'null' ? null : +x)]])
   $(id).onclick = e => { const b = e.target.closest('[data-' + key + ']'); if (!b) return; const f = { lt: 'tf', lb: 'band', ly: 'yon', lp: 'p' }[key]; LF[f] = conv(b.dataset[key]); LS.set('lrcf', LF); shown = 60; drawChips(); drawList(); };
 $('#sort').onchange = e => { ST[M].sort = e.target.value; drawList(); };
 $('#clear').onclick = () => { LF.p = null; LS.set('lrcf', LF); ST[M].chips = []; ST[M].durum = 'hepsi'; LS.set('chips_' + M, []); $('#q').value = ''; drawChips(); drawList(); };
 $('#q').oninput = () => { shown = 60; drawList(); };
 $('#more').onclick = () => { shown += 60; drawList(); };
+$('#vade').onclick = e => { const b = e.target.closest('[data-v]'); if (!b) return; V = b.dataset.v; LS.set('vade', V); CH.tf = PR().chart; applyProfile(); drawVade(); drawOzet(); drawChips(); drawList(); if (curKod && !$('#view-kart').hidden) openCard(curKod); };
+$('#scalp').onclick = e => { if (e.target.closest('#scalp-go')) scalpScan(); const c = e.target.closest('[data-sk]'); if (c && rows().some(r => r.k === c.dataset.sk)) openCard(c.dataset.sk); };
 $('#m-borsa').onclick = () => setM('borsa'); $('#m-kripto').onclick = () => setM('kripto');
 
 async function load(m) {
@@ -499,7 +575,7 @@ async function setM(m) {
     const d = await load(m); if (M !== m) return;
     const t = new Date(d.generated);
     $('#status').textContent = `${d.rows.length} ${MK[m].birim} · veri: ${t.toLocaleDateString('tr-TR')} ${t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${m === 'borsa' ? 'Yahoo Finance günlük' : 'Binance günlük'}`;
-    drawOzet(); drawChips(); drawList();
+    applyProfile(); drawVade(); drawOzet(); drawChips(); drawList();
   } catch (e) {
     $('#status').textContent = '';
     $('#list').innerHTML = `<div class="err">${MK[m].ad} SAR verisi henüz yok. GitHub → Actions → <b>SAR veri</b> → Run workflow ile üretilir (hafta içi her akşam otomatik).</div>`;
@@ -765,10 +841,20 @@ function analyze(daily, cfg) {
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
 const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
-const OCOL = { H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
-const NBAR = { G: 180, H: 160, A: 120 };
+const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
+const NBAR = { '15m': 200, '4S': 180, G: 180, H: 160, A: 120 };
+const INTRA = { '15m': '15m', '4S': '4h' };
 const TZ = () => (M === 'borsa' ? 3 : 0);
 
+async function intraData(k, tf) {
+  const key = 'i:' + k + ':' + tf; CH.ic = CH.ic || {}; if (CH.ic[key] && Date.now() - CH.ic[key].at < 60e3) return CH.ic[key].d;
+  for (const h of ['https://data-api.binance.vision', 'https://api.binance.com']) {
+    try { const r = await fetch(`${h}/api/v3/klines?symbol=${k}USDT&interval=${INTRA[tf]}&limit=1000`); if (!r.ok) continue; const a = await r.json();
+      const o = { t: [], o: [], h: [], l: [], c: [], v: [] }; for (const x of a) { o.t.push(x[0]); o.o.push(+x[1]); o.h.push(+x[2]); o.l.push(+x[3]); o.c.push(+x[4]); o.v.push(+x[7]); }
+      if (o.c.length) { CH.ic[key] = { d: o, at: Date.now() }; return o; } } catch (e) {}
+  }
+  throw new Error('Binance ' + INTRA[tf]);
+}
 async function chartData(k) {
   const key = M + ':' + k; if (CH.key === key && CH.daily) return CH.daily;
   let d = null;
@@ -802,12 +888,12 @@ function pkey(t, tf, tz) {
   if (tf === 'A') return y * 12 + m; if (tf === '3A') return y * 4 + Math.floor(m / 3); if (tf === '6A') return y * 2 + Math.floor(m / 6); return y;
 }
 
-function chartModel(daily, tf) {
-  const tz = TZ(), b = resample(daily, tf, tz), n = b.c.length, N = Math.min(NBAR[tf], n), from = n - N;
+function chartModel(daily, tf, intra) {
+  const tz = TZ(), b = intra || resample(daily, tf, tz), n = b.c.length, N = Math.min(NBAR[tf], n), from = n - N;
   const S = sarSet(b), cfg = MK[M];
   const sars = [...cfg.aktif, 'ort'].map(k => ({ k, v: S[k].s.slice(from) }));
   // üst zaman dilimi SAR Ort. (Pine: request.security, lookahead kapalı → o dönemin canlı değeri)
-  const order = ['G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => (M === 'borsa' || x !== '12A'));
+  const order = ['15m', '4S', 'G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x]).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
   const orts = up.map(ht => {
     const hb = resample(daily, ht, tz), hs = sarSet(hb).ort.s, mp = new Map(); hb.t.forEach((t, i) => mp.set(pkey(t, ht, tz), hs[i]));
     return { tf: ht, v: b.t.slice(from).map(t => mp.get(pkey(t, ht, tz)) ?? null) };
@@ -852,7 +938,7 @@ function drawChart(m) {
   for (let k = 0; k <= 5; k++) { const v = lo + (hi - lo) * k / 5, yy = y(v); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - padR, yy); g.stroke(); g.fillText(fmt(v), W - padR + 4, yy + 3); }
   // tarih etiketleri
   const step = Math.max(1, Math.round(N / 5));
-  for (let i = 0; i < N; i += step) { const d = new Date(m.t[i] + TZ() * 3600e3); g.fillText(m.tf === 'G' ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : d.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' }), x(i) - 14, H - 4); }
+  for (let i = 0; i < N; i += step) { const d = new Date(m.t[i] + TZ() * 3600e3); g.fillText(INTRA[m.tf] ? d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : m.tf === 'G' ? d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : d.toLocaleDateString('tr-TR', { month: 'short', year: '2-digit' }), x(i) - 14, H - 4); }
   g.save(); g.beginPath(); g.rect(0, 0, W - padR, H - padB); g.clip();
   // LRC
   if (CH.on.lrc && m.lrc) {
@@ -904,7 +990,7 @@ function drawChart(m) {
 
 function readout(m, i) {
   if (!m || i == null) return '';
-  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleDateString('tr-TR');
+  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', year: 'numeric' });
   const s = m.sars.filter(z => z.v[i] != null).map(z => `<span style="color:${SCOL[z.k]}">■</span> ${SN[z.k]} <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
   const o = m.orts.filter(z => z.v[i] != null).map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort. <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
   const L = m.lrc && m.lrc.mh[i] != null ? ` · LRC orta <b class="num">${fmt(m.lrc.mh[i])} / ${fmt(m.lrc.ml[i])}</b>, kanal <b class="num">${fmt(m.lrc.up[i])} / ${fmt(m.lrc.lo[i])}</b>` : '';
@@ -913,7 +999,7 @@ function readout(m, i) {
 
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
-    <div class="chips" id="chtf">${['G', 'H', 'A'].map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
+    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
@@ -954,7 +1040,8 @@ async function renderChart(k) {
   const msg = $('#chmsg'); CH.pick = null;
   try {
     const d = await chartData(k); if (!$('#sarcv')) return;
-    const m = chartModel(d, CH.tf); CH.model = m; msg.style.display = 'none';
+    if (INTRA[CH.tf] && M !== 'kripto') CH.tf = 'G';
+    const m = chartModel(d, CH.tf, INTRA[CH.tf] ? await intraData(k, CH.tf) : null); CH.model = m; msg.style.display = 'none';
     const age = (Date.now() - d.t[d.t.length - 1]) / 864e5;
     if (age > 5) CH.uy = [['⚠ Veri ' + new Date(d.t[d.t.length - 1]).toLocaleDateString('tr-TR') + ' tarihinde bitiyor: işlem görmüyor olabilir', '#dc2626'], ...(CH.uy || []).filter(u => !u[0].startsWith('⚠ Veri'))];
     drawChart(m); $('#chleg').innerHTML = legend(m); $('#chread').innerHTML = readout(m, m.c.length - 1);
@@ -968,6 +1055,31 @@ function bindChart(k, r) {
   renderChart(k);
 }
 window.addEventListener('resize', () => { if (CH.model && $('#sarcv')) drawChart(CH.model); });
+
+/* ---------- kısa vade: 15 dk yana atan SAR taraması (canlı, Binance) ---------- */
+async function scalpScan() {
+  const out = $('#scalp-out'); out.innerHTML = '<p class="note">Taranıyor…</p>';
+  try {
+    let t = null;
+    for (const h of ['https://data-api.binance.vision', 'https://api.binance.com']) { try { const r = await fetch(h + '/api/v3/ticker/24hr'); if (r.ok) { t = await r.json(); break; } } catch (e) {} }
+    if (!t) throw new Error('Binance erişilemedi');
+    const bad = /^(USDC|FDUSD|TUSD|BUSD|DAI|USDP|EUR|TRY|USDE|XUSD|USD1|RLUSD|PAXG|WBTC)USDT$|(UP|DOWN|BULL|BEAR)USDT$/;
+    const top = t.filter(x => x.symbol.endsWith('USDT') && !bad.test(x.symbol) && +x.quoteVolume > 5e6).sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 5);
+    const res = await Promise.all(top.map(async x => {
+      const k = x.symbol.replace(/USDT$/, ''), b = await intraData(k, '15m'), S = sarSet(b), n = b.c.length;
+      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next) })).filter(z => z.v != null);
+      const yA = st.filter(z => z.flatRecent && z.side === 'alt'), yU = st.filter(z => z.flatRecent && z.side === 'ust');
+      return { k, chg: +x.priceChangePercent, px: b.c[n - 1], st, yA, yU };
+    }));
+    out.innerHTML = res.map(r => {
+      const v = r.yA.length ? ['pos', `Alttan yana atıyor → yükseliş beklenir. Stop: ${SN[r.yA[0].key]} ${fmt(r.yA[0].v)} (${pct(r.yA[0].dist)})`] :
+        r.yU.length ? ['neg', `Üstten yana atıyor → düşüş beklenir. Stop: ${SN[r.yU[0].key]} ${fmt(r.yU[0].v)} (${pct(r.yU[0].dist)})`] : ['', 'Şu an yana atan SAR yok, bekle.'];
+      return `<div class="krow" data-sk="${esc(r.k)}"><div class="t"><b>${esc(r.k)}</b><em><span class="num">${fmt(r.px)}</span> <span class="pos">${pct(r.chg)}</span></em></div>
+        <p class="note ${v[0]}" style="margin:4px 0 0;font-weight:600">${v[1]}</p>
+        <p class="note" style="margin:2px 0 0">${r.st.map(z => `${SN[z.key]} ${fmt(z.v)} ${z.side === 'alt' ? '↓' : '↑'}${z.flatRecent ? ' yana' : ''}`).join(' · ')}</p></div>`; }).join('') +
+      `<p class="note">Kural: SAR yana attıktan 1–2 mum (15–30 dk) sonra pozisyon kapatılır, stop SAR noktasına konur. Tarama ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} itibarıyla; kaldıraç yüksek risk taşır.</p>`;
+  } catch (e) { out.innerHTML = `<p class="err">15 dk taraması yapılamadı: ${esc(e.message)}</p>`; }
+}
 
 /*SAR-GOMULU-BITIR*/
 </script>
