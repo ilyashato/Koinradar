@@ -146,6 +146,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 .ro-leg{margin-top:10px} .ro-leg summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--accent)}
 .ro-chips{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0}
 #chfs{position:fixed;inset:0;z-index:50;background:var(--bg,#fff);overflow:auto;padding:12px 12px calc(16px + env(safe-area-inset-bottom))}#chfs .fs-head{display:flex;align-items:center;gap:8px;font-size:17px;margin-bottom:8px}#chfs .ro-g{grid-template-columns:1fr 1fr}
+.fav{background:none;border:0;padding:0 6px 0 0;font-size:20px;line-height:1;color:var(--mute);cursor:pointer;vertical-align:-2px}.fav.on{color:#e0a800}
 .lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
 </style></head>
 <body>
@@ -297,6 +298,11 @@ const PR = () => { const p = PROF[M][V]; return { ...p, ilk: p.ilk === 'dongu' ?
 const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' }, makro: { chips: LS.get('chips_makro', []), durum: 'hepsi', sort: 'grp', grp: 'hepsi' } };
 const LF = Object.assign({ tf: 'H', band: 'alt', yon: 'alt', p: null }, LS.get('lrcf', {}));
 let shown = 60, curKod = null;
+// Favoriler (piyasa başına ayrı)
+const FAV = { borsa: LS.get('fav_borsa', []), kripto: LS.get('fav_kripto', []), makro: LS.get('fav_makro', []) };
+const isFav = k => FAV[M].includes(k);
+function togFav(k) { FAV[M] = isFav(k) ? FAV[M].filter(x => x !== k) : [...FAV[M], k]; LS.set('fav_' + M, FAV[M]); }
+const star = k => `<button class="fav ${isFav(k) ? 'on' : ''}" data-fav="${esc(k)}" aria-label="Favori">${isFav(k) ? '★' : '☆'}</button>`;
 // seçili LRC bandına yüzde uzaklık (+ üstünde, − altında)
 function lrcDist(r, tf = LF.tf, band = LF.band) {
   const L = r.lrc && r.lrc[tf]; if (!L || L.yok || r.price == null) return null;
@@ -603,13 +609,13 @@ function rows() { const d = DATA[M]; return d ? d.rows : []; }
 function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Math.abs(x.dist) : 999; }
 function filtered() {
   const s = ST[M], q = $('#q').value.trim().toLocaleUpperCase('tr-TR');
-  let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || r.durum === s.durum));
+  let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || (s.durum === 'fav' ? isFav(r.k) : r.durum === s.durum)));
   if (M === 'makro' && s.grp !== 'hepsi') L = L.filter(r => r.grp === s.grp);
   if (LF.p != null) L = L.filter(r => { const d = lrcDist(r); if (d == null) return false; return LF.yon === 'alt' ? d <= -LF.p : d >= LF.p; });
   const by = { puan: (a, b) => b.puan - a.puan || (b.chg || 0) - (a.chg || 0), chg: (a, b) => (b.chg || 0) - (a.chg || 0), kod: (a, b) => a.k.localeCompare(b.k, 'tr'),
     sup: (a, b) => supDist(a) - supDist(b), grp: (a, b) => Object.keys(GRP).indexOf(a.grp) - Object.keys(GRP).indexOf(b.grp) || b.puan - a.puan, lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999),
     lrcd: (a, b) => { const x = lrcDist(a), y = lrcDist(b); if (x == null) return 1; if (y == null) return -1; return LF.yon === 'alt' ? x - y : y - x; } }[s.sort];
-  return L.sort(by);
+  return L.sort((a, b) => (isFav(b.k) - isFav(a.k)) || by(a, b));
 }
 function sigChips(r, max = 6) {
   const L = ORDER.filter(k => r.sig.includes(k)).slice(0, max);
@@ -618,7 +624,7 @@ function sigChips(r, max = 6) {
 function drawChips() {
   const s = ST[M], cnt = k => rows().filter(r => r.sig.includes(k)).length;
   $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : M === 'makro' ? k !== 'kes_btc' && k !== 'kes_usd' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
-  $('#durum').innerHTML = [['hepsi', 'Tümü'], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
+  $('#durum').innerHTML = [['hepsi', 'Tümü'], ['fav', `★ Favoriler ${FAV[M].length}`], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
   const BN = { alt: 'Alt bant', orta: 'Orta', ust: 'Üst bant' };
   $('#lrc-tf').innerHTML = ['G', 'H'].map(t => `<button class="chip" data-lt="${t}" aria-pressed="${LF.tf === t}">${TFN[t]} LRC</button>`).join('');
   $('#lrc-band').innerHTML = ['alt', 'orta', 'ust'].map(b => `<button class="chip" data-lb="${b}" aria-pressed="${LF.band === b}">${BN[b]}</button>`).join('');
@@ -646,7 +652,7 @@ function drawList() {
   $('#count').textContent = `${L.length} ${cfg.birim} · ${rows().length} içinden`;
   $('#list').innerHTML = L.slice(0, shown).map(r => {
     const sp = nearest(r, 'alt', { noG: true }), rs = nearest(r, 'ust', { noG: true }), L2 = r.lrc && r.lrc.G, e = L2 && (L2.kesisme || []).at(-1);
-    return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div><span class="kod">${esc(r.k)}</span>${r.ad ? ` <span class="mut" style="font-size:12.5px">${esc(r.ad)}</span>` : ''} <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
+    return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div>${star(r.k)}<span class="kod">${esc(r.k)}</span>${r.ad ? ` <span class="mut" style="font-size:12.5px">${esc(r.ad)}</span>` : ''} <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
       <div class="mini"><div><span>Destek</span><b>${sp ? fmt(sp.v) : '—'}</b></div><div><span>Uzaklık</span><b>${sp ? pct(sp.dist) : '—'}</b></div><div><span>Direnç</span><b>${rs ? fmt(rs.v) : '—'}</b></div><div><span>Kesişme</span><b>${e && e.ago <= 60 ? (e.tip === 'yesil' ? 'Yeşil' : 'Turuncu') + ' ' + e.ago + 'b' : '—'}</b></div></div>
       <div class="sigs">${(() => { const d = lrcDist(r); return d == null ? '' : `<span class="sg ${d < 0 ? 'neg' : 'pos'}">${TFN[LF.tf]} LRC ${({ alt: 'alt', orta: 'orta', ust: 'üst' })[LF.band]}: ${pct(d)}</span>`; })()}${sigChips(r)}</div></div>`; }).join('') || `<div class="panel note">Filtreye uyan ${cfg.birim} yok.</div>`;
   $('#more').hidden = L.length <= shown;
@@ -692,7 +698,7 @@ function openCard(k, src) {
   const ek = M === 'borsa' ? (r.usdKes ? `<p class="note">Dolar bazlı son kesişme: ${r.usdKes.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${r.usdKes.ago} bar önce.</p>` : '') :
     [['BTC', r.btcKes], ['ETH', r.ethKes]].filter(z => z[1]).map(([n, e]) => `<p class="note">${n} paritesinde son kesişme: ${e.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${e.ago} bar önce.</p>`).join('');
   const stats = DATA[M].stats || {}, stTxt = r.sig.map(k => { const s = stats[k]; const g = s && (s.g30 || s.g10); return g ? `<li>${esc(SIG[k][0])}: ${s.g30 ? '30' : '10'} günde ort. ${pct(g.ort)}, kazanma %${g.kaz} (${g.n} sinyal)</li>` : ''; }).join('');
-  $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad}${r.grp ? ' · ' + GRP[r.grp] : ''} · SAR</div><div class="nm">${esc(r.k)}</div>${r.ad ? `<div class="mut" style="font-size:13px;margin:-2px 0 6px">${esc(r.ad)}</div>` : ''}<span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
+  $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad}${r.grp ? ' · ' + GRP[r.grp] : ''} · SAR</div><div class="nm">${star(r.k)} ${esc(r.k)}</div>${r.ad ? `<div class="mut" style="font-size:13px;margin:-2px 0 6px">${esc(r.ad)}</div>` : ''}<span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
      <div class="row2"><div class="price num">${fmt(P)}</div><div class="num ${sgn(r.chg)}">${pct(r.chg)}</div></div><div class="sigs">${ORDER.filter(k => r.sig.includes(k)).map(k => `<button class="sg ${SIG[k][1]}" data-info="${k}">${esc(SIG[k][0])} ⓘ</button>`).join('')}</div></div>
    ${notPanel(r)}
    ${basit(r)}
@@ -740,9 +746,9 @@ $('#sclose').onclick = $('#sbg').onclick = () => { $('#sheet').hidden = true; };
 /* ---------- gezinme ---------- */
 function setTab(t) { for (const x of ['tara', 'kart', 'rehber']) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#view-' + x).hidden = x !== t; } if (t === 'rehber') drawRehber(); }
 $('#tab-tara').onclick = () => setTab('tara'); $('#tab-kart').onclick = () => { setTab('kart'); }; $('#tab-rehber').onclick = () => setTab('rehber');
-$('#list').onclick = e => { const c = e.target.closest('.sc'); if (c) openCard(c.dataset.k); };
+$('#list').onclick = e => { const f = e.target.closest('[data-fav]'); if (f) { togFav(f.dataset.fav); drawChips(); drawList(); return; } const c = e.target.closest('.sc'); if (c) openCard(c.dataset.k); };
 $('#ozet').onclick = e => { const c = e.target.closest('[data-oz]'); if (!c) return; const r = DATA[M].piyasaOzet[c.dataset.oz]; openCard(c.dataset.oz, { ...r, k: c.dataset.oz.replace('USDT', '') }); };
-$('#kart').onclick = e => { const b = e.target.closest('[data-info]'); if (b) { const s = SIG[b.dataset.info]; sheet('Sinyal', s[0], `<div class="sh-sec"><p>${esc(s[2])}</p></div>`); } };
+$('#kart').onclick = e => { const f = e.target.closest('[data-fav]'); if (f) { togFav(f.dataset.fav); f.classList.toggle('on', isFav(f.dataset.fav)); f.textContent = isFav(f.dataset.fav) ? '★' : '☆'; return; } const b = e.target.closest('[data-info]'); if (b) { const s = SIG[b.dataset.info]; sheet('Sinyal', s[0], `<div class="sh-sec"><p>${esc(s[2])}</p></div>`); } };
 $('#chips').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; const s = ST[M], k = b.dataset.c; s.chips = s.chips.includes(k) ? s.chips.filter(x => x !== k) : [...s.chips, k]; LS.set('chips_' + M, s.chips); shown = 60; drawChips(); drawList(); };
 $('#durum').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; ST[M].durum = b.dataset.d; shown = 60; drawChips(); drawList(); };
 $('#dongu').onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ST.borsa.dongu = b.dataset.g; LS.set('dongu', b.dataset.g); applyProfile(); drawChips(); drawList(); };
