@@ -238,6 +238,8 @@ const MK = {
 const GRP = { hepsi: 'Tümü', maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto', rasyo: 'Rasyolar' };
 // sinyal: etiket, ton, açıklama (kural kaynağı)
 const SIG = {
+  cekim_alt: ['Güçlü çekim aşağıda', 'neg', 'Fiyatı alttaki bir SAR güçlü çekiyor (yakın, kümelenmiş ve/veya TSI kırmızı): önce o seviyeye düzeltme beklenir.'],
+  cekim_ust: ['Güçlü çekim yukarıda', 'pos', 'Fiyatı üstteki bir SAR güçlü çekiyor: önce o seviyeye tepki beklenir.'],
   med_ust: ['Medyan üstünde', 'pos', 'Fiyat seçili vadenin medyanının üstünde (medyan "yeşil"). Sistem: medyan üstü yükseliş; üstünde kaldıkça medyan yukarı güncellenir. Anlık sarkmalarda renk değişebilir, gün sonu önemli.'],
   med_alt: ['Medyan altında', 'neg', 'Fiyat medyanın altında (medyan "kırmızı"). Kriptoda medyan altı düşüş demek ("onsla eşitlenir"); BIST\'te düşüşten çok sıkışma. Kırılan medyan direnç olur.'],
   med_fark: ['Medyan–ortalama farkı %10+', 'neg', 'Son 50 kapanışın aritmetik ortalaması ile medyanı arasındaki fark %10\'u geçmiş. Sistem: fark %10\'u geçerse derin düzeltme gelir.'],
@@ -264,7 +266,7 @@ const SIG = {
   tsi_yesil: ['Linear TSI yeşil (G+H)', 'pos', 'Günlük ve haftalık Linear TSI yeşil: TSI regresyon eğimi artıyor (momentum hızlanıyor). Kırmızı = yavaşlıyor, yakındaki SAR\'a temas beklenir.'],
   derin: ['Derin düşüş', '', 'Son 300 barın zirvesinden hissede %70+, kriptoda %85+ düşmüş. İdeal kesişme bu tür grafiklerde aranır.'],
 };
-const ORDER = ['med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test'];
+const ORDER = ['med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test', 'cekim_ust', 'cekim_alt'];
 const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'den fazla kaçmış, sinyal bitmiş sayılır', arka_arkaya: 'yeşil ve turuncu arka arkaya geldi: vur-kaç, en hızlı yükseliş ya da düşüşün habercisi', ideal: 'yeşil → test düşüşü → turuncu sırası ve orta bant yukarı: ideal kesişme', tehlikeli: 'bant aşağı giderken düzeltmesiz gelen kesişme: tehlikeli, sonraki turuncu görmezden gelinmeli', coklu: 'son 60 barda 4+ kesişme: çoklu kesişme, iptal riski yüksek', yeni_bant: 'bant yeni oluştu (300 barlık geçmiş yeni doldu): o an görmezden gelinir' };
 
 /* ---------- durum ---------- */
@@ -312,6 +314,32 @@ function levels(r, opts = {}) {
 const lvName = x => `${TFN[x.tf]} ${SN[x.k]}`;
 function nearest(r, side, opts) { const L = levels(r, opts).filter(x => x.side === side); if (!L.length) return null; return L.sort((a, b) => side === 'alt' ? b.v - a.v : a.v - b.v)[0]; }
 
+/* ---------- çekim: fiyatı hangi SAR kendine çekiyor? ---------- */
+// Kurallar (ULUDAĞ): birbirine yakın SAR'ların çekim gücü fazla; fark fazlaysa temas haftaya kalabilir; Linear TSI kırmızıysa temas
+// gerçekleşmeli; bir SAR'ın altındaki tüm SAR'lara temas edildiyse gideceği yer o SAR; iğne atılan SAR %90 yana atar (çekim biter);
+// yana atan SAR'a temas beklenmez; temas edince çekim biter, sonraki SAR'ın itme kuvveti (tepki/düzeltme) devreye girer.
+function cekim(r) {
+  const p = PR(), L = levels(r, { noOrt: true }).filter(x => x.v != null), tk = p.tsi[p.tsi.length - 1], ts = r.tsi && r.tsi[tk];
+  if (!L.length) return null;
+  const out = L.map(x => {
+    let s = 0; const why = [];
+    if (x.eta != null) { const e = x.eta; s += e <= 1 ? 40 : e <= 3 ? 30 : e <= 6 ? 20 : e <= 12 ? 10 : 0; why.push(`fiyat yatay kalırsa ≈${e} ${TFN[x.tf].toLowerCase()} barda temas`); }
+    else s += Math.max(0, 25 - Math.abs(x.dist) * 2);
+    const yak = L.filter(y => y !== x && y.side === x.side && Math.abs(y.v / x.v - 1) <= 0.015).length;
+    if (yak) { s += Math.min(24, yak * 8); why.push(`${yak + 1} SAR birbirine çok yakın`); }
+    if (ts && ts.renk === 'kirmizi' && x.side === 'alt') { s += 10; why.push('Linear TSI kırmızı: temas gerçekleşmeli'); }
+    if (ts && ts.renk === 'yesil' && x.side === 'ust') { s += 10; why.push('Linear TSI yeşil: momentum yukarı itiyor'); }
+    const ara = L.filter(y => y.side === x.side && Math.abs(y.dist) < Math.abs(x.dist));
+    if (ara.length && ara.every(y => y.flipped)) { s += 12; why.push('aradaki SAR\'lara temas edildi, sıradaki hedef bu'); }
+    if (x.igne) { s -= 15; why.push('iğne atıldı: %90 yana atar, çekim biter'); }
+    if (x.flatRecent) { s -= 20; why.push('yana atmış: temas beklenmez'); }
+    s -= Math.abs(x.dist) * 0.8;
+    return { ...x, sk: Math.round(s), why };
+  }).sort((a, b) => b.sk - a.sk);
+  const b = out[0]; b.kuvvet = b.sk >= 45 ? 'güçlü' : b.sk >= 25 ? 'orta' : 'zayıf';
+  return b;
+}
+
 /* ---------- basit anlatım: hiç bilmeyen için "ne olursa ne olur" ---------- */
 function basit(r) {
   const P = r.price, L = levels(r, { noOrt: false }), out = [];
@@ -345,6 +373,10 @@ function basit(r) {
   if (LG && !LG.yok && LG.konum === 'alt') out.push(['Ucuz bölge', `Fiyat günlük LRC kanalının altında (alt bant <b>${fmt(LG.alt)}</b>). Bu bölgede genelde bandın içine doğru tepki gelir.`]);
   else if (LH && !LH.yok && LH.alt < P) out.push(['Derin düzeltme sınırı', `Sert bir düşüşte orta vadeli hedef haftalık LRC alt bandı <b>${fmt(LH.alt)}</b> (${pct((LH.alt / P - 1) * 100)}).`]);
   if (LH && !LH.yok && LH.ortaKat >= 2) out.push(['Dikkat', 'Fiyat haftalık LRC ortalamasının 2 katından fazla: pahalı bölge, kâr almayı düşünmek gerekir.']);
+  // çekim
+  const ck = cekim(r);
+  if (ck && ck.kuvvet !== 'zayıf') out.push(['Çekim', `Fiyatı şu an en çok <b>${lvName(ck)} ${fmt(ck.v)}</b> (${pct(ck.dist)}) kendine çekiyor, çekim <b>${ck.kuvvet}</b>: ${ck.why.join('; ')}. ${ck.side === 'alt' ? 'Bu yüzden önce bir düzeltme ile bu seviyeye inmesi beklenir' : 'Bu yüzden önce bu seviyeye doğru bir tepki beklenir'}. Temas edince çekim biter; ${ck.side === 'alt' ? 'buradan tepki' : 'buradan düzeltme'} gelir.`]);
+  else if (ck) out.push(['Çekim', `Belirgin bir çekim yok; en yakın aday ${lvName(ck)} ${fmt(ck.v)} (${pct(ck.dist)}), ama fark büyük ya da SAR yana atmış. Temas haftalara kalabilir.`]);
   // medyan
   const MD = r.med && r.med[PR().med], MH = r.med && r.med.H;
   if (MD) {
@@ -487,6 +519,7 @@ function profSig(r) {
   if (lastK && lastK.ago <= lim + 10 && yor.some(y => ['tehlikeli', 'arka_arkaya', 'coklu', 'yeni_bant', 'kacti'].includes(y))) s.add('kes_risk');
   for (const k of ['kes_usd', 'kes_btc', 'derin']) if (r.sig0.includes(k)) s.add(k);
   if (p.tsi.every(t => r.tsi && r.tsi[t] && r.tsi[t].renk === 'yesil')) s.add('tsi_yesil');
+  { const ck = cekim(r); if (ck && ck.kuvvet === 'güçlü') s.add(ck.side === 'alt' ? 'cekim_alt' : 'cekim_ust'); }
   const MD = r.med && r.med[p.med]; if (MD) { s.add(MD.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MD.fark) >= 10) s.add('med_fark'); if (Math.abs(MD.dist) <= 2) s.add('med_test'); }
   if (M === 'kripto' && r.k !== 'BTC' && r.k !== 'ETH') { const oz = DATA.kripto.piyasaOzet || {}, bm = ['BTCUSDT', 'ETHUSDT'].some(k => oz[k] && oz[k].med && oz[k].med.H && !oz[k].med.H.ust); if (bm && (s.has('kes_yesil') || s.has('kes_turuncu'))) s.add('kes_risk'); }
   r.sig = [...s]; r.puan = r.sig.filter(x => POSP.includes(x)).length - r.sig.filter(x => NEGP.includes(x)).length;
@@ -567,6 +600,7 @@ function stChip(x) {
   if (x.igne) a.push('<span class="st igne">iğne</span>');
   if (!x.flipped && x.age <= 1) a.push('<span class="st taze">taze</span>');
   if (x.tek) a.push('<span class="st igne">tek</span>');
+  if (x.eta != null && !x.flatRecent) a.push(`<span class="st taze" title="Fiyat yatay kalırsa temasa kalan bar">≈${x.eta} bar</span>`);
   return a.join(' ');
 }
 function openCard(k, src) {
@@ -720,7 +754,7 @@ function psar(h, l, c, start, inc, max) {
     next = result + acc * (maxMin - result);
     next = isBelow ? Math.min(next, l[n - 1], l[n - 2]) : Math.max(next, h[n - 1], h[n - 2]);
   }
-  return { s: out, next };
+  return { s: out, next, acc, ep: maxMin, below: isBelow };
 }
 
 // LUCID SAR — Pine kodundaki fonksiyonun birebir karşılığı (ters dönüş sonrası "reversal_state" dalı Pine'da da çalışmıyor).
@@ -822,7 +856,15 @@ const eq = (a, b) => a != null && b != null && Math.abs(a - b) <= Math.abs(b) * 
 const rnd = (x, p = 4) => (x == null || !isFinite(x) ? null : +(+x).toPrecision(p + 2));
 
 // Tek bir SAR serisinin son bar durumu
-function sarState(s, b, nextVal) {
+// Çekim: Parabolic SAR her bar fiyata AF × (uç nokta − SAR) kadar yaklaşır. Fiyat yatay kalırsa (son barın aralığı)
+// SAR'ın fiyata kaç barda değeceği kapalı formülle hesaplanır: kalan mesafe her bar (1 − AF) ile küçülür.
+function etaOf(st, v, b) {
+  if (!st || st.acc == null || st.ep == null || !isFinite(v)) return null;
+  const i = b.c.length - 1, a = st.acc; if (a <= 0 || a >= 1) return null;
+  if (v < b.c[i]) { const g0 = st.ep - v, need = st.ep - b.l[i]; if (g0 <= 0) return null; if (need <= 0) return 0; if (need >= g0) return 0; return Math.ceil(Math.log(need / g0) / Math.log(1 - a)); }
+  const g0 = v - st.ep, need = b.h[i] - st.ep; if (g0 <= 0) return null; if (need <= 0) return 0; if (need >= g0) return 0; return Math.ceil(Math.log(need / g0) / Math.log(1 - a));
+}
+function sarState(s, b, nextVal, st) {
   const n = b.c.length, i = n - 1;
   if (n < 4 || s[i] == null || s[i - 1] == null) return null;
   const v = s[i], side = v < b.c[i] ? 'alt' : 'ust';
@@ -840,7 +882,8 @@ function sarState(s, b, nextVal) {
   // iğne: bar içinde SAR'a %1'den yakın geldi ama aşmadı
   const near = side === 'alt' ? (b.l[i] - v) / v : (v - b.h[i]) / v;
   const igne = !flipped && near >= 0 && near <= 0.01;
-  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal) };
+  const eta = st && st.below != null && (st.below === (side === 'alt')) ? etaOf(st, v, b) : null;
+  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
 }
 
 /* ---------------- LRC kanal ve kesişme ---------------- */
@@ -928,7 +971,7 @@ function analyze(daily, cfg) {
     const b = resample(daily, tf, cfg.tz);
     if (b.c.length < 4) continue;
     const S = sarSet(b), i = b.c.length - 1, row = { bars: b.c.length, s: {} };
-    for (const k of Object.keys(S)) { const st = sarState(S[k].s, b, S[k].next); if (st) row.s[k] = st; }
+    for (const k of Object.keys(S)) { const st = sarState(S[k].s, b, S[k].next, S[k]); if (st) row.s[k] = st; }
     // SAR birleşmesi (Pine): Parabolic == Moderate == Fast (son 2 bar)
     const bir = k => eq(S.psar.s[k], S.mod.s[k]) && eq(S.psar.s[k], S.fast.s[k]);
     row.birlesme = bir(i) || bir(i - 1);
@@ -1193,12 +1236,14 @@ function chartStrip(m) {
   const yt = { up: ['▲ Yön yukarı', 'pos'], down: ['▼ Yön aşağı', 'neg'], mix: ['◆ Yön kararsız', ''] }[m.yon];
   const it = [`<span class="sg ${yt[1]}">${yt[0]} · ${TFN[m.tf].toLowerCase()} SAR'lar</span>`];
   if (m.tsi) it.push(`<span class="sg ${m.tsi.renk === 'yesil' ? 'pos' : 'neg'}">TSI ${m.tsi.renk === 'yesil' ? 'yeşil · momentum artıyor' : 'kırmızı · momentum zayıflıyor'}</span>`);
+  if (CH.ck) it.push(`<span class="sg" style="color:#7c3aed;border-color:#7c3aed">🧲 Çekim ${CH.ck.kuvvet}: ${esc(lvName(CH.ck))} ${fmt(CH.ck.v)} (${pct(CH.ck.dist)})${CH.ck.eta != null ? ' · ≈' + CH.ck.eta + ' bar' : ''}</span>`);
   for (const u of CH.uy || []) it.push(`<span class="sg" style="color:${u[1]};border-color:${u[1]}">${esc(u[0])}</span>`);
   for (const L of CH.off || []) it.push(`<span class="sg" style="color:${L.col};border-color:${L.col}">${L.v > m.c[m.c.length - 1] ? '↑' : '↓'} ${esc(L.ad)} ${fmt(L.v)} (${pct((L.v / m.c[m.c.length - 1] - 1) * 100)})</span>`);
   el.innerHTML = it.join('');
 }
 function prepWarn(r) {
-  CH.lv = []; CH.uy = []; if (!r) return;
+  CH.lv = []; CH.uy = []; CH.ck = null; if (!r) return;
+  const ck = cekim(r); if (ck && ck.kuvvet !== 'zayıf') { CH.ck = ck; CH.lv.push({ v: ck.v, ad: '🧲 Çekim · ' + lvName(ck), col: '#7c3aed' }); }
   const P = r.price, sup = nearest(r, 'alt', {}), res = nearest(r, 'ust', {});
   if (sup) CH.lv.push({ v: sup.v, ad: (sup.flatRecent ? 'Destek · değmemeli · ' : 'Destek · altı kapanış olumsuz · ') + lvName(sup), col: '#16a34a' });
   if (res) CH.lv.push({ v: res.v, ad: (res.flatRecent ? 'Direnç · değmeden dönerse düşüş · ' : 'Direnç · üstü olumlu · ') + lvName(res), col: '#dc2626' });
@@ -1243,7 +1288,7 @@ async function scalpScan() {
     const top = t.filter(x => x.symbol.endsWith('USDT') && !bad.test(x.symbol) && +x.quoteVolume > 5e6).sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 5);
     const res = await Promise.all(top.map(async x => {
       const k = x.symbol.replace(/USDT$/, ''), b = await intraData(k, '15m'), S = sarSet(b), n = b.c.length;
-      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next) })).filter(z => z.v != null);
+      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next, S[key]) })).filter(z => z.v != null);
       const yA = st.filter(z => z.flatRecent && z.side === 'alt'), yU = st.filter(z => z.flatRecent && z.side === 'ust');
       return { k, chg: +x.priceChangePercent, px: b.c[n - 1], st, yA, yU };
     }));

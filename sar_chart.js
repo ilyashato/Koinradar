@@ -198,12 +198,14 @@ function chartStrip(m) {
   const yt = { up: ['▲ Yön yukarı', 'pos'], down: ['▼ Yön aşağı', 'neg'], mix: ['◆ Yön kararsız', ''] }[m.yon];
   const it = [`<span class="sg ${yt[1]}">${yt[0]} · ${TFN[m.tf].toLowerCase()} SAR'lar</span>`];
   if (m.tsi) it.push(`<span class="sg ${m.tsi.renk === 'yesil' ? 'pos' : 'neg'}">TSI ${m.tsi.renk === 'yesil' ? 'yeşil · momentum artıyor' : 'kırmızı · momentum zayıflıyor'}</span>`);
+  if (CH.ck) it.push(`<span class="sg" style="color:#7c3aed;border-color:#7c3aed">🧲 Çekim ${CH.ck.kuvvet}: ${esc(lvName(CH.ck))} ${fmt(CH.ck.v)} (${pct(CH.ck.dist)})${CH.ck.eta != null ? ' · ≈' + CH.ck.eta + ' bar' : ''}</span>`);
   for (const u of CH.uy || []) it.push(`<span class="sg" style="color:${u[1]};border-color:${u[1]}">${esc(u[0])}</span>`);
   for (const L of CH.off || []) it.push(`<span class="sg" style="color:${L.col};border-color:${L.col}">${L.v > m.c[m.c.length - 1] ? '↑' : '↓'} ${esc(L.ad)} ${fmt(L.v)} (${pct((L.v / m.c[m.c.length - 1] - 1) * 100)})</span>`);
   el.innerHTML = it.join('');
 }
 function prepWarn(r) {
-  CH.lv = []; CH.uy = []; if (!r) return;
+  CH.lv = []; CH.uy = []; CH.ck = null; if (!r) return;
+  const ck = cekim(r); if (ck && ck.kuvvet !== 'zayıf') { CH.ck = ck; CH.lv.push({ v: ck.v, ad: '🧲 Çekim · ' + lvName(ck), col: '#7c3aed' }); }
   const P = r.price, sup = nearest(r, 'alt', {}), res = nearest(r, 'ust', {});
   if (sup) CH.lv.push({ v: sup.v, ad: (sup.flatRecent ? 'Destek · değmemeli · ' : 'Destek · altı kapanış olumsuz · ') + lvName(sup), col: '#16a34a' });
   if (res) CH.lv.push({ v: res.v, ad: (res.flatRecent ? 'Direnç · değmeden dönerse düşüş · ' : 'Direnç · üstü olumlu · ') + lvName(res), col: '#dc2626' });
@@ -248,7 +250,7 @@ async function scalpScan() {
     const top = t.filter(x => x.symbol.endsWith('USDT') && !bad.test(x.symbol) && +x.quoteVolume > 5e6).sort((a, b) => b.priceChangePercent - a.priceChangePercent).slice(0, 5);
     const res = await Promise.all(top.map(async x => {
       const k = x.symbol.replace(/USDT$/, ''), b = await intraData(k, '15m'), S = sarSet(b), n = b.c.length;
-      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next) })).filter(z => z.v != null);
+      const st = ['psar', ...MK.kripto.aktif].map(key => ({ key, ...sarState(S[key].s, b, S[key].next, S[key]) })).filter(z => z.v != null);
       const yA = st.filter(z => z.flatRecent && z.side === 'alt'), yU = st.filter(z => z.flatRecent && z.side === 'ust');
       return { k, chg: +x.priceChangePercent, px: b.c[n - 1], st, yA, yU };
     }));

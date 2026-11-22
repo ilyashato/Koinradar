@@ -36,7 +36,7 @@ export function psar(h, l, c, start, inc, max) {
     next = result + acc * (maxMin - result);
     next = isBelow ? Math.min(next, l[n - 1], l[n - 2]) : Math.max(next, h[n - 1], h[n - 2]);
   }
-  return { s: out, next };
+  return { s: out, next, acc, ep: maxMin, below: isBelow };
 }
 
 // LUCID SAR — Pine kodundaki fonksiyonun birebir karşılığı (ters dönüş sonrası "reversal_state" dalı Pine'da da çalışmıyor).
@@ -138,7 +138,15 @@ const eq = (a, b) => a != null && b != null && Math.abs(a - b) <= Math.abs(b) * 
 const rnd = (x, p = 4) => (x == null || !isFinite(x) ? null : +(+x).toPrecision(p + 2));
 
 // Tek bir SAR serisinin son bar durumu
-function sarState(s, b, nextVal) {
+// Çekim: Parabolic SAR her bar fiyata AF × (uç nokta − SAR) kadar yaklaşır. Fiyat yatay kalırsa (son barın aralığı)
+// SAR'ın fiyata kaç barda değeceği kapalı formülle hesaplanır: kalan mesafe her bar (1 − AF) ile küçülür.
+export function etaOf(st, v, b) {
+  if (!st || st.acc == null || st.ep == null || !isFinite(v)) return null;
+  const i = b.c.length - 1, a = st.acc; if (a <= 0 || a >= 1) return null;
+  if (v < b.c[i]) { const g0 = st.ep - v, need = st.ep - b.l[i]; if (g0 <= 0) return null; if (need <= 0) return 0; if (need >= g0) return 0; return Math.ceil(Math.log(need / g0) / Math.log(1 - a)); }
+  const g0 = v - st.ep, need = b.h[i] - st.ep; if (g0 <= 0) return null; if (need <= 0) return 0; if (need >= g0) return 0; return Math.ceil(Math.log(need / g0) / Math.log(1 - a));
+}
+function sarState(s, b, nextVal, st) {
   const n = b.c.length, i = n - 1;
   if (n < 4 || s[i] == null || s[i - 1] == null) return null;
   const v = s[i], side = v < b.c[i] ? 'alt' : 'ust';
@@ -156,7 +164,8 @@ function sarState(s, b, nextVal) {
   // iğne: bar içinde SAR'a %1'den yakın geldi ama aşmadı
   const near = side === 'alt' ? (b.l[i] - v) / v : (v - b.h[i]) / v;
   const igne = !flipped && near >= 0 && near <= 0.01;
-  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal) };
+  const eta = st && st.below != null && (st.below === (side === 'alt')) ? etaOf(st, v, b) : null;
+  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
 }
 
 /* ---------------- LRC kanal ve kesişme ---------------- */
@@ -244,7 +253,7 @@ export function analyze(daily, cfg) {
     const b = resample(daily, tf, cfg.tz);
     if (b.c.length < 4) continue;
     const S = sarSet(b), i = b.c.length - 1, row = { bars: b.c.length, s: {} };
-    for (const k of Object.keys(S)) { const st = sarState(S[k].s, b, S[k].next); if (st) row.s[k] = st; }
+    for (const k of Object.keys(S)) { const st = sarState(S[k].s, b, S[k].next, S[k]); if (st) row.s[k] = st; }
     // SAR birleşmesi (Pine): Parabolic == Moderate == Fast (son 2 bar)
     const bir = k => eq(S.psar.s[k], S.mod.s[k]) && eq(S.psar.s[k], S.fast.s[k]);
     row.birlesme = bir(i) || bir(i - 1);

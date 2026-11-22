@@ -145,7 +145,7 @@ function compact(a, cfg) {
   const keep = new Set([...cfg.aktif, 'ort']);
   for (const tf of Object.keys(a.tf)) {
     const r = a.tf[tf]; delete r.bars; delete r.ema5; delete r.ema21; if (!r.birlesme) delete r.birlesme;
-    for (const k of Object.keys(r.s)) { if (!keep.has(k)) { delete r.s[k]; continue; } const x = r.s[k]; for (const f of Object.keys(x)) if (x[f] === false || x[f] === null || (f === 'flat' && x[f] === 0)) delete x[f]; }
+    for (const k of Object.keys(r.s)) { if (!keep.has(k)) { delete r.s[k]; continue; } const x = r.s[k]; for (const f of Object.keys(x)) if (x[f] === false || x[f] === null || (f === 'flat' && x[f] === 0) || (f === 'af')) delete x[f]; }
   }
   return a;
 }
