@@ -145,6 +145,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 .ro-hint{margin:10px 0 0;font-size:11.5px;color:var(--mute)}
 .ro-leg{margin-top:10px} .ro-leg summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--accent)}
 .ro-chips{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0}
+#chfs{position:fixed;inset:0;z-index:50;background:var(--bg,#fff);overflow:auto;padding:12px 12px calc(16px + env(safe-area-inset-bottom))}#chfs .fs-head{display:flex;align-items:center;gap:8px;font-size:17px;margin-bottom:8px}#chfs .ro-g{grid-template-columns:1fr 1fr}
 .lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
 </style></head>
 <body>
@@ -604,6 +605,7 @@ function stChip(x) {
   return a.join(' ');
 }
 function openCard(k, src) {
+  if (CH.vade !== V || CH.m !== M) { CH.tf = PR().chart; CH.vade = V; CH.m = M; }
   const r = src || rows().find(x => x.k === k); if (!r) return;
   curKod = k; setTab('kart');
   const cfg = MK[M], L = levels(r).sort((a, b) => b.v - a.v), P = r.price;
@@ -643,7 +645,6 @@ function openCard(k, src) {
    <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
    ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
   window.scrollTo({ top: 0 });
-  if (CH.vade !== V || CH.m !== M) { CH.tf = PR().chart; CH.vade = V; CH.m = M; }
   bindChart(r.k, r);
 }
 
@@ -1038,7 +1039,7 @@ function makroBuild(def, S) {
 
 /* ---------- SAR Radar grafiği: mumlar + SAR noktaları + üst dilim SAR Ort. + LRC kanal ve kesişme ---------- */
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
-const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
+const CH = { view: 120, key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
 const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
 const NBAR = { '15m': 200, '4S': 180, G: 180, H: 160, A: 120 };
@@ -1128,9 +1129,17 @@ function chartModel(daily, tf, intra) {
 }
 
 function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; }
-function drawChart(m) {
-  const cv = $('#sarcv'); if (!cv || !m) return;
-  const W = cv.parentElement.clientWidth, H = 360, dpr = window.devicePixelRatio || 1;
+// son `n` barı keser (yakınlaştırma)
+function sliceModel(m, n) {
+  const N = m.c.length; if (!n || n >= N) return m; const f = N - n, s = a => a.slice(f);
+  return { ...m, t: s(m.t), o: s(m.o), h: s(m.h), l: s(m.l), c: s(m.c), medS: s(m.medS), medW: m.medW.length ? s(m.medW) : [],
+    sars: m.sars.map(z => ({ ...z, v: s(z.v) })), orts: m.orts.map(z => ({ ...z, v: s(z.v) })), flips: m.flips.filter(z => z.i >= f).map(z => ({ ...z, i: z.i - f })),
+    lrc: m.lrc ? { mh: s(m.lrc.mh), ml: s(m.lrc.ml), up: s(m.lrc.up), lo: s(m.lrc.lo), kes: m.lrc.kes.filter(z => z.i >= f).map(z => ({ ...z, i: z.i - f })) } : null };
+}
+function drawChart(m0, O = {}) {
+  const cv = O.cv || $('#sarcv'); if (!cv || !m0) return;
+  const m = sliceModel(m0, O.n || CH.view), K = O.big ? 1.7 : 1.25;
+  const W = cv.parentElement.clientWidth, H = O.H || 380, dpr = window.devicePixelRatio || 1;
   cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const N = m.c.length, padR = 54, padT = 8, padB = 18, cw = (W - padR) / N;
@@ -1149,24 +1158,24 @@ function drawChart(m) {
   // LRC
   if (CH.on.lrc && m.lrc) {
     const ln = (arr, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; arr.forEach((v, i) => { if (v == null) { st = false; return; } st ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); st = true; }); g.stroke(); g.setLineDash([]); };
-    ln(m.lrc.up, good + 'aa', 1.5); ln(m.lrc.lo, bad + 'aa', 1.5); ln(m.lrc.mh, '#2563eb', 2); ln(m.lrc.ml, '#dc2626', 2, [4, 3]);
+    ln(m.lrc.up, good + '88', 1.3 * K); ln(m.lrc.lo, bad + '88', 1.3 * K); ln(m.lrc.mh, '#2563eb', 2 * K); ln(m.lrc.ml, '#dc2626', 2 * K, [5 * K, 4 * K]);
   }
   // medyan (mor)
   if (CH.on.med) { const ml = (arr, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; arr.forEach((v, i) => { if (v == null) { st = false; return; } st ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); st = true; }); g.stroke(); g.setLineDash([]); };
-    ml(m.medS, '#9333ea', 2); if (m.medW.length) ml(m.medW, '#c084fc', 2, [5, 3]); }
+    ml(m.medS, '#9333ea', 2.2 * K); if (m.medW.length) ml(m.medW, '#c084fc', 2.2 * K, [6 * K, 4 * K]); }
   // üst dilim SAR Ort.
-  if (CH.on.ort) for (const o of m.orts) { g.fillStyle = OCOL[o.tf]; o.v.forEach((v, i) => { if (v == null) return; g.beginPath(); g.arc(x(i), y(v), Math.max(1.6, Math.min(3, cw * 0.35)), 0, 7); g.fill(); }); }
+  if (CH.on.ort) for (const o of m.orts) { g.fillStyle = OCOL[o.tf]; o.v.forEach((v, i) => { if (v == null) return; g.beginPath(); g.arc(x(i), y(v), Math.max(2 * K, Math.min(3.4 * K, cw * 0.4)), 0, 7); g.fill(); }); }
   // mumlar
-  for (let i = 0; i < N; i++) { const up = m.c[i] >= m.o[i], col = up ? good : bad; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = 1;
+  for (let i = 0; i < N; i++) { const up = m.c[i] >= m.o[i], col = up ? good : bad; g.strokeStyle = col; g.fillStyle = col; g.lineWidth = Math.max(1, K * 0.9);
     g.beginPath(); g.moveTo(x(i), y(m.h[i])); g.lineTo(x(i), y(m.l[i])); g.stroke();
-    const bw = Math.max(1, cw * 0.62), y1 = y(Math.max(m.o[i], m.c[i])), y2 = y(Math.min(m.o[i], m.c[i])); g.fillRect(x(i) - bw / 2, y1, bw, Math.max(1, y2 - y1)); }
+    const bw = Math.max(1.5, cw * 0.7), y1 = y(Math.max(m.o[i], m.c[i])), y2 = y(Math.min(m.o[i], m.c[i])); g.fillRect(x(i) - bw / 2, y1, bw, Math.max(1, y2 - y1)); }
   // aktif SAR'lar (+), yana atanlar kalın çizgi (Pine line.new)
   if (CH.on.sar) for (const s of m.sars) {
-    const col = SCOL[s.k], r = Math.max(1.8, Math.min(3.2, cw * 0.3));
+    const col = SCOL[s.k], r = Math.max(2.2 * K, Math.min(4 * K, cw * 0.42));
     s.v.forEach((v, i) => { if (v == null) return; const xx = x(i), yy = y(v);
       if (s.k === 'lin') g.strokeStyle = g.fillStyle = m.c[i] >= v ? '#22c55e' : '#ef4444'; else g.strokeStyle = g.fillStyle = col;
-      if (i > 0 && s.v[i - 1] != null && Math.abs(s.v[i - 1] - v) <= Math.abs(v) * 1e-9) { g.globalAlpha = 0.45; g.lineWidth = 4; g.beginPath(); g.moveTo(x(i - 1), yy); g.lineTo(xx, yy); g.stroke(); g.globalAlpha = 1; }
-      g.lineWidth = 1.3; g.beginPath(); g.moveTo(xx - r, yy); g.lineTo(xx + r, yy); g.moveTo(xx, yy - r); g.lineTo(xx, yy + r); g.stroke(); });
+      if (i > 0 && s.v[i - 1] != null && Math.abs(s.v[i - 1] - v) <= Math.abs(v) * 1e-9) { g.globalAlpha = 0.5; g.lineWidth = 4.5 * K; g.beginPath(); g.moveTo(x(i - 1), yy); g.lineTo(xx, yy); g.stroke(); g.globalAlpha = 1; }
+      g.lineWidth = 1.6 * K; g.beginPath(); g.moveTo(xx - r, yy); g.lineTo(xx + r, yy); g.moveTo(xx, yy - r); g.lineTo(xx, yy + r); g.stroke(); });
   }
   // dönüş okları (ilk SAR'a temas)
   if (CH.on.uyari) for (const f of m.flips) { const xx = x(f.i), up = f.yon === 'up', yy = up ? y(m.l[f.i]) + 10 : y(m.h[f.i]) - 10;
@@ -1178,7 +1187,7 @@ function drawChart(m) {
     const top = padT + 12, bot = H - padB - 2, used = [];
     for (const L of [...CH.lv].sort((p, q) => q.v - p.v)) {
       const yy = y(L.v); if (yy < top || yy > bot) { CH.off.push(L); continue; }
-      g.strokeStyle = L.col; g.lineWidth = 1.4; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - padR, yy); g.stroke(); g.setLineDash([]);
+      g.strokeStyle = L.col; g.lineWidth = 1.6 * K; g.setLineDash([7, 5]); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - padR, yy); g.stroke(); g.setLineDash([]);
       let ly = yy - 4; while (used.some(u => Math.abs(u - ly) < 12)) ly += 12; used.push(ly);
       const txt = L.ad; g.font = 'bold 10px ' + css('--f-body'); const tw = Math.min(g.measureText(txt).width, W - padR - 16), lx = W - padR - tw - 8;
       g.fillStyle = css('--panel'); g.globalAlpha = 0.85; g.fillRect(lx - 3, ly - 9, tw + 8, 12); g.globalAlpha = 1; g.fillStyle = L.col; g.fillText(txt, lx + 1, ly, tw);
@@ -1193,8 +1202,9 @@ function drawChart(m) {
   // son fiyat
   const lc = m.c[N - 1], ly = y(lc); g.fillStyle = css('--accent'); g.fillRect(W - padR, ly - 8, padR, 16); g.fillStyle = '#fff'; g.font = 'bold 10px ' + css('--f-num'); g.fillText(fmt(lc), W - padR + 3, ly + 4);
   // seçili bar
-  if (CH.pick != null && CH.pick < N) { g.strokeStyle = mute; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x(CH.pick), padT); g.lineTo(x(CH.pick), H - padB); g.stroke(); g.setLineDash([]); }
-  CH.geo = { cw, padR, N };
+  const pk = CH.pick == null ? null : CH.pick - (m0.c.length - N);
+  if (pk != null && pk >= 0 && pk < N) { g.strokeStyle = mute; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x(pk), padT); g.lineTo(x(pk), H - padB); g.stroke(); g.setLineDash([]); }
+  if (!O.cv) CH.geo = { cw, padR, N, off: m0.c.length - N }; else CH.fgeo = { cw, padR, N, off: m0.c.length - N };
 }
 
 function readout(m, i) {
@@ -1220,7 +1230,7 @@ function chartPanel() {
     <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['med', 'Medyan'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
-    <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
+    <div style="position:relative;margin-top:8px"><button class="btn small" id="chbig" style="position:absolute;left:6px;bottom:24px;z-index:2;opacity:.9">⤢ Büyüt</button><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
     <div id="chread" class="ro"></div>
     <details class="ro-leg"><summary>Grafik nasıl okunur?</summary><div class="note" id="chleg"></div></details></div>`;
 }
@@ -1272,7 +1282,8 @@ function bindChart(k, r) {
   prepWarn(r);
   $('#chtf').onclick = e => { const b = e.target.closest('[data-tf]'); if (!b) return; CH.tf = b.dataset.tf; $('#chtf').querySelectorAll('[data-tf]').forEach(x => x.setAttribute('aria-pressed', x.dataset.tf === CH.tf)); renderChart(k); };
   $('#chon').onclick = e => { const b = e.target.closest('[data-on]'); if (!b) return; CH.on[b.dataset.on] = !CH.on[b.dataset.on]; LS.set('ch_on', CH.on); b.setAttribute('aria-pressed', CH.on[b.dataset.on]); drawChart(CH.model); };
-  $('#sarcv').onclick = e => { if (!CH.model || !CH.geo) return; const r = e.target.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / CH.geo.cw); if (i < 0 || i >= CH.geo.N) return; CH.pick = i; drawChart(CH.model); $('#chread').innerHTML = readout(CH.model, i); };
+  $('#sarcv').onclick = () => openFS();
+  $('#chbig').onclick = () => openFS();
   renderChart(k);
 }
 window.addEventListener('resize', () => { if (CH.model && $('#sarcv')) drawChart(CH.model); });
@@ -1301,6 +1312,28 @@ async function scalpScan() {
       `<p class="note">Kural: SAR yana attıktan 1–2 mum (15–30 dk) sonra pozisyon kapatılır, stop SAR noktasına konur. Tarama ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} itibarıyla; kaldıraç yüksek risk taşır.</p>`;
   } catch (e) { out.innerHTML = `<p class="err">15 dk taraması yapılamadı: ${esc(e.message)}</p>`; }
 }
+
+/* ---------- tam ekran grafik ---------- */
+function fsH() { return Math.max(320, window.innerHeight - 250); }
+function openFS() {
+  if (!CH.model) return; let el = $('#chfs');
+  if (!el) { el = document.createElement('div'); el.id = 'chfs'; document.body.appendChild(el); }
+  el.innerHTML = `<div class="fs-head"><b>${esc(curKod || '')}</b> <span class="mut">${TFN[CH.tf]}</span><span style="flex:1"></span>
+    <button class="btn small" data-z="-">−</button><button class="btn small" data-z="+">+</button><button class="iconbtn" id="fsx" aria-label="Kapat">✕</button></div>
+    <div class="chips" id="fstf">${$('#chtf').innerHTML}</div><div class="chips" id="fson" style="margin-top:4px">${$('#chon').innerHTML}</div>
+    <details style="margin-top:6px"><summary class="small" style="font-weight:700;color:var(--accent);cursor:pointer">Uyarılar ve seviyeler (${$('#chstrip').children.length})</summary><div class="sigs">${$('#chstrip').innerHTML}</div></details>
+    <div style="position:relative;margin-top:6px"><canvas id="fscv" style="display:block;width:100%;touch-action:pan-y"></canvas></div>
+    <div id="fsread" class="ro" style="margin-top:8px"></div>`;
+  el.hidden = false; document.body.style.overflow = 'hidden';
+  const draw = () => { drawChart(CH.model, { cv: $('#fscv'), H: fsH(), big: true, n: CH.fview }); };
+  CH.fview = CH.fview || 90; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick ?? CH.model.c.length - 1);
+  $('#fsx').onclick = () => { el.hidden = true; document.body.style.overflow = ''; drawChart(CH.model); };
+  el.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { CH.fview = Math.max(30, Math.min(CH.model.c.length, Math.round(CH.fview * (b.dataset.z === '+' ? 0.7 : 1.4)))); draw(); });
+  $('#fscv').onclick = e => { const G = CH.fgeo; if (!G) return; const r = e.target.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / G.cw); if (i < 0 || i >= G.N) return; CH.pick = i + G.off; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick); };
+  $('#fstf').onclick = async e => { const b = e.target.closest('[data-tf]'); if (!b) return; CH.tf = b.dataset.tf; CH.pick = null; $('#chtf').querySelectorAll('[data-tf]').forEach(x => x.setAttribute('aria-pressed', x.dataset.tf === CH.tf)); await renderChart(curKod); openFS(); };
+  $('#fson').onclick = e => { const b = e.target.closest('[data-on]'); if (!b) return; CH.on[b.dataset.on] = !CH.on[b.dataset.on]; LS.set('ch_on', CH.on); b.setAttribute('aria-pressed', CH.on[b.dataset.on]); $('#chon').querySelector(`[data-on="${b.dataset.on}"]`)?.setAttribute('aria-pressed', CH.on[b.dataset.on]); draw(); };
+}
+window.addEventListener('resize', () => { const el = $('#chfs'); if (el && !el.hidden && CH.model) drawChart(CH.model, { cv: $('#fscv'), H: fsH(), big: true, n: CH.fview }); });
 
 /*SAR-GOMULU-BITIR*/
 </script>
