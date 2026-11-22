@@ -310,7 +310,9 @@ function basit(r) {
     else out.push(['Üstteki direnç', `<b>${fmt(d.v)}</b> (${pct(d.dist)}) — ${lvName(d)}. <b>Fiyatın buraya değmesi iyidir:</b> değip üstünde kalırsa yükseliş ${nx ? `<b>${fmt(nx.v)}</b> (${pct(nx.dist)}) seviyesine` : 'yukarı'} uzayabilir. Değip üstünde kalamazsa eninde sonunda alttaki desteğe de gider.`]);
   } else out.push(['Üstteki direnç', 'Seçili vadede fiyatın üstünde SAR yok: önü açık.']);
   // ilk SAR kuralı
-  if (A.length >= 3 && !A[0].flatRecent) out.push(['Düşüş olursa', `Önce <b>${fmt(A[0].v)}</b>'e bakılır. Buna değmeden diğerlerine gidilmez. Değerse sistem %80 ihtimalle alttakilere de sarkma bekler; en alttaki iki seviyeye genelde inilmez, yani dip bölgesi olarak <b>${fmt(A[A.length - 3].v)}</b> civarı izlenir.`]);
+  const AY = A.filter(x => x.dist > -35);
+  if (AY.length >= 3 && !AY[0].flatRecent) out.push(['Düşüş olursa', `Önce <b>${fmt(AY[0].v)}</b> seviyesine bakılır; buna değmeden alttakilere gidilmez. Değerse sistem %80 ihtimalle alttakilere de sarkma bekler. En alttaki iki seviyeye genelde inilmez; bu yüzden dip bölgesi olarak <b>${fmt(AY[AY.length - 3].v)}</b> (${pct(AY[AY.length - 3].dist)}) civarı izlenir.`]);
+  else if (AY.length && !AY[0].flatRecent) out.push(['Düşüş olursa', `İlk bakılacak yer <b>${fmt(AY[0].v)}</b>. Buna değmeden daha aşağıdaki SAR'lardan bahsedilmez.`]);
   // LRC
   const LH = r.lrc && r.lrc.H, LG = r.lrc && r.lrc.G;
   if (LG && !LG.yok && LG.konum === 'alt') out.push(['Ucuz bölge', `Fiyat günlük LRC kanalının altında (alt bant <b>${fmt(LG.alt)}</b>). Bu bölgede genelde bandın içine doğru tepki gelir.`]);
