@@ -272,7 +272,9 @@ function yorum(r) {
   const ig = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.igne);
   if (ig.length) s2.push(`${ig.map(lvName).join(', ')} SAR'ına iğne atıldı: sistem bu durumda %90 yana atma bekliyor. Vakit kaybetmeden temas olmazsa dönem kapanışında yana atar.`);
   const fl = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flipped);
-  fl.forEach(x => s2.push(x.side === 'ust' ? `${lvName(x)} desteğine temas edildi: bu SAR iptal oldu, desteğini çekti. Bir alttaki daha uzun vadeli SAR devreye girer.` : `${lvName(x)} direncine temas edildi ve SAR fiyatın altına geçti (olumlu).`));
+  const flD = fl.filter(x => x.side === 'ust'), flR = fl.filter(x => x.side === 'alt');
+  if (flD.length) s2.push(`Bu dönemde temas edilip iptal olan destek SAR'ları: ${flD.map(lvName).join(', ')}. Desteklerini çektiler; bir alttaki daha uzun vadeli SAR devreye girer, aynı SAR'dan ikinci tepki beklenmez.`);
+  if (flR.length) s2.push(`Temas edilip fiyatın altına geçen direnç SAR'ları: ${flR.map(lvName).join(', ')} (olumlu).`);
   if (has('tek')) s2.push('TEK SAR var: yükselişte tek barlık başarısız dönüş, yükseliş işareti.');
   if (has('birlesme')) s2.push('SAR birleşmesi var (Parabolic = Moderate = Fast).');
   // ilk SAR kuralı (döngü zaman diliminde)
@@ -317,8 +319,9 @@ function yorum(r) {
   let t4 = s4.length ? s4.join(', ') + '.' : '';
   const hd = [];
   if (gG) hd.push(`kısa vadede günlük SAR ${fmt(gG.v)}`);
-  if (LH && !LH.yok) hd.push(`orta vadede haftalık LRC alt bandı ${fmt(LH.alt)}`);
+  if (LH && !LH.yok && LH.alt < P) hd.push(`orta vadede haftalık LRC alt bandı ${fmt(LH.alt)}`);
   if (hd.length) t4 += ` Düzeltme gelirse hedefler: ${hd.join(', ')} (fiyat inerken bu seviyeler yukarı çıkar, sonra buluşur).`;
+  if (LH && !LH.yok && LH.alt >= P) t4 += ` Fiyat haftalık LRC alt bandının (${fmt(LH.alt)}) altında: sistem bandın içine dönüş tepkisi bekler.`;
   const boz = (yanAlt.length && Math.abs(yanAlt[0].dist) <= 20) ? yanAlt[0] : gs;
   if (boz) t4 += ` Bozulma: ${fmt(boz.v)} altında ${TFN[boz.tf].toLowerCase()} kapanış.`;
   if (t4) out.push(t4.trim());
