@@ -131,6 +131,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 .kes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 .kes span{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 7px;color:#fff}
 .kes .yesil{background:#16a34a} .kes .turuncu{background:#ea8a0c}
+.basit .bs{padding:9px 0;border-top:1px solid var(--line2)} .basit .bs:first-of-type{border-top:0} .basit .bt{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin-bottom:3px} .basit p{margin:0;font-size:15px;line-height:1.55}
 .lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
 </style></head>
 <body>
@@ -283,6 +284,52 @@ function levels(r, opts = {}) {
 }
 const lvName = x => `${TFN[x.tf]} ${SN[x.k]}`;
 function nearest(r, side, opts) { const L = levels(r, opts).filter(x => x.side === side); if (!L.length) return null; return L.sort((a, b) => side === 'alt' ? b.v - a.v : a.v - b.v)[0]; }
+
+/* ---------- basit anlatım: hiç bilmeyen için "ne olursa ne olur" ---------- */
+function basit(r) {
+  const P = r.price, L = levels(r, { noOrt: false }), out = [];
+  const alts = L.filter(x => x.side === 'alt').sort((a, b) => b.v - a.v), usts = L.filter(x => x.side === 'ust').sort((a, b) => a.v - b.v);
+  const uniq = arr => arr.filter((x, i) => i === 0 || Math.abs(x.v / arr[i - 1].v - 1) > 0.01);
+  let A = uniq(alts), U = uniq(usts), uzakA = false, uzakU = false;
+  if (!A.length) { A = uniq(levels(r, { all: true }).filter(x => x.side === 'alt').sort((a, b) => b.v - a.v)); uzakA = A.length > 0; }
+  if (!U.length) { U = uniq(levels(r, { all: true }).filter(x => x.side === 'ust').sort((a, b) => a.v - b.v)); uzakU = U.length > 0; }
+  const tsi = r.tsi || {}, has = k => (r.sig || []).includes(k);
+  const yon = r.durum === 'olumlu' ? ['🟢', 'Genel tablo olumlu: SAR\'lar çoğunlukla fiyatı destekliyor.'] : r.durum === 'olumsuz' ? ['🔴', 'Genel tablo olumsuz: SAR\'lar çoğunlukla fiyatın üstünde, baskı var.'] : ['🟡', 'Genel tablo kararsız: ne net yükseliş ne net düşüş.'];
+  out.push(['Şu an', `${yon[0]} ${yon[1]} Fiyat <b>${fmt(P)}</b>.`]);
+  // destek
+  if (A[0]) {
+    const d = A[0], nx = A[1];
+    if (uzakA) out.push(['Not', 'Seçili vadenin SAR\'larının hepsi fiyatın üstünde; en yakın destek daha uzun vadeli zaman diliminden alındı.']);
+    if (d.flatRecent) out.push(['Alttaki destek', `<b>${fmt(d.v)}</b> (${pct(d.dist)}) — ${lvName(d)}. Bu nokta yana attı: <b>fiyat buraya değmemeli.</b> Değmediği sürece yükseliş beklenir. Değerse ya da altında kapanırsa düşüş derinleşir${nx ? `, sıradaki destek <b>${fmt(nx.v)}</b> (${pct(nx.dist)})` : ''}.`]);
+    else out.push(['Alttaki destek', `<b>${fmt(d.v)}</b> (${pct(d.dist)}) — ${lvName(d)}. Düzeltme olursa fiyatın buraya kadar inmesi normal. Buradan tepki gelirse sağlam; <b>altında kapanış olursa</b> bu destek iptal olur${nx ? `, gözler <b>${fmt(nx.v)}</b> (${pct(nx.dist)}) seviyesine döner` : ''}. Aynı destekten ikinci kez tepki beklenmez.`]);
+  } else out.push(['Alttaki destek', 'Seçili vadede fiyatın altında SAR yok: tüm SAR\'lar üstte, destek zayıf.']);
+  // direnç
+  if (U[0]) {
+    const d = U[0], nx = U[1];
+    if (d.flatRecent) out.push(['Üstteki direnç', `<b>${fmt(d.v)}</b> (${pct(d.dist)}) — ${lvName(d)}. Bu nokta üstten yana attı: <b>fiyat buraya değmeden dönerse düşüş eğilimi sürer.</b> Değip üstüne çıkarsa olumlu döner${nx ? `, sonraki hedef <b>${fmt(nx.v)}</b>` : ''}.`]);
+    else out.push(['Üstteki direnç', `<b>${fmt(d.v)}</b> (${pct(d.dist)}) — ${lvName(d)}. <b>Fiyatın buraya değmesi iyidir:</b> değip üstünde kalırsa yükseliş ${nx ? `<b>${fmt(nx.v)}</b> (${pct(nx.dist)}) seviyesine` : 'yukarı'} uzayabilir. Değip üstünde kalamazsa eninde sonunda alttaki desteğe de gider.`]);
+  } else out.push(['Üstteki direnç', 'Seçili vadede fiyatın üstünde SAR yok: önü açık.']);
+  // ilk SAR kuralı
+  if (A.length >= 3 && !A[0].flatRecent) out.push(['Düşüş olursa', `Önce <b>${fmt(A[0].v)}</b>'e bakılır. Buna değmeden diğerlerine gidilmez. Değerse sistem %80 ihtimalle alttakilere de sarkma bekler; en alttaki iki seviyeye genelde inilmez, yani dip bölgesi olarak <b>${fmt(A[A.length - 3].v)}</b> civarı izlenir.`]);
+  // LRC
+  const LH = r.lrc && r.lrc.H, LG = r.lrc && r.lrc.G;
+  if (LG && !LG.yok && LG.konum === 'alt') out.push(['Ucuz bölge', `Fiyat günlük LRC kanalının altında (alt bant <b>${fmt(LG.alt)}</b>). Bu bölgede genelde bandın içine doğru tepki gelir.`]);
+  else if (LH && !LH.yok && LH.alt < P) out.push(['Derin düzeltme sınırı', `Sert bir düşüşte orta vadeli hedef haftalık LRC alt bandı <b>${fmt(LH.alt)}</b> (${pct((LH.alt / P - 1) * 100)}).`]);
+  if (LH && !LH.yok && LH.ortaKat >= 2) out.push(['Dikkat', 'Fiyat haftalık LRC ortalamasının 2 katından fazla: pahalı bölge, kâr almayı düşünmek gerekir.']);
+  // momentum
+  const tk = PR().tsi[PR().tsi.length - 1];
+  if (tsi[tk]) out.push(['Momentum', tsi[tk].renk === 'yesil' ? `${TFN[tk]} Linear TSI yeşil: güç artıyor.` : `${TFN[tk]} Linear TSI kırmızı: güç azalıyor, yakındaki SAR'a${A[0] ? ` (<b>${fmt(A[0].v)}</b>)` : ''} değme ihtimali artar.`]);
+  // kesişme
+  const kk = (r.lrc && r.lrc[PROF[M][V].kes] || {}).kesisme || [], ke = kk[kk.length - 1];
+  if (ke && ke.ago <= 20) out.push(['Kesişme', ke.tip === 'yesil' ? `${ke.ago} bar önce <b>yeşil kesişme</b>: toplama başlamış olabilir. Asıl hareket genelde turuncu kesişmeden sonra gelir; arada %8–12 test düşüşü olabilir.` : `${ke.ago} bar önce <b>turuncu kesişme</b>: hareket başlıyor olabilir. Beklenti küçük tutulmalı (%10–15); fiyat ${fmt(ke.px)} altına inerse sinyal bozulur.`]);
+  // özet karar
+  const stop = A[0] && A[0].flatRecent ? A[0] : A[0];
+  const plan = [];
+  if (U[0]) plan.push(`<b>${fmt(U[0].v)}</b> üstü = olumlu`);
+  if (stop) plan.push(`<b>${fmt(stop.v)}</b> altı kapanış = olumsuz`);
+  if (plan.length) out.push(['Kısaca', plan.join(', ') + '. Arada kalırsa fiyat sıkışır, beklemek gerekir.']);
+  return `<div class="panel basit"><p class="ph">Basit <b>anlatım</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${({ kisa: 'kısa', orta: 'orta', uzun: 'uzun' })[V]} vade</span></p>${out.map(([t, h]) => `<div class="bs"><b class="bt">${t}</b><p>${h}</p></div>`).join('')}<p class="note">Sistemin kurallarına göre yazılmıştır; yatırım tavsiyesi değildir.</p></div>`;
+}
 
 /* ---------- otomatik yorum ---------- */
 function yorum(r) {
@@ -507,6 +554,7 @@ function openCard(k, src) {
   const stats = DATA[M].stats || {}, stTxt = r.sig.map(k => { const s = stats[k]; const g = s && (s.g30 || s.g10); return g ? `<li>${esc(SIG[k][0])}: ${s.g30 ? '30' : '10'} günde ort. ${pct(g.ort)}, kazanma %${g.kaz} (${g.n} sinyal)</li>` : ''; }).join('');
   $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad} · SAR</div><div class="nm">${esc(r.k)}</div><span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
      <div class="row2"><div class="price num">${fmt(P)}</div><div class="num ${sgn(r.chg)}">${pct(r.chg)}</div></div><div class="sigs">${ORDER.filter(k => r.sig.includes(k)).map(k => `<button class="sg ${SIG[k][1]}" data-info="${k}">${esc(SIG[k][0])} ⓘ</button>`).join('')}</div></div>
+   ${basit(r)}
    ${chartPanel()}
    <div class="panel yorum"><p class="ph">Otomatik <b>yorum</b></p>${yorum(r).map(p => `<p>${p}</p>`).join('')}</div>
    <div class="panel"><p class="ph">SAR <b>merdiveni</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${cfg.set} + SAR Ort.</span></p><table class="lad">${lad}</table>
@@ -1024,8 +1072,8 @@ function chartStrip(m) {
 function prepWarn(r) {
   CH.lv = []; CH.uy = []; if (!r) return;
   const P = r.price, sup = nearest(r, 'alt', {}), res = nearest(r, 'ust', {});
-  if (sup) CH.lv.push({ v: sup.v, ad: 'Destek · ' + lvName(sup), col: '#16a34a' });
-  if (res) CH.lv.push({ v: res.v, ad: 'Direnç · ' + lvName(res), col: '#dc2626' });
+  if (sup) CH.lv.push({ v: sup.v, ad: (sup.flatRecent ? 'Destek · değmemeli · ' : 'Destek · altı kapanış olumsuz · ') + lvName(sup), col: '#16a34a' });
+  if (res) CH.lv.push({ v: res.v, ad: (res.flatRecent ? 'Direnç · değmeden dönerse düşüş · ' : 'Direnç · üstü olumlu · ') + lvName(res), col: '#dc2626' });
   const cfg = MK[M], ya = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flatRecent);
   const yA = ya.filter(x => x.side === 'alt').sort((a, b) => b.v - a.v)[0], yU = ya.filter(x => x.side === 'ust').sort((a, b) => a.v - b.v)[0];
   if (yA && (!sup || Math.abs(yA.v - sup.v) > sup.v * 0.004)) CH.lv.push({ v: yA.v, ad: 'Yana atan (destek) · ' + lvName(yA), col: '#a16207' });

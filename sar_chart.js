@@ -185,8 +185,8 @@ function chartStrip(m) {
 function prepWarn(r) {
   CH.lv = []; CH.uy = []; if (!r) return;
   const P = r.price, sup = nearest(r, 'alt', {}), res = nearest(r, 'ust', {});
-  if (sup) CH.lv.push({ v: sup.v, ad: 'Destek · ' + lvName(sup), col: '#16a34a' });
-  if (res) CH.lv.push({ v: res.v, ad: 'Direnç · ' + lvName(res), col: '#dc2626' });
+  if (sup) CH.lv.push({ v: sup.v, ad: (sup.flatRecent ? 'Destek · değmemeli · ' : 'Destek · altı kapanış olumsuz · ') + lvName(sup), col: '#16a34a' });
+  if (res) CH.lv.push({ v: res.v, ad: (res.flatRecent ? 'Direnç · değmeden dönerse düşüş · ' : 'Direnç · üstü olumlu · ') + lvName(res), col: '#dc2626' });
   const cfg = MK[M], ya = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flatRecent);
   const yA = ya.filter(x => x.side === 'alt').sort((a, b) => b.v - a.v)[0], yU = ya.filter(x => x.side === 'ust').sort((a, b) => a.v - b.v)[0];
   if (yA && (!sup || Math.abs(yA.v - sup.v) > sup.v * 0.004)) CH.lv.push({ v: yA.v, ad: 'Yana atan (destek) · ' + lvName(yA), col: '#a16207' });
