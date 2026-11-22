@@ -583,7 +583,7 @@ function profSig(r) {
   for (const k of ['kes_usd', 'kes_btc', 'derin']) if (r.sig0.includes(k)) s.add(k);
   if (p.tsi.every(t => r.tsi && r.tsi[t] && r.tsi[t].renk === 'yesil')) s.add('tsi_yesil');
   if (((r.lrc || {}).H || {}).konum === 'ust') s.add('lrc_ust');
-  each(p.lv, x => { if (x.igneli) s.add('igneli'); });
+  each(p.ana.filter(t => t !== 'G'), x => { if (x.igneli) s.add('igneli'); });
   { const w = r.tf && r.tf.H; if (w && act.filter(k => w.s[k] && w.s[k].flipped && w.s[k].side === 'ust' && !w.s[k].igneli).length >= 2) s.add('h_tukendi'); }
   if ((s.has('kes_turuncu') || s.has('kes_ideal')) && s.has('tsi_yesil') && (M === 'makro' || r.sig0.includes('kes_usd') || r.sig0.includes('kes_btc'))) s.add('kes_teyitli');
   { const ck = cekim(r); if (ck && ck.kuvvet === 'güçlü') s.add(ck.side === 'alt' ? 'cekim_alt' : 'cekim_ust'); }

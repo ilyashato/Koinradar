@@ -257,7 +257,7 @@ td.r,th.r{text-align:right}
 body.fs-on{overflow:hidden}
 @media (max-height:500px){.fshint{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-.sarmix{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:6px}.sm-t{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}.sm-c{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;font-weight:600}.sm-c .up{color:var(--up,#16a34a)}.sm-c .dn{color:var(--dn,#dc2626)}</style>
+.sm-r{display:grid;gap:5px;font-size:13px}.sm-r>div{display:grid;grid-template-columns:104px 1fr;gap:8px}.sarmix{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:6px}.sm-t{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}.sm-c{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;font-weight:600}.sm-c .up{color:var(--up,#16a34a)}.sm-c .dn{color:var(--dn,#dc2626)}</style>
 
 <div class="wrap">
   <a class="hf" href="/" aria-label="hatofinancial">
@@ -764,6 +764,26 @@ function sarOf(sym) {
   for (const k of R.sig || []) { if (SAR_POS[k]) { v += SAR_POS[k]; pos.push(k); } if (SAR_NEG[k]) { v -= SAR_NEG[k]; neg.push(k); } }
   return { score: Math.max(5, Math.min(95, v)), pos, neg, durum: R.durum };
 }
+function sarBox(x, r) {
+  const R = S.sar && S.sar.map.get(sarKey(x.sym)); if (!R) return '';
+  const sr = sarOf(x.sym), P = R.price, lv = [];
+  for (const tf of ['H', 'A', '3A', '6A']) { const row = R.tf && R.tf[tf]; if (!row) continue; for (const [k, v] of Object.entries(row.s || {})) if (k !== 'ort' && v && v.v != null) lv.push({ ...v, tf, k }); }
+  const TN = { H: 'Haftalık', A: 'Aylık', '3A': '3 aylık', '6A': '6 aylık' }, SNm = { psar: 'Parabolic', lin: 'Linear', luc: 'Lucid', slow: 'Triple Slow', mod: 'Triple Moderate', fast: 'Triple Fast' };
+  const sup = lv.filter(z => z.side === 'alt').sort((a, b) => b.v - a.v)[0], res = lv.filter(z => z.side === 'ust').sort((a, b) => a.v - b.v)[0];
+  const pf = v => (v > 0 ? '+' : '') + v.toFixed(1).replace('.', ',') + '%', lvTxt = z => `<b class="num">${fmt(z.v)}</b> <span class="muted">${TN[z.tf]} ${SNm[z.k] || z.k} · ${pf(z.dist)}${z.flatRecent ? ' · yana attı' : ''}</span>`;
+  const MH = R.med && R.med.H, LH = R.lrc && R.lrc.H, kes = R.lrc && R.lrc.G && (R.lrc.G.kesisme || []).at(-1);
+  const rows = [];
+  if (sup) rows.push(['Destek', lvTxt(sup) + (sup.flatRecent ? ' — değmemeli' : ' — altı kapanış olumsuz')]);
+  if (res) rows.push(['Direnç', lvTxt(res) + (res.flatRecent ? ' — değmeden dönerse düşüş' : ' — üstü olumlu')]);
+  if (MH) rows.push(['Haftalık medyan', `<b class="num">${fmt(MH.v)}</b> <span class="${MH.ust ? 'up' : 'dn'}">fiyat ${MH.ust ? 'üstünde' : 'altında'}</span>`]);
+  if (LH && !LH.yok) rows.push(['Haftalık LRC', `<b class="num">${fmt(LH.alt)} – ${fmt(LH.ust)}</b> <span class="muted">${({ alt: 'fiyat bandın altında (ucuz)', ust: 'fiyat bandın üstünde (uzak dur)', ic: 'fiyat bant içinde (sıkışma)' })[LH.konum]}</span>`]);
+  if (kes && kes.ago <= 30) rows.push(['Son kesişme', `${kes.tip === 'yesil' ? 'Yeşil' : 'Turuncu'} · ${kes.ago} bar önce · o günden ${pf(kes.fark)}`]);
+  const D = { olumlu: ['Olumlu', 'up'], olumsuz: ['Olumsuz', 'dn'], notr: ['Nötr', 'muted'] }[R.durum] || ['—', 'muted'];
+  return `<div class="sarmix"><div class="sm-t"><b style="font-size:14px">SAR Radar</b><span class="${D[1]}" style="font-weight:700">${D[0]}</span><span>SAR puanı <b class="num">${sr ? sr.score.toFixed(0) : '—'}</b></span>${r.tech != null && S.wSar > 0 ? `<span class="muted">teknik ${r.tech.toFixed(0)} · SAR ağırlığı %${Math.round(S.wSar * 100)}</span>` : ''}</div>
+    ${sr && (sr.pos.length || sr.neg.length) ? `<div class="sm-c">${sr.pos.map(k => `<span class="up">+ ${SAR_TXT[k] || k}</span>`).join('')}${sr.neg.map(k => `<span class="dn">− ${SAR_TXT[k] || k}</span>`).join('')}</div>` : ''}
+    <div class="sm-r">${rows.map(([a, b]) => `<div><span class="muted">${a}</span><span>${b}</span></div>`).join('')}</div>
+    <a class="small" href="sar.html">SAR Radar'da grafik ve tam yorum ›</a></div>`;
+}
 function blendSar(x, r) {
   if (!r || !isFinite(r.score)) return r; const sr = sarOf(x.sym);
   r.tech = r.tech ?? r.score; r.sarR = sr;
@@ -890,9 +910,17 @@ const SIGS = {
   ma200: ['MA200’ü yeni geçti', 'Fiyat son 5 mumda 200’lük ortalamayı yukarı kesti.', (d, I, i) => { for (let q = i; q > i - 5 && q > 0; q--) if (isFinite(I.sma200[q]) && d.c[q - 1] <= I.sma200[q - 1] && d.c[q] > I.sma200[q]) return true; return false; }],
   hacim: ['Hacimli', 'Son mumun hacmi 20 mumluk ortalamanın 1,5 katı ve üstü.', (d, I, i) => d.v[i] / I.volSma20[i - 1] >= 1.5],
 };
+// SAR Radar sinyalleri (data/sar_*.json, günlük veri) — Sinyaller paneline ayrı grup
+const SAR_SIG = { med_ust: ['Medyan üstünde', 'Fiyat haftalık medyanın üstünde: olumlu.'], alt_yana: ['Alttan yana atan SAR', 'Fiyatın altındaki SAR yatay kaldı: destek, temas etmedikçe yükseliş.'], igneli: ['İğneli temas', 'Destek SAR\'ına iğne atıldı, kapanış üstte: tepki uzun sürer.'],
+  kes_teyitli: ['Teyitli kesişme', 'LRC kesişmesi + TSI yeşil + dolar/BTC teyidi.'], direnc_asildi: ['Direnç SAR\'ı aşıldı', 'Üstteki SAR\'a temas edildi, SAR fiyatın altına geçti.'], cakisma: ['3A+6A SAR çakışması', '3 ve 6 aylık SAR\'lar aynı bölgede: güçlü destek.'],
+  aylik_tepki: ['Aylık SAR tepki adayı', 'Fiyata yaklaşan aylık SAR\'lar ve 3\'ü 21 EMA altında.'], kes_turuncu: ['Turuncu LRC kesişmesi', 'Son 20 barda turuncu kesişme: hareket başlıyor.'], tsi_yesil: ['Linear TSI yeşil', 'Günlük ve haftalık Linear TSI yeşil: momentum artıyor.'],
+  lrc_alt: ['LRC alt bandın altı', 'Ucuz bölge: bandın içine tepki beklenir.'],
+  ust_yana: ['Üstten yana atan SAR', 'Fiyatın üstündeki SAR yatay kaldı: direnç, düşüş sürer.'], destek_kayip: ['Destek SAR\'ı kaybedildi', 'Alttaki SAR\'a temas edildi, destek iptal.'], h_tukendi: ['Haftalık SAR tükendi', 'Birden çok haftalık SAR\'a iğnesiz temas: ara tepki.'],
+  lrc_ust: ['Haftalık LRC üstünde', 'Bant üstündeki enstrümandan uzak durulur.'], med_alt: ['Medyan altında', 'Fiyat haftalık medyanın altında.'], trend_bozuk: ['Günlük SAR\'lar üstte', 'Fiyat aktif günlük SAR\'ların altında.'] };
+for (const [k, v] of Object.entries(SAR_SIG)) SIGS['sar:' + k] = [v[0], v[1] + ' (SAR Radar, günlük veri)', null];
 const SAGE = new Map();
 function sigAge(x, keys, tf) {
-  const D = tfData(x, tf); if (!D || !keys.length) return null; const d = D.d, I = D.I, n = d.c.length, i = n - 2; if (i < 26) return null;
+  keys = keys.filter(k => !k.startsWith('sar:')); const D = tfData(x, tf); if (!D || !keys.length) return null; const d = D.d, I = D.I, n = d.c.length, i = n - 2; if (i < 26) return null;
   const ck = x.sym + '|' + tf + '|' + keys.join() + '|' + n; let c = SAGE.get(ck);
   if (!c) { let start = -1, capped = false;
     for (const k of keys) { let s = i; const lim = Math.max(25, i - 150); while (s - 1 >= lim) { let ok = false; try { ok = !!SIGS[k][2](d, I, s - 1); } catch (e) {} if (!ok) break; s--; } if (s === lim && s > 25) capped = true; start = Math.max(start, s); }
@@ -906,7 +934,7 @@ function sigAgeTxt(a, tf, short) {
   const sg = v => (v >= 0 ? '+' : '−') + Math.abs(v * 100).toFixed(1).replace('.', ',') + '%';
   return `${when} · ${short ? '' : 'şu an '}${sg(a.gain)} · zirve ${sg(a.max)}`;
 }
-function sigOk(x, k, tf) { const D = tfData(x, tf || S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
+function sigOk(x, k, tf) { if (k.startsWith('sar:')) { const R = S.sar && S.sar.map.get(sarKey(x.sym)); return !!(R && (R.sig || []).includes(k.slice(4))); } const D = tfData(x, tf || S.listTF); if (!D) return false; const i = D.d.c.length - 2; if (i < 25) return false; try { return !!SIGS[k][2](D.d, D.I, i); } catch (e) { return false; } }
 function renderViews() {
   const rs = listCoins(), eff = effFlt(), d1 = S.listTF === '1d';
   for (const v of ['guclu', 'dip', 'tum', 'fav']) $('#n-' + v).textContent = rs.filter(x => inView(x, v)).length;
@@ -914,7 +942,7 @@ function renderViews() {
   const tfb = $('#listTF'); const want = Object.entries(TF).filter(([k]) => !(MODE === 'borsa' && isH(k))).map(([k, v]) => `<button type="button" data-t="${k}" aria-pressed="${S.listTF === k}">${v.t}</button>`).join('');
   if (tfb.dataset.k !== S.listTF || !tfb.innerHTML) { tfb.innerHTML = want; tfb.dataset.k = S.listTF; }
   const sg = $('#sigs'), cnt = Object.fromEntries(Object.keys(SIGS).map(k => [k, rs.filter(x => sigOk(x, k)).length]));
-  const SIGG = [['Dönüş ve uyumsuzluk', ['divB', 'divT', 'refD', 'refT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
+  const SIGG = [...(S.sar ? [['SAR Radar · olumlu', ['med_ust', 'alt_yana', 'igneli', 'kes_teyitli', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'kes_turuncu', 'tsi_yesil', 'lrc_alt'].map(k => 'sar:' + k)], ['SAR Radar · olumsuz', ['ust_yana', 'destek_kayip', 'h_tukendi', 'lrc_ust', 'med_alt', 'trend_bozuk'].map(k => 'sar:' + k)]] : []), ['Dönüş ve uyumsuzluk', ['divB', 'divT', 'refD', 'refT', 'rsi30', 'wtDip']], ['Kesişimler', ['ma920', 'ma920d', 'ema510', 'macd', 'rsi50x']], ['Trend ve kırılım', ['rsi50', 'dizilim', 'kirilim', 'ma200', 'sikisma']], ['Para akışı', ['giris', 'cikis', 'hacim']]];
   const sh = SIGG.map(([g, ks]) => `<div class="sgg">${g}</div><div class="sgrow">${ks.map(k => `<button type="button" class="view" data-sg="${k}" aria-pressed="${S.sig.includes(k)}" title="${esc(SIGS[k][1])}">${esc(SIGS[k][0])} <b>${cnt[k]}</b></button>`).join('')}</div>`).join('');
   if (sg.dataset.h !== sh) { sg.innerHTML = sh; sg.dataset.h = sh; }
   document.querySelectorAll('#sgcard [data-sc]').forEach(b => b.disabled = !S.sig.length);
@@ -1181,7 +1209,8 @@ function renderDetail() {
         <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]} ${ib('_skor')}</div><div class="p"><span class="lv-p">${fmt(x.live ? x.live.p : r.close)}</span> <span class="lv-c ${(x.live ? x.live.chg : chg) >= 0 ? 'up' : 'dn'}">${pc(x.live ? x.live.chg : chg)}</span></div><div class="small muted">${when}</div></div></div>
       <div class="meter"><i style="left:${Math.max(1, Math.min(99, r.score))}%"></i></div>
       <div class="meterlab"><span>Uzak dur</span><span>Zayıf</span><span>Kararsız</span><span>Olumlu</span></div>${noMA}
-      ${r.sarR && S.wSar > 0 ? `<div class="sarmix"><div class="sm-t"><span>Teknik puan <b class="num">${r.tech.toFixed(0)}</b></span><span>SAR Radar puanı <b class="num">${r.sarR.score.toFixed(0)}</b></span><span class="muted">SAR ağırlığı %${Math.round(S.wSar * 100)}</span></div>
+      ${sarBox(x, r)}
+      ${false ? `<div class="sarmix"><div class="sm-t"><span>Teknik puan <b class="num">${r.tech.toFixed(0)}</b></span><span>SAR Radar puanı <b class="num">${r.sarR.score.toFixed(0)}</b></span><span class="muted">SAR ağırlığı %${Math.round(S.wSar * 100)}</span></div>
         ${r.sarR.pos.length || r.sarR.neg.length ? `<div class="sm-c">${r.sarR.pos.map(k => `<span class="up">+ ${SAR_TXT[k]}</span>`).join('')}${r.sarR.neg.map(k => `<span class="dn">− ${SAR_TXT[k]}</span>`).join('')}</div>` : '<div class="small muted">SAR tarafında belirgin sinyal yok (nötr, 50).</div>'}
         <a class="small" href="sar.html">SAR Radar'da ayrıntı ›</a></div>` : ''}
     </div>

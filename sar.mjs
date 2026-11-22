@@ -135,7 +135,7 @@ export function signals(a, cfg, extra = {}) {
   if (extra.kesUsd) s.add('kes_usd'); if (extra.kesBtc) s.add('kes_btc');
   if (a.tsi.G && a.tsi.H && a.tsi.G.renk === 'yesil' && a.tsi.H.renk === 'yesil') s.add('tsi_yesil');
   if (LH.konum === 'ust') s.add('lrc_ust');
-  each(cfg.tfs, x => { if (x.igneli) s.add('igneli'); });
+  each(cfg.ana.filter(t => t !== 'G'), x => { if (x.igneli) s.add('igneli'); });
   { const w = a.tf.H; if (w) { const t = act.filter(k => w.s[k] && w.s[k].flipped && w.s[k].side === 'ust' && !w.s[k].igneli).length; if (t >= 2) s.add('h_tukendi'); } }
   if (s.has('kes_turuncu') || s.has('kes_ideal')) { if (s.has('tsi_yesil') && (extra.kesUsd || extra.kesBtc || cfg === CFG.makro)) s.add('kes_teyitli'); }
   const MH = a.med && a.med.H; if (MH) { s.add(MH.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MH.fark) >= 10) s.add('med_fark'); if (Math.abs(MH.dist) <= 2) s.add('med_test'); }
