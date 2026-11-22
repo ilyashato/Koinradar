@@ -257,7 +257,7 @@ td.r,th.r{text-align:right}
 body.fs-on{overflow:hidden}
 @media (max-height:500px){.fshint{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-.row:has(#topSeg){display:none}</style>
+.sarmix{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:12px;display:grid;gap:6px}.sm-t{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}.sm-c{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12.5px;font-weight:600}.sm-c .up{color:var(--up,#16a34a)}.sm-c .dn{color:var(--dn,#dc2626)}.row:has(#topSeg){display:none}</style>
 
 <div class="wrap">
   <a class="hf" href="/" aria-label="hatofinancial">
@@ -304,6 +304,7 @@ body.fs-on{overflow:hidden}
             <div class="row"><span>Skor türü<span class="muted">Kesin = standart kurallar, Sezgisel = kursa özgü kurallar</span></span>
               <div class="seg" id="sortSeg"><button type="button" data-k="score" aria-pressed="true">Birleşik</button><button type="button" data-k="kesin" aria-pressed="false">Kesin</button><button type="button" data-k="sezgisel" aria-pressed="false">Sezgisel</button></div></div>
             <div class="row"><label for="wS">Sezgisel kuralların ağırlığı<span class="muted">0 = yok say, 1 = kesin kurallar kadar</span></label><span><input type="range" id="wS" min="0" max="1" step="0.1" value="0.6"> <span class="num" id="wSv">0.6</span></span></div>
+            <div class="row"><label for="wSar">SAR Radar puanının ağırlığı<span class="muted">Genel puan = teknik puan × (1 − ağırlık) + SAR puanı × ağırlık. 0 = SAR'ı yok say</span></label><span><input type="range" id="wSar" min="0" max="1" step="0.1" value="0.5"> <span class="num" id="wSarv">0.5</span></span></div>
             <div class="row"><span>Güvenlik kapıları<span class="muted">MA200 altı, trend aşağı, RSI 50 altı ise skoru sınırla</span></span><button class="switch" type="button" id="fGates" aria-pressed="true" aria-label="Güvenlik kapıları"></button></div>
             <div class="row"><span>Geri test ağırlıkları<span class="muted" id="wHelp">Önce Geri test sekmesinde testi çalıştırın</span></span><button class="switch" type="button" id="fWeights" aria-pressed="false" aria-label="Geri test ağırlıkları" disabled></button></div>
             <div class="row"><span>Taranacak coin sayısı<span class="muted">Binance'teki tüm USDT pariteleri ya da hacme göre ilk 100/50. Az coin daha hızlı yüklenir.</span></span>
@@ -1502,7 +1503,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;',
 const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const store = { get(k, d) { try { const v = localStorage.getItem('br_' + k); return v == null ? d : JSON.parse(v); } catch { return d; } }, set(k, v) { try { localStorage.setItem('br_' + k, JSON.stringify(v)); } catch {} } };
 
-const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true), sig: store.get('sig', []), liveT: 0, fullT: 0 };
+const S = { coins: [], source: 'none', flt: store.get('flt', []), listTF: store.get('listTF', '1d'), sort: store.get('sort', 'score'), wS: store.get('wS', 0.6), gates: store.get('gates', true), useW: false, q: '', sel: null, bt: null, top: store.get('top', 0), btc: null, young: 0, total: 0, loading: false, fav: store.get('fav', []), tcTF: store.get('tcTF', '1d'), btH: store.get('btH', 7), btAdj: store.get('btAdj', true), sig: store.get('sig', []), liveT: 0, fullT: 0, wSar: store.get('wSar', 0.5), sar: null };
 
 // ───────── Sade dil ─────────
 const VERDICT = { gp: 'Güçlü görünüm', p: 'Olumlu', n: 'Kararsız', z: 'Zayıf', k: 'Uzak dur' };
@@ -1681,7 +1682,7 @@ const INFO = {
   tf4_bozulma: ['4 saatlikte fiyatın MA9/20/50 altına inmesi.', 'Alt zaman dilimindeki bozulma üst zaman dilimine yayılabilir.'],
   tf4_erken: ['4 saatlik tüm ortalamaların üstünde, günlük MA200 altında.', 'Erken dönüş işareti; günlük teyit gelmeden riskli.'],
   // ── özel başlıklar (rule olmayanlar) ──
-  _skor: ['Puan nasıl okunur?', '0–100 arası. Kuralların ağırlıklı toplamıdır; kapılar (MA200 altı, EMA5/10 aşağı, RSI 50 altı) puanı sınırlar. Kesin kurallar tam, sezgisel (kursa özgü) kurallar ayarlanan ağırlıkla girer.', '75+ güçlü, 60+ olumlu, 45–60 kararsız, 30–45 zayıf, altı uzak dur. Puan, üstte seçtiğin zaman diliminin mumlarına göre hesaplanır. Yatırım tavsiyesi değildir.'],
+  _skor: ['Puan nasıl okunur?', '0–100 arası. Kuralların ağırlıklı toplamıdır; kapılar (MA200 altı, EMA5/10 aşağı, RSI 50 altı) puanı sınırlar. Kesin kurallar tam, sezgisel (kursa özgü) kurallar ayarlanan ağırlıkla girer. SAR Radar puanı varsayılan olarak %50 ağırlıkla genel puana katılır (Gelişmiş ayarlar).', '75+ güçlü, 60+ olumlu, 45–60 kararsız, 30–45 zayıf, altı uzak dur. Puan, üstte seçtiğin zaman diliminin mumlarına göre hesaplanır. Yatırım tavsiyesi değildir.'],
   _g_ma200: ['Kapı: MA200 altı', 'Fiyat 200 mumluk ortalamanın altında.', 'Puan en fazla 40 olur. Ortalamanın üstüne çıkmadan güçlü sinyal sayılmaz.'],
   _g_ema: ['Kapı: EMA5/10 aşağı', 'Kısa vadeli trend yönü aşağı.', 'Puan en fazla 55 olur. EMA5 tekrar EMA10 üstüne çıkınca kalkar.'],
   _g_rsi: ['Kapı: RSI 50 altı', 'Satıcılar baskın.', 'Puan en fazla 50 olur. RSI 50 üstüne dönünce kalkar.'],
@@ -1868,7 +1869,32 @@ function prepare(coins) {
   S.coins = coins; S.bt = null; S.useW = false; rescore();
 }
 const opts = () => ({ sezgiselW: S.wS, gates: S.gates, ruleWeights: S.useW && S.bt ? S.bt.suggestedWeights : null });
-function evalCoin(x) {
+// ───────── SAR Radar puanı (data/sar_*.json) ─────────
+const SAR_POS = { alt_yana: 10, tek: 6, direnc_asildi: 10, cakisma: 8, dip6a: 6, aylik_tepki: 8, kes_ideal: 8, kes_turuncu: 5, tsi_yesil: 6, kes_usd: 4, kes_btc: 4 };
+const SAR_NEG = { ust_yana: 12, destek_kayip: 12, trend_bozuk: 10, lrc_pahali: 8, kes_risk: 6 };
+const SAR_TXT = { alt_yana: 'Alttan yana atan SAR (destek)', tek: 'TEK SAR', direnc_asildi: 'Direnç SAR\'ı aşıldı', cakisma: '3 ve 6 aylık SAR çakışması', dip6a: '6 aylık SAR desteğine yakın', aylik_tepki: 'Aylık SAR tepki adayı', kes_ideal: 'İdeal LRC kesişmesi', kes_turuncu: 'Turuncu LRC kesişmesi', tsi_yesil: 'Linear TSI yeşil', kes_usd: 'Dolar bazlı kesişme', kes_btc: 'BTC paritesinde kesişme',
+  ust_yana: 'Üstten yana atan SAR (direnç)', destek_kayip: 'Destek SAR\'ı kaybedildi', trend_bozuk: 'Fiyat günlük SAR\'ların altında', lrc_pahali: 'LRC 2 katı: pahalı', kes_risk: 'Riskli kesişme' };
+const sarKey = sym => MODE === 'borsa' ? sym : sym.replace(/USDT$/, '');
+function sarOf(sym) {
+  const R = S.sar && S.sar.map.get(sarKey(sym)); if (!R) return null;
+  let v = 50; const pos = [], neg = [];
+  for (const k of R.sig || []) { if (SAR_POS[k]) { v += SAR_POS[k]; pos.push(k); } if (SAR_NEG[k]) { v -= SAR_NEG[k]; neg.push(k); } }
+  return { score: Math.max(5, Math.min(95, v)), pos, neg, durum: R.durum };
+}
+function blendSar(x, r) {
+  if (!r || !isFinite(r.score)) return r; const sr = sarOf(x.sym);
+  r.tech = r.tech ?? r.score; r.sarR = sr;
+  if (sr && S.wSar > 0) { r.score = r.tech * (1 - S.wSar) + sr.score * S.wSar; r.label = CR.label(r.score); } else { r.score = r.tech; r.label = CR.label(r.score); }
+  return r;
+}
+async function loadSar() {
+  try { const r = await fetch(`data/sar_${MODE}.json`, { cache: 'no-cache' }); if (!r.ok) return; const j = await r.json();
+    S.sar = { map: new Map(j.rows.map(z => [z.k, z])), t: j.generated };
+    for (const k of Object.keys(j.piyasaOzet || {})) S.sar.map.set(k.replace(/USDT$/, ''), j.piyasaOzet[k]);
+    if (S.coins.length) rescore(); } catch (e) {}
+}
+function evalCoin(x) { return blendSar(x, evalCoin0(x)); }
+function evalCoin0(x) {
   const d = x.d, i = d.c.length - 2; if (i < 210) return null;
   const w = new CR.Walker(d, x.I, opts()); let tf4 = null;
   if (x.J) { const tEnd = d.t[i] + 864e5; let k = x.d4.c.length - 2; while (k > 0 && x.d4.t[k] + 4 * 36e5 > tEnd) k--; tf4 = { I: x.J, d: x.d4, i: k }; }
@@ -2067,9 +2093,12 @@ function evalTF(x, tf) {
   const D = tfData(x, tf); if (!D) return null;
   x.tfres = x.tfres || {}; const key = tf + (D.d === x.dw || D.d === x.dm ? 'R' : 'r');
   if (key in x.tfres) return x.tfres[key];
+  const r0 = evalTF0(x, D, tf); return x.tfres[key] = blendSar(x, r0);
+}
+function evalTF0(x, D, tf) {
   const i = D.d.c.length - 2; let res = null;
   if (i >= (isH(tf) ? 100 : 30)) { try { res = new CR.Walker(D.d, D.I, opts()).evaluate(i, null); if (!res || !isFinite(res.score)) res = null; } catch (e) { res = null; } }
-  return x.tfres[key] = res;
+  return res;
 }
 // Haftalık / aylık için Binance'ten gerçek geçmiş (MA200 için daha fazla mum); olmazsa günlükten türetilir
 let tfJob = null;
@@ -2269,6 +2298,9 @@ function renderDetail() {
         <div><div class="v v-${r.label.k}">${VERDICT[r.label.k]} ${ib('_skor')}</div><div class="p"><span class="lv-p">${fmt(x.live ? x.live.p : r.close)}</span> <span class="lv-c ${(x.live ? x.live.chg : chg) >= 0 ? 'up' : 'dn'}">${pc(x.live ? x.live.chg : chg)}</span></div><div class="small muted">${when}</div></div></div>
       <div class="meter"><i style="left:${Math.max(1, Math.min(99, r.score))}%"></i></div>
       <div class="meterlab"><span>Uzak dur</span><span>Zayıf</span><span>Kararsız</span><span>Olumlu</span></div>${noMA}
+      ${r.sarR && S.wSar > 0 ? `<div class="sarmix"><div class="sm-t"><span>Teknik puan <b class="num">${r.tech.toFixed(0)}</b></span><span>SAR Radar puanı <b class="num">${r.sarR.score.toFixed(0)}</b></span><span class="muted">SAR ağırlığı %${Math.round(S.wSar * 100)}</span></div>
+        ${r.sarR.pos.length || r.sarR.neg.length ? `<div class="sm-c">${r.sarR.pos.map(k => `<span class="up">+ ${SAR_TXT[k]}</span>`).join('')}${r.sarR.neg.map(k => `<span class="dn">− ${SAR_TXT[k]}</span>`).join('')}</div>` : '<div class="small muted">SAR tarafında belirgin sinyal yok (nötr, 50).</div>'}
+        <a class="small" href="sar.html">SAR Radar'da ayrıntı ›</a></div>` : ''}
     </div>
     <div class="card say">
       <div class="sect">Neden bu puan?</div>
@@ -2948,6 +2980,8 @@ function syncAdv() {
 }
 $('#topSeg').addEventListener('click', e => { const n = e.target.dataset.n; if (n == null || S.loading) return; S.top = +n; store.set('top', S.top); syncAdv(); start(); });
 $('#sortSeg').addEventListener('click', e => { const k = e.target.dataset.k; if (!k) return; S.sort = k; store.set('sort', k); syncAdv(); renderList(); });
+$('#wSar').value = S.wSar; $('#wSarv').textContent = (+S.wSar).toFixed(1);
+let wst; $('#wSar').addEventListener('input', e => { S.wSar = +e.target.value; $('#wSarv').textContent = S.wSar.toFixed(1); store.set('wSar', S.wSar); clearTimeout(wst); wst = setTimeout(rescore, 150); });
 let wt; $('#wS').addEventListener('input', e => { S.wS = +e.target.value; $('#wSv').textContent = S.wS.toFixed(1); store.set('wS', S.wS); clearTimeout(wt); wt = setTimeout(rescore, 150); });
 $('#fGates').addEventListener('click', () => { S.gates = !S.gates; store.set('gates', S.gates); rescore(); });
 $('#fWeights').addEventListener('click', () => { if (!S.bt) return; S.useW = !S.useW; rescore(); });
@@ -3056,6 +3090,7 @@ async function start() {
   }
   btn.disabled = false;
 }
+loadSar();
 window.__CR = { S, shareCard }; // otomatik paylaşım betiği (paylas.mjs) için
 start();
 })();
