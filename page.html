@@ -753,9 +753,9 @@ function prepare(coins) {
 }
 const opts = () => ({ sezgiselW: S.wS, gates: S.gates, ruleWeights: S.useW && S.bt ? S.bt.suggestedWeights : null });
 // ───────── SAR Radar puanı (data/sar_*.json) ─────────
-const SAR_POS = { med_ust: 10, alt_yana: 10, tek: 6, direnc_asildi: 10, cakisma: 8, dip6a: 6, aylik_tepki: 8, kes_ideal: 8, kes_turuncu: 5, tsi_yesil: 6, kes_usd: 4, kes_btc: 4 };
-const SAR_NEG = { med_alt: MODE === 'borsa' ? 5 : 10, med_fark: 8, ust_yana: 12, destek_kayip: 12, trend_bozuk: 10, lrc_pahali: 8, kes_risk: 6 };
-const SAR_TXT = { med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', alt_yana: 'Alttan yana atan SAR (destek)', tek: 'TEK SAR', direnc_asildi: 'Direnç SAR\'ı aşıldı', cakisma: '3 ve 6 aylık SAR çakışması', dip6a: '6 aylık SAR desteğine yakın', aylik_tepki: 'Aylık SAR tepki adayı', kes_ideal: 'İdeal LRC kesişmesi', kes_turuncu: 'Turuncu LRC kesişmesi', tsi_yesil: 'Linear TSI yeşil', kes_usd: 'Dolar bazlı kesişme', kes_btc: 'BTC paritesinde kesişme',
+const SAR_POS = { kes_teyitli: 8, med_ust: 10, alt_yana: 10, tek: 6, direnc_asildi: 10, cakisma: 8, dip6a: 6, aylik_tepki: 8, kes_ideal: 8, kes_turuncu: 5, tsi_yesil: 6, kes_usd: 4, kes_btc: 4 };
+const SAR_NEG = { lrc_ust: 10, med_alt: MODE === 'borsa' ? 5 : 10, med_fark: 8, ust_yana: 12, destek_kayip: 12, trend_bozuk: 10, lrc_pahali: 8, kes_risk: 6 };
+const SAR_TXT = { kes_teyitli: 'Teyitli kesişme', lrc_ust: 'Haftalık LRC üst bandının üstü (uzak dur)', med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', alt_yana: 'Alttan yana atan SAR (destek)', tek: 'TEK SAR', direnc_asildi: 'Direnç SAR\'ı aşıldı', cakisma: '3 ve 6 aylık SAR çakışması', dip6a: '6 aylık SAR desteğine yakın', aylik_tepki: 'Aylık SAR tepki adayı', kes_ideal: 'İdeal LRC kesişmesi', kes_turuncu: 'Turuncu LRC kesişmesi', tsi_yesil: 'Linear TSI yeşil', kes_usd: 'Dolar bazlı kesişme', kes_btc: 'BTC paritesinde kesişme',
   ust_yana: 'Üstten yana atan SAR (direnç)', destek_kayip: 'Destek SAR\'ı kaybedildi', trend_bozuk: 'Fiyat günlük SAR\'ların altında', lrc_pahali: 'LRC 2 katı: pahalı', kes_risk: 'Riskli kesişme' };
 const sarKey = sym => MODE === 'borsa' ? sym : sym.replace(/USDT$/, '');
 function sarOf(sym) {

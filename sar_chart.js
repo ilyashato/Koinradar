@@ -222,6 +222,7 @@ function prepWarn(r) {
   const yA = ya.filter(x => x.side === 'alt').sort((a, b) => b.v - a.v)[0], yU = ya.filter(x => x.side === 'ust').sort((a, b) => a.v - b.v)[0];
   if (yA && (!sup || Math.abs(yA.v - sup.v) > sup.v * 0.004)) CH.lv.push({ v: yA.v, ad: 'Yana atan (destek) · ' + lvName(yA), col: '#a16207' });
   if (yU && (!res || Math.abs(yU.v - res.v) > res.v * 0.004)) CH.lv.push({ v: yU.v, ad: 'Yana atan (direnç) · ' + lvName(yU), col: '#a16207' });
+  const nt = notOf(r); if (nt) { for (const v of nt.d) CH.lv.push({ v, ad: 'Hoca desteği ' + fmt(v), col: '#b8860b' }); for (const v of nt.r) CH.lv.push({ v, ad: 'Hoca eşiği ' + fmt(v), col: '#b8860b' }); }
   const LH = r.lrc && r.lrc.H; if (LH && !LH.yok && LH.alt < P) CH.lv.push({ v: LH.alt, ad: 'Düzeltme hedefi · haftalık LRC alt', col: '#2563eb' });
   const W = { destek_kayip: 'Destek SAR\'ı kaybedildi', ust_yana: 'Üstten yana atan SAR: direnç', trend_bozuk: 'Fiyat günlük SAR\'ların altında', kes_risk: 'Riskli kesişme', lrc_pahali: 'LRC 2 katı: pahalı bölge',
     igne: 'SAR\'a iğne: yana atma bekleniyor', lrc_alt: 'LRC alt bandın altında: tepki bölgesi', alt_yana: 'Alttan yana atan SAR: destek', tek: 'TEK SAR: yükseliş işareti', direnc_asildi: 'Direnç SAR\'ı aşıldı', kes_ideal: 'İdeal kesişme', aylik_tepki: 'Aylık SAR tepki adayı' };

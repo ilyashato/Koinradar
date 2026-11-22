@@ -275,7 +275,7 @@ export function analyze(daily, cfg) {
 export const MAKRO = [
   ['ALTIN', 'Altın (ons, $)', 'maden', { y: 'GC=F' }], ['GUMUS', 'Gümüş (ons, $)', 'maden', { y: 'SI=F' }],
   ['PLATIN', 'Platin (ons, $)', 'maden', { y: 'PL=F' }], ['PALADYUM', 'Paladyum (ons, $)', 'maden', { y: 'PA=F' }],
-  ['GRAMALTIN', 'Gram altın (₺)', 'maden', { f: ['*', 'GC=F', 'USDTRY=X', 1 / 31.1035] }], ['GUMUSTL', 'Gümüş (ons, ₺)', 'maden', { f: ['*', 'SI=F', 'USDTRY=X', 1] }],
+  ['GRAMALTIN', 'Gram altın (₺)', 'maden', { f: ['*', 'GC=F', 'USDTRY=X', 1 / 31.1035] }], ['GUMUSTL', 'Gümüş (ons, ₺)', 'maden', { f: ['*', 'SI=F', 'USDTRY=X', 1] }], ['GRAMGUMUS', 'Gram gümüş (₺)', 'maden', { f: ['*', 'SI=F', 'USDTRY=X', 1 / 31.1035] }],
   ['WTI', 'Ham petrol WTI', 'emtia', { y: 'CL=F' }], ['BRENT', 'Brent petrol', 'emtia', { y: 'BZ=F' }], ['DOGALGAZ', 'Doğalgaz', 'emtia', { y: 'NG=F' }],
   ['BAKIR', 'Bakır', 'emtia', { y: 'HG=F' }], ['BUGDAY', 'Buğday', 'emtia', { y: 'ZW=F' }], ['MISIR', 'Mısır', 'emtia', { y: 'ZC=F' }],
   ['DXY', 'Dolar endeksi (DXY)', 'fx', { y: 'DX-Y.NYB' }], ['EURUSD', 'Euro / Dolar', 'fx', { y: 'EURUSD=X' }], ['GBPUSD', 'Sterlin / Dolar', 'fx', { y: 'GBPUSD=X' }],

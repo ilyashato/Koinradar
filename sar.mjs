@@ -92,10 +92,10 @@ export const SIG = {
   direnc_asildi: 'Direnç SAR\'ı aşıldı', destek_kayip: 'Destek SAR\'ı kaybedildi', cakisma: '3A+6A SAR çakışması', dip6a: '6 aylık SAR yakın',
   aylik_tepki: 'Aylık SAR tepki adayı', trend_bozuk: "Günlük SAR'lar üstte", lrc_alt: 'LRC alt bandın altı', lrc_pahali: 'LRC 2 katı (pahalı)',
   kes_yesil: 'Yeşil kesişme', kes_turuncu: 'Turuncu kesişme', kes_ideal: 'İdeal kesişme', kes_risk: 'Riskli kesişme', kes_usd: 'Dolar bazlı kesişme',
-  kes_btc: 'BTC paritesinde kesişme', med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', med_test: 'Haftalık medyana yakın', tsi_yesil: 'Linear TSI yeşil (G+H)', derin: 'Derin düşüş',
+  kes_btc: 'BTC paritesinde kesişme', lrc_ust: 'Haftalık LRC üst bandının üstü', kes_teyitli: 'Teyitli kesişme', med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', med_test: 'Haftalık medyana yakın', tsi_yesil: 'Linear TSI yeşil (G+H)', derin: 'Derin düşüş',
 };
-const POS = ['med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'];
-const NEG = ['med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
+const POS = ['kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'];
+const NEG = ['lrc_ust', 'med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
 
 function clusters(levels, price) {
   // aynı taraftaki seviyeler: %3 içinde en az 3 SAR → küme
@@ -134,6 +134,8 @@ export function signals(a, cfg, extra = {}) {
   if (lastK && lastK.ago <= 30 && yor.some(y => ['tehlikeli', 'arka_arkaya', 'coklu', 'yeni_bant', 'kacti'].includes(y))) s.add('kes_risk');
   if (extra.kesUsd) s.add('kes_usd'); if (extra.kesBtc) s.add('kes_btc');
   if (a.tsi.G && a.tsi.H && a.tsi.G.renk === 'yesil' && a.tsi.H.renk === 'yesil') s.add('tsi_yesil');
+  if (LH.konum === 'ust') s.add('lrc_ust');
+  if (s.has('kes_turuncu') || s.has('kes_ideal')) { if (s.has('tsi_yesil') && (extra.kesUsd || extra.kesBtc || cfg === CFG.makro)) s.add('kes_teyitli'); }
   const MH = a.med && a.med.H; if (MH) { s.add(MH.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MH.fark) >= 10) s.add('med_fark'); if (Math.abs(MH.dist) <= 2) s.add('med_test'); }
   if (L.dusus != null && L.dusus <= cfg.derin) s.add('derin');
   const sig = [...s], puan = sig.filter(x => POS.includes(x)).length - sig.filter(x => NEG.includes(x)).length;
