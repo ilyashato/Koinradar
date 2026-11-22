@@ -238,6 +238,10 @@ const MK = {
 const GRP = { hepsi: 'Tümü', maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto', rasyo: 'Rasyolar' };
 // sinyal: etiket, ton, açıklama (kural kaynağı)
 const SIG = {
+  med_ust: ['Medyan üstünde', 'pos', 'Fiyat seçili vadenin medyanının üstünde (medyan "yeşil"). Sistem: medyan üstü yükseliş; üstünde kaldıkça medyan yukarı güncellenir. Anlık sarkmalarda renk değişebilir, gün sonu önemli.'],
+  med_alt: ['Medyan altında', 'neg', 'Fiyat medyanın altında (medyan "kırmızı"). Kriptoda medyan altı düşüş demek ("onsla eşitlenir"); BIST\'te düşüşten çok sıkışma. Kırılan medyan direnç olur.'],
+  med_fark: ['Medyan–ortalama farkı %10+', 'neg', 'Son 50 kapanışın aritmetik ortalaması ile medyanı arasındaki fark %10\'u geçmiş. Sistem: fark %10\'u geçerse derin düzeltme gelir.'],
+  med_test: ['Medyana yakın', '', 'Fiyat medyana %2\'den yakın: medyan hem destek hem direnç çalışır, kritik seviye.'],
   alt_yana: ['Alttan yana atan SAR', 'pos', 'SAR fiyatın altında yatay kaldı (değeri önceki barla aynı). Destek; temas etmedikçe yükseliş beklenir. Sistemin verisi: 100 grafiğin 92\'sinde yana atan SAR\'a temas olmadan dönüş.'],
   ust_yana: ['Üstten yana atan SAR', 'neg', 'SAR fiyatın üstünde yatay kaldı. Direnç; temas edilmedikçe düşüş sürer.'],
   tek: ['TEK SAR', 'pos', 'Yükselişte SAR tek bar için fiyatın üstüne çıkıp hemen geri döndü (başarısız dönüş). Pine koşulu: SAR[1] > kapanış[1], tepe > SAR[1], SAR < kapanış, SAR[2] < kapanış[2]. "Tek nokta üstte ise yükseliş".'],
@@ -260,7 +264,7 @@ const SIG = {
   tsi_yesil: ['Linear TSI yeşil (G+H)', 'pos', 'Günlük ve haftalık Linear TSI yeşil: TSI regresyon eğimi artıyor (momentum hızlanıyor). Kırmızı = yavaşlıyor, yakındaki SAR\'a temas beklenir.'],
   derin: ['Derin düşüş', '', 'Son 300 barın zirvesinden hissede %70+, kriptoda %85+ düşmüş. İdeal kesişme bu tür grafiklerde aranır.'],
 };
-const ORDER = ['alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali'];
+const ORDER = ['med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test'];
 const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'den fazla kaçmış, sinyal bitmiş sayılır', arka_arkaya: 'yeşil ve turuncu arka arkaya geldi: vur-kaç, en hızlı yükseliş ya da düşüşün habercisi', ideal: 'yeşil → test düşüşü → turuncu sırası ve orta bant yukarı: ideal kesişme', tehlikeli: 'bant aşağı giderken düzeltmesiz gelen kesişme: tehlikeli, sonraki turuncu görmezden gelinmeli', coklu: 'son 60 barda 4+ kesişme: çoklu kesişme, iptal riski yüksek', yeni_bant: 'bant yeni oluştu (300 barlık geçmiş yeni doldu): o an görmezden gelinir' };
 
 /* ---------- durum ---------- */
@@ -269,18 +273,18 @@ TFN['15m'] = '15 dk'; TFN['4S'] = '4 saatlik'; TFK['15m'] = '15dk'; TFK['4S'] = 
 // Vade profilleri (notlardan): hangi zaman dilimlerine bakılacağı
 const PROF = {
   borsa: {
-    kisa: { ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar ve günlük LRC/kesişme. Yükselen hisse günlük SAR\'a kadar düzeltme yapabilir; son günlük SAR\'ın altında kalırsa haftalık SAR\'ın çekimine girer. Düzeltmede alttaki günlük SAR\'a bakılır.' },
-    orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı. Haftalık SAR\'a temas olunca fiyat bir süre oyalanır; fiyat 3–6 aylık SAR\'a gitmeden haftalık/aylık SAR\'larda zig-zag yapar.' },
-    uzun: { ana: ['3A', '6A', '12A'], lv: ['A', '3A', '6A', '12A'], ilk: 'dongu', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: 3 ve 6 aylık SAR\'lar (BIST\'te en etkilisi, en etkili SAR Triple Moderate). 6 aylık SAR hissenin dibi olur. SAR döngüsüne göre aylık/3 aylık/6 aylık seç.' } },
+    kisa: { med: 'G', ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar ve günlük LRC/kesişme. Yükselen hisse günlük SAR\'a kadar düzeltme yapabilir; son günlük SAR\'ın altında kalırsa haftalık SAR\'ın çekimine girer. Düzeltmede alttaki günlük SAR\'a bakılır.' },
+    orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı. Haftalık SAR\'a temas olunca fiyat bir süre oyalanır; fiyat 3–6 aylık SAR\'a gitmeden haftalık/aylık SAR\'larda zig-zag yapar.' },
+    uzun: { med: 'A', ana: ['3A', '6A', '12A'], lv: ['A', '3A', '6A', '12A'], ilk: 'dongu', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: 3 ve 6 aylık SAR\'lar (BIST\'te en etkilisi, en etkili SAR Triple Moderate). 6 aylık SAR hissenin dibi olur. SAR döngüsüne göre aylık/3 aylık/6 aylık seç.' } },
   kripto: {
-    kisa: { ana: ['G'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: '15m', not: 'Kısa vade: 15 dk yana atan SAR (Binance\'te en çok yükselen 4–5 coin; alttan yana atıyorsa yükselir, üstten düşer; 15–30 dk\'lık kaldıraçlı pozisyon, stop SAR noktasına, SAR yana attıktan 1–2 mum sonra kapat) ve günlük kesişme (kriptoda en etkilisi).' },
-    orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
-    uzun: { ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Kriptoda 6 aylık SAR\'a temas coinin %90–95 düştüğünü gösterir: alım fırsatı.' } },
+    kisa: { med: 'G', ana: ['G'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: '15m', not: 'Kısa vade: 15 dk yana atan SAR (Binance\'te en çok yükselen 4–5 coin; alttan yana atıyorsa yükselir, üstten düşer; 15–30 dk\'lık kaldıraçlı pozisyon, stop SAR noktasına, SAR yana attıktan 1–2 mum sonra kapat) ve günlük kesişme (kriptoda en etkilisi).' },
+    orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
+    uzun: { med: 'A', ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Kriptoda 6 aylık SAR\'a temas coinin %90–95 düştüğünü gösterir: alım fırsatı.' } },
 };
 PROF.makro = {
-  kisa: { ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar, günlük LRC ve kesişme. Düzeltmede kısa vadeci alttaki günlük SAR\'lara bakar.' },
-  orta: { ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı (orta vadeci haftalık LRC\'yi izler). Onslarda haftalık SAR\'a temas olunca fiyat oyalanır; ilk SAR\'a temas olmadan diğerlerine gidilmez.' },
-  uzun: { ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A', '12A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Yana atan aylık/3 aylık SAR temassız kaldıkça o süre güvenli bölge; 3 ve 6 aylık SAR\'ların üst üste binmesi en sağlam destektir.' } };
+  kisa: { med: 'G', ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar, günlük LRC ve kesişme. Düzeltmede kısa vadeci alttaki günlük SAR\'lara bakar.' },
+  orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı (orta vadeci haftalık LRC\'yi izler). Onslarda haftalık SAR\'a temas olunca fiyat oyalanır; ilk SAR\'a temas olmadan diğerlerine gidilmez.' },
+  uzun: { med: 'A', ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A', '12A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Yana atan aylık/3 aylık SAR temassız kaldıkça o süre güvenli bölge; 3 ve 6 aylık SAR\'ların üst üste binmesi en sağlam destektir.' } };
 let V = LS.get('vade', 'orta'); if (!PROF.borsa[V]) V = 'orta';
 const PR = () => { const p = PROF[M][V]; return { ...p, ilk: p.ilk === 'dongu' ? ST.borsa.dongu : p.ilk, vade: V }; };
 const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' }, makro: { chips: LS.get('chips_makro', []), durum: 'hepsi', sort: 'grp', grp: 'hepsi' } };
@@ -341,6 +345,14 @@ function basit(r) {
   if (LG && !LG.yok && LG.konum === 'alt') out.push(['Ucuz bölge', `Fiyat günlük LRC kanalının altında (alt bant <b>${fmt(LG.alt)}</b>). Bu bölgede genelde bandın içine doğru tepki gelir.`]);
   else if (LH && !LH.yok && LH.alt < P) out.push(['Derin düzeltme sınırı', `Sert bir düşüşte orta vadeli hedef haftalık LRC alt bandı <b>${fmt(LH.alt)}</b> (${pct((LH.alt / P - 1) * 100)}).`]);
   if (LH && !LH.yok && LH.ortaKat >= 2) out.push(['Dikkat', 'Fiyat haftalık LRC ortalamasının 2 katından fazla: pahalı bölge, kâr almayı düşünmek gerekir.']);
+  // medyan
+  const MD = r.med && r.med[PR().med], MH = r.med && r.med.H;
+  if (MD) {
+    const tn = TFN[PR().med].toLowerCase();
+    if (MD.ust) out.push(['Medyan', `Fiyat ${tn} medyanın (<b>${fmt(MD.v)}</b>, ${pct(MD.dist)}) <b>üstünde</b>: olumlu. Üstünde kaldıkça medyan yukarı güncellenir. <b>${fmt(MD.v)} altına inerse</b> ${M === 'kripto' ? 'düşüş başlar (kriptoda medyan altı düşüş demek)' : 'sıkışmaya girer'}.`]);
+    else out.push(['Medyan', `Fiyat ${tn} medyanın (<b>${fmt(MD.v)}</b>, ${pct(MD.dist)}) <b>altında</b>: ${M === 'kripto' ? 'kriptoda medyan altı düşüş demek; medyanın üstüne çıkmadan yükseliş beklenmez' : M === 'borsa' ? 'BIST\'te bu düşüşten çok sıkışma demek' : 'olumsuz'}. Kırılan medyan direnç olur; <b>${fmt(MD.v)} üstüne çıkış</b> olumluya döndürür.`]);
+    if (Math.abs(MD.fark) >= 10) out.push(['Dikkat', `Ortalama ile medyan arasında %${fmt(Math.abs(MD.fark), 0)} fark var. Sistem bu fark %10'u geçince derin düzeltme bekler.`]);
+  }
   // momentum
   const tk = PR().tsi[PR().tsi.length - 1];
   if (tsi[tk]) out.push(['Momentum', tsi[tk].renk === 'yesil' ? `${TFN[tk]} Linear TSI yeşil: güç artıyor.` : `${TFN[tk]} Linear TSI kırmızı: güç azalıyor, yakındaki SAR'a${A[0] ? ` (<b>${fmt(A[0].v)}</b>)` : ''} değme ihtimali artar.`]);
@@ -370,6 +382,8 @@ function yorum(r) {
   if (M === 'kripto') { const b = DATA.kripto && DATA.kripto.piyasaOzet && DATA.kripto.piyasaOzet.BTCUSDT; if (b && r.k !== 'BTC') g += ` BTC görünümü ${({ olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' })[b.durum]}; coin kararında BTC trendi gözetilmeli.`; }
   else if (M === 'borsa' && V === 'uzun') { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
   g += ` Değerlendirme ${({ kisa: 'kısa', orta: 'orta', uzun: 'uzun' })[V]} vadeye göre (${PR().ana.map(t => TFN[t].toLowerCase()).join(', ')} SAR'lar).`;
+  const MDy = r.med && r.med[PR().med];
+  if (MDy) g += ` ${TFN[PR().med]} medyan ${fmt(MDy.v)}: fiyat ${MDy.ust ? 'üstünde (yeşil)' : 'altında (kırmızı)'}${MDy.sure > 1 ? `, ${MDy.sure} bardır` : ''}; medyan ${({ yukari: 'yukarı', asagi: 'aşağı', sabit: 'sabit' })[MDy.yon]} güncelleniyor, ortalama ile fark %${fmt(Math.abs(MDy.fark), 1)}${Math.abs(MDy.fark) >= 10 ? ' (%10 üstü: derin düzeltme riski)' : ''}.`;
   out.push(g);
 
   // 2) SAR merdiveni ve yana atmalar
@@ -448,7 +462,7 @@ function clustersP(levels, price) {
   }
   return out;
 }
-const POSP = ['alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'], NEGP = ['ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
+const POSP = ['med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'], NEGP = ['med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
 function profSig(r) {
   if (r.sig0 == null) r.sig0 = r.sig || [];
   const p = PR(), act = MK[M].aktif, s = new Set(), P = r.price;
@@ -473,6 +487,8 @@ function profSig(r) {
   if (lastK && lastK.ago <= lim + 10 && yor.some(y => ['tehlikeli', 'arka_arkaya', 'coklu', 'yeni_bant', 'kacti'].includes(y))) s.add('kes_risk');
   for (const k of ['kes_usd', 'kes_btc', 'derin']) if (r.sig0.includes(k)) s.add(k);
   if (p.tsi.every(t => r.tsi && r.tsi[t] && r.tsi[t].renk === 'yesil')) s.add('tsi_yesil');
+  const MD = r.med && r.med[p.med]; if (MD) { s.add(MD.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MD.fark) >= 10) s.add('med_fark'); if (Math.abs(MD.dist) <= 2) s.add('med_test'); }
+  if (M === 'kripto' && r.k !== 'BTC' && r.k !== 'ETH') { const oz = DATA.kripto.piyasaOzet || {}, bm = ['BTCUSDT', 'ETHUSDT'].some(k => oz[k] && oz[k].med && oz[k].med.H && !oz[k].med.H.ust); if (bm && (s.has('kes_yesil') || s.has('kes_turuncu'))) s.add('kes_risk'); }
   r.sig = [...s]; r.puan = r.sig.filter(x => POSP.includes(x)).length - r.sig.filter(x => NEGP.includes(x)).length;
   r.durum = r.puan >= 2 ? 'olumlu' : r.puan <= -2 ? 'olumsuz' : 'notr';
 }
@@ -589,6 +605,7 @@ function openCard(k, src) {
    <div class="panel"><p class="ph">SAR <b>merdiveni</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${cfg.set} + SAR Ort.</span></p><table class="lad">${lad}</table>
      <p class="note">Değer o dönemin canlı noktasıdır (TradingView'daki gibi dönem içinde sabit kalır). "yana" = değer önceki dönemle aynı, "temas" = bu dönemde temas edip taraf değiştirdi, "taze" = yeni oluştu, "iğne" = %1'den yakın geçti.</p></div>
    <div class="panel"><p class="ph">Zaman dilimi <b>tablosu</b></p>${grid}<p class="note">Yeşil = var (son 2 bar), kırmızı = olumsuz durum. TSI hücresindeki sayı, rengin kaç bardır sürdüğü.</p></div>
+   ${r.med ? `<div class="panel"><p class="ph">Medyan ve <b>ortalama</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· son 50 kapanış</span></p><div class="kv">${['G', 'H', 'A'].filter(t => r.med[t]).map(t => { const x = r.med[t]; return `<span>${TFN[t]} medyan</span><b class="${x.ust ? 'pos' : 'neg'}">${fmt(x.v)} · ${x.ust ? 'üstünde' : 'altında'} (${pct(x.dist)})</b><span>${TFN[t]} ortalama · fark</span><b>${fmt(x.ort)} · %${fmt(x.fark, 1)}</b>`; }).join('')}</div><p class="note">Sistem sahibi medyanı kendisi hesapladığını, indikatörlerin onun rakamlarıyla tutmayacağını söylüyor; burada standart hesap kullanılır (son 50 kapanışın medyanı). En önemlisi haftalık.</p></div>` : ''}
    <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
    ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
   window.scrollTo({ top: 0 });
@@ -892,6 +909,18 @@ function linTsi(b) {
   return { renk: now, sure, deger: rnd(t[n - 1], 3), cizgi: rnd(linregAt(t, 10, n - 1), 3) };
 }
 
+/* ---------------- Medyan ve ortalama (sistem sahibi kendi hesabını paylaşmıyor; standart hesap) ---------------- */
+// Son MEDN kapanışın medyanı ve aritmetik ortalaması. Kural: fiyat medyanın üstünde = olumlu (yeşil), altı = olumsuz/sıkışma;
+// medyan ile ortalama arası fark %10'u geçmemeli, geçerse derin düzeltme riski.
+const MEDN = 50;
+function medAt(c, i, N = MEDN) { if (i - N + 1 < 0) return null; const a = c.slice(i - N + 1, i + 1).sort((x, y) => x - y); return N % 2 ? a[(N - 1) / 2] : (a[N / 2 - 1] + a[N / 2]) / 2; }
+function medyan(b, N = MEDN) {
+  const c = b.c, n = c.length, i = n - 1; if (n < N + 2) return null;
+  const m = medAt(c, i, N), m1 = medAt(c, i - 1, N); let ort = 0; for (let k = n - N; k < n; k++) ort += c[k]; ort /= N;
+  let sure = 0; const up = c[i] > m; for (let k = i; k >= N && (c[k] > medAt(c, k, N)) === up; k--) sure++;
+  return { v: rnd(m), ort: rnd(ort), fark: rnd((ort / m - 1) * 100, 2), dist: rnd((m / c[i] - 1) * 100, 2), ust: up, sure, yon: m > m1 ? 'yukari' : m < m1 ? 'asagi' : 'sabit' };
+}
+
 /* ---------------- bir enstrümanın tam analizi ---------------- */
 function analyze(daily, cfg) {
   const out = { tf: {}, lrc: {}, tsi: {} }, n = daily.c.length, price = daily.c[n - 1];
@@ -910,6 +939,7 @@ function analyze(daily, cfg) {
   for (const tf of cfg.lrcTfs) out.lrc[tf] = lrc(resample(daily, tf, cfg.tz));
   for (const tf of cfg.tsiTfs) { const b = resample(daily, tf, cfg.tz); out.tsi[tf] = linTsi(b); }
   // günlük EMA21 (aylık SAR tepki taraması için)
+  out.med = {}; for (const tf of ['G', 'H', 'A']) { const b = resample(daily, tf, cfg.tz); out.med[tf] = medyan(b); }
   const e21d = ema(daily.c, 21); out.ema21g = rnd(e21d[n - 1]);
   out.price = rnd(price); out.chg = n > 1 ? rnd((price / daily.c[n - 2] - 1) * 100, 2) : null; out.t = daily.t[n - 1];
   return out;
@@ -965,7 +995,7 @@ function makroBuild(def, S) {
 
 /* ---------- SAR Radar grafiği: mumlar + SAR noktaları + üst dilim SAR Ort. + LRC kanal ve kesişme ---------- */
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
-const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
+const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
 const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
 const NBAR = { '15m': 200, '4S': 180, G: 180, H: 160, A: 120 };
@@ -1039,6 +1069,9 @@ function chartModel(daily, tf, intra) {
       if (a0 == null || b0 == null) continue; if (a0 >= b0 && a1 < b1) lrcL.kes.push({ i: j - 1, tip: 'yesil' }); else if (a0 <= b0 && a1 > b1) lrcL.kes.push({ i: j - 1, tip: 'turuncu' }); }
     for (const k of ['mh', 'ml', 'up', 'lo']) lrcL[k] = lrcL[k].slice(1);
   }
+  const medS = [], medW = [];
+  for (let i = from; i < n; i++) medS.push(medAt(b.c, i));
+  if (!intra && tf === 'G') { const hb = resample(daily, 'H', tz), mp = new Map(); hb.t.forEach((t, i) => mp.set(pkey(t, 'H', tz), medAt(hb.c, i))); b.t.slice(from).forEach(t => medW.push(mp.get(pkey(t, 'H', tz)) ?? null)); }
   const bar = k => b[k].slice(from);
   // ilk SAR'ın dönüş noktaları (temas → taraf değişimi) ve TEK SAR
   const ik = M === 'borsa' ? 'fast' : 'lin', iv = S[ik].s, flips = [];
@@ -1048,7 +1081,7 @@ function chartModel(daily, tf, intra) {
   const li = n - 1, alt = cfg.aktif.filter(k => S[k].s[li] != null && S[k].s[li] < b.c[li]).length;
   const yon = alt === cfg.aktif.length ? 'up' : alt === 0 ? 'down' : 'mix';
   const tsi = linTsi(b);
-  return { ik, flips, yon, tsi, tf, t: bar('t'), o: bar('o'), h: bar('h'), l: bar('l'), c: bar('c'), sars, orts, lrc: lrcL, need: n < 302 ? 302 - n : 0 };
+  return { medS, medW, ik, flips, yon, tsi, tf, t: bar('t'), o: bar('o'), h: bar('h'), l: bar('l'), c: bar('c'), sars, orts, lrc: lrcL, need: n < 302 ? 302 - n : 0 };
 }
 
 function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; }
@@ -1075,6 +1108,9 @@ function drawChart(m) {
     const ln = (arr, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; arr.forEach((v, i) => { if (v == null) { st = false; return; } st ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); st = true; }); g.stroke(); g.setLineDash([]); };
     ln(m.lrc.up, good + 'aa', 1.5); ln(m.lrc.lo, bad + 'aa', 1.5); ln(m.lrc.mh, '#2563eb', 2); ln(m.lrc.ml, '#dc2626', 2, [4, 3]);
   }
+  // medyan (mor)
+  if (CH.on.med) { const ml = (arr, col, w, dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); let st = false; arr.forEach((v, i) => { if (v == null) { st = false; return; } st ? g.lineTo(x(i), y(v)) : g.moveTo(x(i), y(v)); st = true; }); g.stroke(); g.setLineDash([]); };
+    ml(m.medS, '#9333ea', 2); if (m.medW.length) ml(m.medW, '#c084fc', 2, [5, 3]); }
   // üst dilim SAR Ort.
   if (CH.on.ort) for (const o of m.orts) { g.fillStyle = OCOL[o.tf]; o.v.forEach((v, i) => { if (v == null) return; g.beginPath(); g.arc(x(i), y(v), Math.max(1.6, Math.min(3, cw * 0.35)), 0, 7); g.fill(); }); }
   // mumlar
@@ -1128,17 +1164,18 @@ function readout(m, i) {
   const sars = m.sars.map(z => row(plus(z.k === 'lin' ? (m.c[i] >= z.v[i] ? '#22c55e' : '#ef4444') : SCOL[z.k]), SN[z.k], z.v[i])).join('');
   const orts = m.orts.map(z => row(dot(OCOL[z.tf]), TFN[z.tf] + ' Ort.', z.v[i])).join('');
   const L = m.lrc && m.lrc.mh[i] != null ? [row(ln('#16a34a'), 'Kanal üst', m.lrc.up[i]), row(ln('#2563eb'), 'Orta üst', m.lrc.mh[i]), row(ln('#dc2626', 1), 'Orta alt', m.lrc.ml[i]), row(ln('#dc2626'), 'Kanal alt', m.lrc.lo[i])].join('') : '';
+  const MED = [row(ln('#9333ea'), TFN[m.tf] + ' medyan', m.medS[i]), m.medW.length ? row(ln('#c084fc', 1), 'Haftalık medyan', m.medW[i]) : ''].join('');
   const sec = (t, h) => h ? `<div class="ro-s"><div class="ro-h">${t}</div>${h}</div>` : '';
   return `<div class="ro-top"><div><div class="ro-dt">${d}${CH.pick == null ? ' · son bar' : ''}</div><div class="ro-ohlc">A <b>${fmt(m.o[i])}</b> Y <b>${fmt(m.h[i])}</b> D <b>${fmt(m.l[i])}</b></div></div>
     <div style="text-align:right"><div class="ro-px num">${fmt(P)}</div>${ch == null ? '' : `<div class="ro-ch ${sgn(ch)}">${pct(ch)}</div>`}</div></div>
-    <div class="ro-g">${sec(TFN[m.tf] + ' SAR\'lar', sars)}${sec('Üst dilim SAR Ort.', orts)}${sec('LRC 300', L)}</div>
+    <div class="ro-g">${sec(TFN[m.tf] + ' SAR\'lar', sars)}${sec('Üst dilim SAR Ort.', orts)}${sec('Medyan (50)', MED)}${sec('LRC 300', L)}</div>
     <p class="ro-hint">▼ fiyatın altında (destek) · ▲ fiyatın üstünde (direnç) · başka bir güne bakmak için grafikte o mumun üstüne dokun</p>`;
 }
 
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
     <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
-    <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
+    <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['med', 'Medyan'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
     <div id="chread" class="ro"></div>
@@ -1147,8 +1184,9 @@ function chartPanel() {
 function legend(m) {
   const a = m.sars.map(z => `<span style="color:${SCOL[z.k]};font-weight:800">+</span> ${SN[z.k]}`);
   const b = m.orts.map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort.`);
+  const md = ['<span style="color:#9333ea">━</span> medyan', ...(m.medW.length ? ['<span style="color:#c084fc">┅</span> haftalık medyan'] : [])];
   const c = m.lrc ? ['<span style="color:#2563eb">━</span> LRC orta üst', '<span style="color:#dc2626">┅</span> orta alt', '<span style="color:var(--good)">━</span>/<span style="color:var(--bad)">━</span> kanal üst/alt'] : [`LRC için ${m.need} bar daha gerekli`];
-  return '<div class="ro-chips">' + [...a, ...b, ...c].map(x => `<span>${x}</span>`).join('') + '</div>' + 'Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
+  return '<div class="ro-chips">' + [...a, ...b, ...md, ...c].map(x => `<span>${x}</span>`).join('') + '</div>' + 'Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
 }
 function chartStrip(m) {
   const el = $('#chstrip'); if (!el) return; if (!CH.on.uyari) { el.innerHTML = ''; return; }

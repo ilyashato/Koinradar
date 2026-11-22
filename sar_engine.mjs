@@ -225,6 +225,18 @@ export function linTsi(b) {
   return { renk: now, sure, deger: rnd(t[n - 1], 3), cizgi: rnd(linregAt(t, 10, n - 1), 3) };
 }
 
+/* ---------------- Medyan ve ortalama (sistem sahibi kendi hesabını paylaşmıyor; standart hesap) ---------------- */
+// Son MEDN kapanışın medyanı ve aritmetik ortalaması. Kural: fiyat medyanın üstünde = olumlu (yeşil), altı = olumsuz/sıkışma;
+// medyan ile ortalama arası fark %10'u geçmemeli, geçerse derin düzeltme riski.
+export const MEDN = 50;
+export function medAt(c, i, N = MEDN) { if (i - N + 1 < 0) return null; const a = c.slice(i - N + 1, i + 1).sort((x, y) => x - y); return N % 2 ? a[(N - 1) / 2] : (a[N / 2 - 1] + a[N / 2]) / 2; }
+export function medyan(b, N = MEDN) {
+  const c = b.c, n = c.length, i = n - 1; if (n < N + 2) return null;
+  const m = medAt(c, i, N), m1 = medAt(c, i - 1, N); let ort = 0; for (let k = n - N; k < n; k++) ort += c[k]; ort /= N;
+  let sure = 0; const up = c[i] > m; for (let k = i; k >= N && (c[k] > medAt(c, k, N)) === up; k--) sure++;
+  return { v: rnd(m), ort: rnd(ort), fark: rnd((ort / m - 1) * 100, 2), dist: rnd((m / c[i] - 1) * 100, 2), ust: up, sure, yon: m > m1 ? 'yukari' : m < m1 ? 'asagi' : 'sabit' };
+}
+
 /* ---------------- bir enstrümanın tam analizi ---------------- */
 export function analyze(daily, cfg) {
   const out = { tf: {}, lrc: {}, tsi: {} }, n = daily.c.length, price = daily.c[n - 1];
@@ -243,6 +255,7 @@ export function analyze(daily, cfg) {
   for (const tf of cfg.lrcTfs) out.lrc[tf] = lrc(resample(daily, tf, cfg.tz));
   for (const tf of cfg.tsiTfs) { const b = resample(daily, tf, cfg.tz); out.tsi[tf] = linTsi(b); }
   // günlük EMA21 (aylık SAR tepki taraması için)
+  out.med = {}; for (const tf of ['G', 'H', 'A']) { const b = resample(daily, tf, cfg.tz); out.med[tf] = medyan(b); }
   const e21d = ema(daily.c, 21); out.ema21g = rnd(e21d[n - 1]);
   out.price = rnd(price); out.chg = n > 1 ? rnd((price / daily.c[n - 2] - 1) * 100, 2) : null; out.t = daily.t[n - 1];
   return out;
