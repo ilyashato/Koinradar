@@ -151,11 +151,19 @@ function drawChart(m) {
 
 function readout(m, i) {
   if (!m || i == null) return '';
-  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const s = m.sars.filter(z => z.v[i] != null).map(z => `<span style="color:${SCOL[z.k]}">■</span> ${SN[z.k]} <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
-  const o = m.orts.filter(z => z.v[i] != null).map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort. <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
-  const L = m.lrc && m.lrc.mh[i] != null ? ` · LRC orta <b class="num">${fmt(m.lrc.mh[i])} / ${fmt(m.lrc.ml[i])}</b>, kanal <b class="num">${fmt(m.lrc.up[i])} / ${fmt(m.lrc.lo[i])}</b>` : '';
-  return `<b>${d}</b> · A ${fmt(m.o[i])} Y ${fmt(m.h[i])} D ${fmt(m.l[i])} K <b class="num">${fmt(m.c[i])}</b><br>${s}${o ? '<br>' + o : ''}${L}`;
+  const P = m.c[i], d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: 'short', year: 'numeric' });
+  const ch = i > 0 ? (P / m.c[i - 1] - 1) * 100 : null;
+  const row = (sw, ad, v) => { if (v == null) return ''; const dd = (v / P - 1) * 100, alt = v < P;
+    return `<div class="ro-r"><span class="ro-sw">${sw}</span><span class="ro-n">${ad}</span><span class="ro-v num">${fmt(v)}</span><span class="ro-d ${alt ? 'pos' : 'neg'}">${alt ? '▼' : '▲'} ${fmt(Math.abs(dd), 1)}%</span></div>`; };
+  const plus = c => `<i style="color:${c}">+</i>`, dot = c => `<i class="ro-dot" style="background:${c}"></i>`, ln = (c, dash) => `<i class="ro-ln" style="border-top:2px ${dash ? 'dotted' : 'solid'} ${c}"></i>`;
+  const sars = m.sars.map(z => row(plus(z.k === 'lin' ? (m.c[i] >= z.v[i] ? '#22c55e' : '#ef4444') : SCOL[z.k]), SN[z.k], z.v[i])).join('');
+  const orts = m.orts.map(z => row(dot(OCOL[z.tf]), TFN[z.tf] + ' Ort.', z.v[i])).join('');
+  const L = m.lrc && m.lrc.mh[i] != null ? [row(ln('#16a34a'), 'Kanal üst', m.lrc.up[i]), row(ln('#2563eb'), 'Orta üst', m.lrc.mh[i]), row(ln('#dc2626', 1), 'Orta alt', m.lrc.ml[i]), row(ln('#dc2626'), 'Kanal alt', m.lrc.lo[i])].join('') : '';
+  const sec = (t, h) => h ? `<div class="ro-s"><div class="ro-h">${t}</div>${h}</div>` : '';
+  return `<div class="ro-top"><div><div class="ro-dt">${d}${CH.pick == null ? ' · son bar' : ''}</div><div class="ro-ohlc">A <b>${fmt(m.o[i])}</b> Y <b>${fmt(m.h[i])}</b> D <b>${fmt(m.l[i])}</b></div></div>
+    <div style="text-align:right"><div class="ro-px num">${fmt(P)}</div>${ch == null ? '' : `<div class="ro-ch ${sgn(ch)}">${pct(ch)}</div>`}</div></div>
+    <div class="ro-g">${sec(TFN[m.tf] + ' SAR\'lar', sars)}${sec('Üst dilim SAR Ort.', orts)}${sec('LRC 300', L)}</div>
+    <p class="ro-hint">▼ fiyatın altında (destek) · ▲ fiyatın üstünde (direnç) · başka bir güne bakmak için grafikte o mumun üstüne dokun</p>`;
 }
 
 function chartPanel() {
@@ -164,14 +172,14 @@ function chartPanel() {
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
-    <div class="note" id="chread" style="min-height:1.5em"></div>
-    <div class="note" id="chleg"></div></div>`;
+    <div id="chread" class="ro"></div>
+    <details class="ro-leg"><summary>Grafik nasıl okunur?</summary><div class="note" id="chleg"></div></details></div>`;
 }
 function legend(m) {
   const a = m.sars.map(z => `<span style="color:${SCOL[z.k]};font-weight:800">+</span> ${SN[z.k]}`);
   const b = m.orts.map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort.`);
   const c = m.lrc ? ['<span style="color:#2563eb">━</span> LRC orta üst', '<span style="color:#dc2626">┅</span> orta alt', '<span style="color:var(--good)">━</span>/<span style="color:var(--bad)">━</span> kanal üst/alt'] : [`LRC için ${m.need} bar daha gerekli`];
-  return [...a, ...b, ...c].join(' &nbsp; ') + '<br>Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
+  return '<div class="ro-chips">' + [...a, ...b, ...c].map(x => `<span>${x}</span>`).join('') + '</div>' + 'Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
 }
 function chartStrip(m) {
   const el = $('#chstrip'); if (!el) return; if (!CH.on.uyari) { el.innerHTML = ''; return; }

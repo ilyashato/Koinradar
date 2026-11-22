@@ -132,6 +132,19 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 .kes span{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 7px;color:#fff}
 .kes .yesil{background:#16a34a} .kes .turuncu{background:#ea8a0c}
 .basit .bs{padding:9px 0;border-top:1px solid var(--line2)} .basit .bs:first-of-type{border-top:0} .basit .bt{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin-bottom:3px} .basit p{margin:0;font-size:15px;line-height:1.55}
+.ro{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:12px;background:var(--panel)}
+.ro-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--line2)}
+.ro-dt{font-weight:800;font-size:14px} .ro-ohlc{font-size:12.5px;color:var(--mute);margin-top:2px} .ro-ohlc b{font:600 12.5px var(--f-num);color:var(--ink2);margin-right:6px}
+.ro-px{font:700 20px var(--f-num)} .ro-ch{font:600 12.5px var(--f-num)}
+.ro-g{display:grid;gap:12px;margin-top:10px} @media(min-width:640px){.ro-g{grid-template-columns:repeat(3,1fr)}}
+.ro-h{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin-bottom:4px}
+.ro-r{display:grid;grid-template-columns:18px 1fr auto 62px;align-items:center;gap:6px;padding:4px 0;border-top:1px solid var(--line2);font-size:13.5px}
+.ro-r:first-of-type{border-top:0} .ro-sw{display:flex;justify-content:center} .ro-sw i{font-style:normal;font-weight:900;font-size:16px;line-height:1}
+.ro-dot{width:9px;height:9px;border-radius:50%;display:inline-block} .ro-ln{width:14px;display:inline-block}
+.ro-n{color:var(--ink2)} .ro-v{font-weight:700;text-align:right} .ro-d{font:600 11.5px var(--f-num);text-align:right}
+.ro-hint{margin:10px 0 0;font-size:11.5px;color:var(--mute)}
+.ro-leg{margin-top:10px} .ro-leg summary{cursor:pointer;font-weight:700;font-size:13px;color:var(--accent)}
+.ro-chips{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0}
 .lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
 </style></head>
 <body>
@@ -1040,11 +1053,19 @@ function drawChart(m) {
 
 function readout(m, i) {
   if (!m || i == null) return '';
-  const d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', year: 'numeric' });
-  const s = m.sars.filter(z => z.v[i] != null).map(z => `<span style="color:${SCOL[z.k]}">■</span> ${SN[z.k]} <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
-  const o = m.orts.filter(z => z.v[i] != null).map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort. <b class="num">${fmt(z.v[i])}</b>`).join(' · ');
-  const L = m.lrc && m.lrc.mh[i] != null ? ` · LRC orta <b class="num">${fmt(m.lrc.mh[i])} / ${fmt(m.lrc.ml[i])}</b>, kanal <b class="num">${fmt(m.lrc.up[i])} / ${fmt(m.lrc.lo[i])}</b>` : '';
-  return `<b>${d}</b> · A ${fmt(m.o[i])} Y ${fmt(m.h[i])} D ${fmt(m.l[i])} K <b class="num">${fmt(m.c[i])}</b><br>${s}${o ? '<br>' + o : ''}${L}`;
+  const P = m.c[i], d = new Date(m.t[i] + TZ() * 3600e3).toLocaleString('tr-TR', INTRA[m.tf] ? { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: 'short', year: 'numeric' });
+  const ch = i > 0 ? (P / m.c[i - 1] - 1) * 100 : null;
+  const row = (sw, ad, v) => { if (v == null) return ''; const dd = (v / P - 1) * 100, alt = v < P;
+    return `<div class="ro-r"><span class="ro-sw">${sw}</span><span class="ro-n">${ad}</span><span class="ro-v num">${fmt(v)}</span><span class="ro-d ${alt ? 'pos' : 'neg'}">${alt ? '▼' : '▲'} ${fmt(Math.abs(dd), 1)}%</span></div>`; };
+  const plus = c => `<i style="color:${c}">+</i>`, dot = c => `<i class="ro-dot" style="background:${c}"></i>`, ln = (c, dash) => `<i class="ro-ln" style="border-top:2px ${dash ? 'dotted' : 'solid'} ${c}"></i>`;
+  const sars = m.sars.map(z => row(plus(z.k === 'lin' ? (m.c[i] >= z.v[i] ? '#22c55e' : '#ef4444') : SCOL[z.k]), SN[z.k], z.v[i])).join('');
+  const orts = m.orts.map(z => row(dot(OCOL[z.tf]), TFN[z.tf] + ' Ort.', z.v[i])).join('');
+  const L = m.lrc && m.lrc.mh[i] != null ? [row(ln('#16a34a'), 'Kanal üst', m.lrc.up[i]), row(ln('#2563eb'), 'Orta üst', m.lrc.mh[i]), row(ln('#dc2626', 1), 'Orta alt', m.lrc.ml[i]), row(ln('#dc2626'), 'Kanal alt', m.lrc.lo[i])].join('') : '';
+  const sec = (t, h) => h ? `<div class="ro-s"><div class="ro-h">${t}</div>${h}</div>` : '';
+  return `<div class="ro-top"><div><div class="ro-dt">${d}${CH.pick == null ? ' · son bar' : ''}</div><div class="ro-ohlc">A <b>${fmt(m.o[i])}</b> Y <b>${fmt(m.h[i])}</b> D <b>${fmt(m.l[i])}</b></div></div>
+    <div style="text-align:right"><div class="ro-px num">${fmt(P)}</div>${ch == null ? '' : `<div class="ro-ch ${sgn(ch)}">${pct(ch)}</div>`}</div></div>
+    <div class="ro-g">${sec(TFN[m.tf] + ' SAR\'lar', sars)}${sec('Üst dilim SAR Ort.', orts)}${sec('LRC 300', L)}</div>
+    <p class="ro-hint">▼ fiyatın altında (destek) · ▲ fiyatın üstünde (direnç) · başka bir güne bakmak için grafikte o mumun üstüne dokun</p>`;
 }
 
 function chartPanel() {
@@ -1053,14 +1074,14 @@ function chartPanel() {
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
-    <div class="note" id="chread" style="min-height:1.5em"></div>
-    <div class="note" id="chleg"></div></div>`;
+    <div id="chread" class="ro"></div>
+    <details class="ro-leg"><summary>Grafik nasıl okunur?</summary><div class="note" id="chleg"></div></details></div>`;
 }
 function legend(m) {
   const a = m.sars.map(z => `<span style="color:${SCOL[z.k]};font-weight:800">+</span> ${SN[z.k]}`);
   const b = m.orts.map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort.`);
   const c = m.lrc ? ['<span style="color:#2563eb">━</span> LRC orta üst', '<span style="color:#dc2626">┅</span> orta alt', '<span style="color:var(--good)">━</span>/<span style="color:var(--bad)">━</span> kanal üst/alt'] : [`LRC için ${m.need} bar daha gerekli`];
-  return [...a, ...b, ...c].join(' &nbsp; ') + '<br>Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
+  return '<div class="ro-chips">' + [...a, ...b, ...c].map(x => `<span>${x}</span>`).join('') + '</div>' + 'Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
 }
 function chartStrip(m) {
   const el = $('#chstrip'); if (!el) return; if (!CH.on.uyari) { el.innerHTML = ''; return; }
