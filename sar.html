@@ -1174,7 +1174,7 @@ function makroBuild(def, S) {
 const CH = { view: 120, key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
 const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
-const NBAR = { '15m': 200, '4S': 180, G: 180, H: 160, A: 120 };
+const NBAR = { '15m': 600, '4S': 600, G: 700, H: 400, A: 200 };
 const INTRA = { '15m': '15m', '4S': '4h' };
 const TZ = () => (M === 'borsa' ? 3 : 0);
 
@@ -1262,21 +1262,24 @@ function chartModel(daily, tf, intra) {
 
 function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; }
 // son `n` barı keser (yakınlaştırma)
-function sliceModel(m, n) {
-  const N = m.c.length; if (!n || n >= N) return m; const f = N - n, s = a => a.slice(f);
+function sliceModel(m, n, pan = 0) {
+  const N = m.c.length; if (!n || n >= N) { n = N; pan = 0; } pan = Math.max(0, Math.min(pan, N - n)); if (n >= N) return m; const f = N - n - pan, e = N - pan, s = a => a.slice(f, e);
   return { ...m, t: s(m.t), o: s(m.o), h: s(m.h), l: s(m.l), c: s(m.c), medS: s(m.medS), medW: m.medW.length ? s(m.medW) : [],
-    sars: m.sars.map(z => ({ ...z, v: s(z.v) })), orts: m.orts.map(z => ({ ...z, v: s(z.v) })), flips: m.flips.filter(z => z.i >= f).map(z => ({ ...z, i: z.i - f })),
-    lrc: m.lrc ? { mh: s(m.lrc.mh), ml: s(m.lrc.ml), up: s(m.lrc.up), lo: s(m.lrc.lo), kes: m.lrc.kes.filter(z => z.i >= f).map(z => ({ ...z, i: z.i - f })) } : null };
+    sars: m.sars.map(z => ({ ...z, v: s(z.v) })), orts: m.orts.map(z => ({ ...z, v: s(z.v) })), flips: m.flips.filter(z => z.i >= f && z.i < e).map(z => ({ ...z, i: z.i - f })),
+    lrc: m.lrc ? { mh: s(m.lrc.mh), ml: s(m.lrc.ml), up: s(m.lrc.up), lo: s(m.lrc.lo), kes: m.lrc.kes.filter(z => z.i >= f && z.i < e).map(z => ({ ...z, i: z.i - f })) } : null };
 }
 function drawChart(m0, O = {}) {
   const cv = O.cv || $('#sarcv'); if (!cv || !m0) return;
-  const m = sliceModel(m0, O.n || CH.view), K = O.big ? 1.7 : 1.25;
+  const m = sliceModel(m0, O.n || CH.view, O.pan || 0), K = O.big ? 1.7 : 1.25;
   const W = cv.parentElement.clientWidth, H = O.H || 380, dpr = window.devicePixelRatio || 1;
   cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const N = m.c.length, padR = 54, padT = 8, padB = 18, cw = (W - padR) / N;
   let lo = Math.min(...m.l), hi = Math.max(...m.h); const P0 = m.c[N - 1];
   if (CH.on.uyari && CH.lv) for (const L of CH.lv) if (Math.abs(L.v / P0 - 1) <= 0.3) { lo = Math.min(lo, L.v); hi = Math.max(hi, L.v); }
+  const inc = arr => { for (const v of arr || []) if (v != null && isFinite(v) && Math.abs(v / P0 - 1) <= 0.6) { lo = Math.min(lo, v); hi = Math.max(hi, v); } };
+  if (CH.on.lrc && m.lrc) { inc(m.lrc.mh); inc(m.lrc.ml); }
+  if (CH.on.med) inc(m.medS);
   const sp = hi - lo; lo -= sp * 0.08; hi += sp * 0.08;
   const y = v => padT + (hi - v) / (hi - lo) * (H - padT - padB), x = i => i * cw + cw / 2;
   const ink = css('--ink'), mute = css('--mute'), line = css('--line2'), good = css('--good'), bad = css('--bad');
@@ -1334,9 +1337,9 @@ function drawChart(m0, O = {}) {
   // son fiyat
   const lc = m.c[N - 1], ly = y(lc); g.fillStyle = css('--accent'); g.fillRect(W - padR, ly - 8, padR, 16); g.fillStyle = '#fff'; g.font = 'bold 10px ' + css('--f-num'); g.fillText(fmt(lc), W - padR + 3, ly + 4);
   // seçili bar
-  const pk = CH.pick == null ? null : CH.pick - (m0.c.length - N);
+  const pk = CH.pick == null ? null : CH.pick - (m0.c.length - N - Math.max(0, Math.min(O.pan || 0, m0.c.length - N)));
   if (pk != null && pk >= 0 && pk < N) { g.strokeStyle = mute; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(x(pk), padT); g.lineTo(x(pk), H - padB); g.stroke(); g.setLineDash([]); }
-  if (!O.cv) CH.geo = { cw, padR, N, off: m0.c.length - N }; else CH.fgeo = { cw, padR, N, off: m0.c.length - N };
+  const off0 = m0.c.length - N - Math.max(0, Math.min(O.pan || 0, m0.c.length - N)); if (!O.cv) CH.geo = { cw, padR, N, off: off0 }; else CH.fgeo = { cw, padR, N, off: off0 };
 }
 
 function readout(m, i) {
@@ -1452,17 +1455,25 @@ function openFS() {
   if (!CH.model) return; let el = $('#chfs');
   if (!el) { el = document.createElement('div'); el.id = 'chfs'; document.body.appendChild(el); }
   el.innerHTML = `<div class="fs-head"><b>${esc(curKod || '')}</b> <span class="mut">${TFN[CH.tf]}</span><span style="flex:1"></span>
-    <button class="btn small" data-z="-">−</button><button class="btn small" data-z="+">+</button><button class="iconbtn" id="fsx" aria-label="Kapat">✕</button></div>
+    <span class="small muted">iki parmakla yakınlaştır, sola-sağa kaydır</span><button class="btn small" data-z="-">−</button><button class="btn small" data-z="+">+</button><button class="iconbtn" id="fsx" aria-label="Kapat">✕</button></div>
     <div class="chips" id="fstf">${$('#chtf').innerHTML}</div><div class="chips" id="fson" style="margin-top:4px">${$('#chon').innerHTML}</div>
     <details style="margin-top:6px"><summary class="small" style="font-weight:700;color:var(--accent);cursor:pointer">Uyarılar ve seviyeler (${$('#chstrip').children.length})</summary><div class="sigs">${$('#chstrip').innerHTML}</div></details>
-    <div style="position:relative;margin-top:6px"><canvas id="fscv" style="display:block;width:100%;touch-action:pan-y"></canvas></div>
+    <div style="position:relative;margin-top:6px"><canvas id="fscv" style="display:block;width:100%;touch-action:none"></canvas></div>
     <div id="fsread" class="ro" style="margin-top:8px"></div>`;
   el.hidden = false; document.body.style.overflow = 'hidden';
-  const draw = () => { drawChart(CH.model, { cv: $('#fscv'), H: fsH(), big: true, n: CH.fview }); };
-  CH.fview = CH.fview || 90; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick ?? CH.model.c.length - 1);
+  const draw = () => { const N = CH.model.c.length; CH.fview = Math.max(20, Math.min(N, CH.fview)); CH.fpan = Math.max(0, Math.min(CH.fpan || 0, N - CH.fview)); drawChart(CH.model, { cv: $('#fscv'), H: fsH(), big: true, n: CH.fview, pan: CH.fpan }); };
+  CH.fview = CH.fview || 90; CH.fpan = 0; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick ?? CH.model.c.length - 1);
   $('#fsx').onclick = () => { el.hidden = true; document.body.style.overflow = ''; drawChart(CH.model); };
-  el.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { CH.fview = Math.max(30, Math.min(CH.model.c.length, Math.round(CH.fview * (b.dataset.z === '+' ? 0.7 : 1.4)))); draw(); });
-  $('#fscv').onclick = e => { const G = CH.fgeo; if (!G) return; const r = e.target.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / G.cw); if (i < 0 || i >= G.N) return; CH.pick = i + G.off; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick); };
+  el.querySelectorAll('[data-z]').forEach(b => b.onclick = () => { CH.fview = Math.round(CH.fview * (b.dataset.z === '+' ? 0.7 : 1.45)); draw(); });
+  const cv = $('#fscv'); let t0 = null, moved = false;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  cv.addEventListener('touchstart', e => { moved = false; t0 = e.touches.length === 2 ? { d: dist(e.touches), v: CH.fview } : { x: e.touches[0].clientX, y: e.touches[0].clientY, p: CH.fpan }; }, { passive: true });
+  cv.addEventListener('touchmove', e => { if (!t0) return;
+    if (e.touches.length === 2 && t0.d) { e.preventDefault(); moved = true; CH.fview = Math.round(t0.v * t0.d / dist(e.touches)); draw(); }
+    else if (e.touches.length === 1 && t0.x != null) { const dx = e.touches[0].clientX - t0.x, dy = e.touches[0].clientY - t0.y; if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 6) { e.preventDefault(); moved = true; const G = CH.fgeo; CH.fpan = Math.round(t0.p + dx / (G ? G.cw : 4)); draw(); } } }, { passive: false });
+  cv.addEventListener('touchend', () => { t0 = null; }, { passive: true });
+  cv.addEventListener('wheel', e => { e.preventDefault(); CH.fview = Math.round(CH.fview * (e.deltaY > 0 ? 1.15 : 0.87)); draw(); }, { passive: false });
+  $('#fscv').onclick = e => { if (moved) { moved = false; return; } const G = CH.fgeo; if (!G) return; const r = e.target.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / G.cw); if (i < 0 || i >= G.N) return; CH.pick = i + G.off; draw(); $('#fsread').innerHTML = readout(CH.model, CH.pick); };
   $('#fstf').onclick = async e => { const b = e.target.closest('[data-tf]'); if (!b) return; CH.tf = b.dataset.tf; CH.pick = null; $('#chtf').querySelectorAll('[data-tf]').forEach(x => x.setAttribute('aria-pressed', x.dataset.tf === CH.tf)); await renderChart(curKod); openFS(); };
   $('#fson').onclick = e => { const b = e.target.closest('[data-on]'); if (!b) return; CH.on[b.dataset.on] = !CH.on[b.dataset.on]; LS.set('ch_on', CH.on); b.setAttribute('aria-pressed', CH.on[b.dataset.on]); $('#chon').querySelector(`[data-on="${b.dataset.on}"]`)?.setAttribute('aria-pressed', CH.on[b.dataset.on]); draw(); };
 }
