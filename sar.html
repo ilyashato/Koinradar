@@ -420,7 +420,7 @@ function openCard(k, src) {
    <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
    ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
   window.scrollTo({ top: 0 });
-  bindChart(r.k);
+  bindChart(r.k, r);
 }
 
 /* ---------- kurallar ---------- */
@@ -726,7 +726,7 @@ function analyze(daily, cfg) {
 
 /* ---------- SAR Radar grafiği: mumlar + SAR noktaları + üst dilim SAR Ort. + LRC kanal ve kesişme ---------- */
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
-const CH = { key: null, daily: null, tf: 'G', on: LS.get('ch_on', { sar: true, ort: true, lrc: true, kes: true }), pick: null };
+const CH = { key: null, daily: null, tf: 'G', on: Object.assign({ sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
 const OCOL = { H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
 const NBAR = { G: 180, H: 160, A: 120 };
@@ -787,7 +787,15 @@ function chartModel(daily, tf) {
     for (const k of ['mh', 'ml', 'up', 'lo']) lrcL[k] = lrcL[k].slice(1);
   }
   const bar = k => b[k].slice(from);
-  return { tf, t: bar('t'), o: bar('o'), h: bar('h'), l: bar('l'), c: bar('c'), sars, orts, lrc: lrcL, need: n < 302 ? 302 - n : 0 };
+  // ilk SAR'ın dönüş noktaları (temas → taraf değişimi) ve TEK SAR
+  const ik = M === 'borsa' ? 'fast' : 'lin', iv = S[ik].s, flips = [];
+  for (let i = Math.max(from, 2); i < n; i++) { if (iv[i] == null || iv[i - 1] == null) continue;
+    const a = iv[i - 1] < b.c[i - 1], c2 = iv[i] < b.c[i];
+    if (a !== c2) flips.push({ i: i - from, yon: c2 ? 'up' : 'down', v: iv[i] }); }
+  const li = n - 1, alt = cfg.aktif.filter(k => S[k].s[li] != null && S[k].s[li] < b.c[li]).length;
+  const yon = alt === cfg.aktif.length ? 'up' : alt === 0 ? 'down' : 'mix';
+  const tsi = linTsi(b);
+  return { ik, flips, yon, tsi, tf, t: bar('t'), o: bar('o'), h: bar('h'), l: bar('l'), c: bar('c'), sars, orts, lrc: lrcL, need: n < 302 ? 302 - n : 0 };
 }
 
 function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || '#888'; }
@@ -797,7 +805,9 @@ function drawChart(m) {
   cv.width = W * dpr; cv.height = H * dpr; cv.style.width = W + 'px'; cv.style.height = H + 'px';
   const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
   const N = m.c.length, padR = 54, padT = 8, padB = 18, cw = (W - padR) / N;
-  let lo = Math.min(...m.l), hi = Math.max(...m.h); const sp = hi - lo; lo -= sp * 0.12; hi += sp * 0.12;
+  let lo = Math.min(...m.l), hi = Math.max(...m.h); const P0 = m.c[N - 1];
+  if (CH.on.uyari && CH.lv) for (const L of CH.lv) if (Math.abs(L.v / P0 - 1) <= 0.3) { lo = Math.min(lo, L.v); hi = Math.max(hi, L.v); }
+  const sp = hi - lo; lo -= sp * 0.08; hi += sp * 0.08;
   const y = v => padT + (hi - v) / (hi - lo) * (H - padT - padB), x = i => i * cw + cw / 2;
   const ink = css('--ink'), mute = css('--mute'), line = css('--line2'), good = css('--good'), bad = css('--bad');
   // ızgara
@@ -826,7 +836,24 @@ function drawChart(m) {
       if (i > 0 && s.v[i - 1] != null && Math.abs(s.v[i - 1] - v) <= Math.abs(v) * 1e-9) { g.globalAlpha = 0.45; g.lineWidth = 4; g.beginPath(); g.moveTo(x(i - 1), yy); g.lineTo(xx, yy); g.stroke(); g.globalAlpha = 1; }
       g.lineWidth = 1.3; g.beginPath(); g.moveTo(xx - r, yy); g.lineTo(xx + r, yy); g.moveTo(xx, yy - r); g.lineTo(xx, yy + r); g.stroke(); });
   }
+  // dönüş okları (ilk SAR'a temas)
+  if (CH.on.uyari) for (const f of m.flips) { const xx = x(f.i), up = f.yon === 'up', yy = up ? y(m.l[f.i]) + 10 : y(m.h[f.i]) - 10;
+    g.fillStyle = up ? good : bad; g.beginPath(); if (up) { g.moveTo(xx, yy - 5); g.lineTo(xx - 5, yy + 4); g.lineTo(xx + 5, yy + 4); } else { g.moveTo(xx, yy + 5); g.lineTo(xx - 5, yy - 4); g.lineTo(xx + 5, yy - 4); } g.fill(); }
   g.restore();
+  // destek / direnç / yana atan / düzeltme hedefi çizgileri (ekran dışındakiler üstteki şeritte listelenir)
+  CH.off = [];
+  if (CH.on.uyari && CH.lv) {
+    const top = padT + 12, bot = H - padB - 2, used = [];
+    for (const L of [...CH.lv].sort((p, q) => q.v - p.v)) {
+      const yy = y(L.v); if (yy < top || yy > bot) { CH.off.push(L); continue; }
+      g.strokeStyle = L.col; g.lineWidth = 1.4; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(0, yy); g.lineTo(W - padR, yy); g.stroke(); g.setLineDash([]);
+      let ly = yy - 4; while (used.some(u => Math.abs(u - ly) < 12)) ly += 12; used.push(ly);
+      const txt = L.ad; g.font = 'bold 10px ' + css('--f-body'); const tw = Math.min(g.measureText(txt).width, W - padR - 16), lx = W - padR - tw - 8;
+      g.fillStyle = css('--panel'); g.globalAlpha = 0.85; g.fillRect(lx - 3, ly - 9, tw + 8, 12); g.globalAlpha = 1; g.fillStyle = L.col; g.fillText(txt, lx + 1, ly, tw);
+      g.fillRect(W - padR, yy - 7, padR, 14); g.fillStyle = '#fff'; g.font = 'bold 9.5px ' + css('--f-num'); g.fillText(fmt(L.v), W - padR + 3, yy + 3);
+    }
+  }
+  chartStrip(m);
   // kesişme etiketleri
   if (CH.on.kes && m.lrc) for (const k of m.lrc.kes) { const xx = x(k.i), yy = Math.min(y(m.l[k.i]) + 14, H - padB - 14);
     g.fillStyle = k.tip === 'yesil' ? '#16a34a' : '#ea8a0c'; g.beginPath(); g.moveTo(xx, yy - 6); g.lineTo(xx - 5, yy); g.lineTo(xx + 5, yy); g.fill();
@@ -850,8 +877,9 @@ function readout(m, i) {
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
     <div class="chips" id="chtf">${['G', 'H', 'A'].map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
-    <div class="chips" id="chon" style="margin-top:6px">${[['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
-    <div style="position:relative;margin-top:10px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
+    <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
+    <div class="sigs" id="chstrip" style="margin-top:10px"></div>
+    <div style="position:relative;margin-top:8px"><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>
     <div class="note" id="chread" style="min-height:1.5em"></div>
     <div class="note" id="chleg"></div></div>`;
 }
@@ -859,17 +887,44 @@ function legend(m) {
   const a = m.sars.map(z => `<span style="color:${SCOL[z.k]};font-weight:800">+</span> ${SN[z.k]}`);
   const b = m.orts.map(z => `<span style="color:${OCOL[z.tf]}">●</span> ${TFN[z.tf]} Ort.`);
   const c = m.lrc ? ['<span style="color:#2563eb">━</span> LRC orta üst', '<span style="color:#dc2626">┅</span> orta alt', '<span style="color:var(--good)">━</span>/<span style="color:var(--bad)">━</span> kanal üst/alt'] : [`LRC için ${m.need} bar daha gerekli`];
-  return [...a, ...b, ...c].join(' &nbsp; ') + '<br>Kalın yatay çizgi = yana atan SAR (değer önceki barla aynı). Dokunduğun barın değerleri yukarıda görünür.';
+  return [...a, ...b, ...c].join(' &nbsp; ') + '<br>Kalın yatay çizgi = yana atan SAR. ▲/▼ = ilk SAR\'a temas edip yön değiştirdiği bar. Kesikli çizgiler: destek (yeşil), direnç (kırmızı), yana atan (sarı), düzeltme hedefi (mavi); ekran dışındakiler grafiğin üstünde ↑/↓ ile listelenir. Dokunduğun barın değerleri yukarıda.';
+}
+function chartStrip(m) {
+  const el = $('#chstrip'); if (!el) return; if (!CH.on.uyari) { el.innerHTML = ''; return; }
+  const yt = { up: ['▲ Yön yukarı', 'pos'], down: ['▼ Yön aşağı', 'neg'], mix: ['◆ Yön kararsız', ''] }[m.yon];
+  const it = [`<span class="sg ${yt[1]}">${yt[0]} · ${TFN[m.tf].toLowerCase()} SAR'lar</span>`];
+  if (m.tsi) it.push(`<span class="sg ${m.tsi.renk === 'yesil' ? 'pos' : 'neg'}">TSI ${m.tsi.renk === 'yesil' ? 'yeşil · momentum artıyor' : 'kırmızı · momentum zayıflıyor'}</span>`);
+  for (const u of CH.uy || []) it.push(`<span class="sg" style="color:${u[1]};border-color:${u[1]}">${esc(u[0])}</span>`);
+  for (const L of CH.off || []) it.push(`<span class="sg" style="color:${L.col};border-color:${L.col}">${L.v > m.c[m.c.length - 1] ? '↑' : '↓'} ${esc(L.ad)} ${fmt(L.v)} (${pct((L.v / m.c[m.c.length - 1] - 1) * 100)})</span>`);
+  el.innerHTML = it.join('');
+}
+function prepWarn(r) {
+  CH.lv = []; CH.uy = []; if (!r) return;
+  const P = r.price, sup = nearest(r, 'alt', {}), res = nearest(r, 'ust', {});
+  if (sup) CH.lv.push({ v: sup.v, ad: 'Destek · ' + lvName(sup), col: '#16a34a' });
+  if (res) CH.lv.push({ v: res.v, ad: 'Direnç · ' + lvName(res), col: '#dc2626' });
+  const cfg = MK[M], ya = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flatRecent);
+  const yA = ya.filter(x => x.side === 'alt').sort((a, b) => b.v - a.v)[0], yU = ya.filter(x => x.side === 'ust').sort((a, b) => a.v - b.v)[0];
+  if (yA && (!sup || Math.abs(yA.v - sup.v) > sup.v * 0.004)) CH.lv.push({ v: yA.v, ad: 'Yana atan (destek) · ' + lvName(yA), col: '#a16207' });
+  if (yU && (!res || Math.abs(yU.v - res.v) > res.v * 0.004)) CH.lv.push({ v: yU.v, ad: 'Yana atan (direnç) · ' + lvName(yU), col: '#a16207' });
+  const LH = r.lrc && r.lrc.H; if (LH && !LH.yok && LH.alt < P) CH.lv.push({ v: LH.alt, ad: 'Düzeltme hedefi · haftalık LRC alt', col: '#2563eb' });
+  const W = { destek_kayip: 'Destek SAR\'ı kaybedildi', ust_yana: 'Üstten yana atan SAR: direnç', trend_bozuk: 'Fiyat günlük SAR\'ların altında', kes_risk: 'Riskli kesişme', lrc_pahali: 'LRC 2 katı: pahalı bölge',
+    igne: 'SAR\'a iğne: yana atma bekleniyor', lrc_alt: 'LRC alt bandın altında: tepki bölgesi', alt_yana: 'Alttan yana atan SAR: destek', tek: 'TEK SAR: yükseliş işareti', direnc_asildi: 'Direnç SAR\'ı aşıldı', kes_ideal: 'İdeal kesişme', aylik_tepki: 'Aylık SAR tepki adayı' };
+  const neg = ['destek_kayip', 'ust_yana', 'trend_bozuk', 'kes_risk', 'lrc_pahali'], pos = ['alt_yana', 'tek', 'direnc_asildi', 'kes_ideal', 'aylik_tepki'];
+  for (const k of [...neg, 'igne', 'lrc_alt', ...pos]) if ((r.sig || []).includes(k) && CH.uy.length < 4) CH.uy.push([(neg.includes(k) ? '⚠ ' : pos.includes(k) ? '✓ ' : '• ') + W[k], neg.includes(k) ? '#dc2626' : pos.includes(k) ? '#16a34a' : '#a16207']);
 }
 async function renderChart(k) {
   const msg = $('#chmsg'); CH.pick = null;
   try {
     const d = await chartData(k); if (!$('#sarcv')) return;
     const m = chartModel(d, CH.tf); CH.model = m; msg.style.display = 'none';
+    const age = (Date.now() - d.t[d.t.length - 1]) / 864e5;
+    if (age > 5) CH.uy = [['⚠ Veri ' + new Date(d.t[d.t.length - 1]).toLocaleDateString('tr-TR') + ' tarihinde bitiyor: işlem görmüyor olabilir', '#dc2626'], ...(CH.uy || []).filter(u => !u[0].startsWith('⚠ Veri'))];
     drawChart(m); $('#chleg').innerHTML = legend(m); $('#chread').innerHTML = readout(m, m.c.length - 1);
   } catch (e) { if (msg) msg.textContent = 'Grafik verisi alınamadı (' + e.message + ').'; }
 }
-function bindChart(k) {
+function bindChart(k, r) {
+  prepWarn(r);
   $('#chtf').onclick = e => { const b = e.target.closest('[data-tf]'); if (!b) return; CH.tf = b.dataset.tf; $('#chtf').querySelectorAll('[data-tf]').forEach(x => x.setAttribute('aria-pressed', x.dataset.tf === CH.tf)); renderChart(k); };
   $('#chon').onclick = e => { const b = e.target.closest('[data-on]'); if (!b) return; CH.on[b.dataset.on] = !CH.on[b.dataset.on]; LS.set('ch_on', CH.on); b.setAttribute('aria-pressed', CH.on[b.dataset.on]); drawChart(CH.model); };
   $('#sarcv').onclick = e => { if (!CH.model || !CH.geo) return; const r = e.target.getBoundingClientRect(), i = Math.floor((e.clientX - r.left) / CH.geo.cw); if (i < 0 || i >= CH.geo.N) return; CH.pick = i; drawChart(CH.model); $('#chread').innerHTML = readout(CH.model, i); };

@@ -169,7 +169,7 @@ async function runBorsa() {
   ENDEKS.forEach((s, i) => { if (idx[i]) { const a = analyze(idx[i], cfg); piyasa[s] = { ...compact(a, cfg), ...signals(a, cfg) }; } });
   let ok = 0;
   const rows = (await pool(list, 6, async kod => {
-    const d = await yahoo(kod + '.IS'); if (!d || d.c.length < 60) return null; ok++;
+    const d = await yahoo(kod + '.IS'); if (!d || d.c.length < 60 || Date.now() - d.t[d.t.length - 1] > 10 * 864e5) return null; ok++;
     const a = compact(analyze(d, cfg), cfg);
     let kesUsd = false; if (usd) { const u = lrc(ratio(d, usd)); const k = (u.kesisme || []).at(-1); kesUsd = !!(k && k.ago <= 20); a.usdKes = k || null; }
     const s = signals(a, cfg, { kesUsd });
@@ -190,7 +190,7 @@ async function runKripto() {
   const piyasa = {}; for (const [k, d] of [['BTCUSDT', btc], ['ETHUSDT', eth]]) if (d) { const a = analyze(d, cfg); piyasa[k] = { ...compact(a, cfg), ...signals(a, cfg) }; }
   let ok = 0;
   const rows = (await pool(list, 4, async sym => {
-    const d = sym === 'BTCUSDT' ? btc : sym === 'ETHUSDT' ? eth : await bnDaily(sym); if (!d || d.c.length < 60) return null; ok++;
+    const d = sym === 'BTCUSDT' ? btc : sym === 'ETHUSDT' ? eth : await bnDaily(sym); if (!d || d.c.length < 60 || Date.now() - d.t[d.t.length - 1] > 4 * 864e5) return null; ok++;
     const a = compact(analyze(d, cfg), cfg);
     let kesBtc = false;
     if (btc && sym !== 'BTCUSDT') { const r = lrc(ratio(d, btc)); const k = (r.kesisme || []).at(-1); a.btcKes = k || null; kesBtc = !!(k && k.ago <= 20); }
