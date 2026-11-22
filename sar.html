@@ -147,6 +147,7 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
 .ro-chips{display:flex;flex-wrap:wrap;gap:4px 12px;margin:8px 0}
 #chfs{position:fixed;inset:0;z-index:50;background:var(--bg,#fff);overflow:auto;padding:12px 12px calc(16px + env(safe-area-inset-bottom))}#chfs .fs-head{display:flex;align-items:center;gap:8px;font-size:17px;margin-bottom:8px}#chfs .ro-g{grid-template-columns:1fr 1fr}
 .fav{background:none;border:0;padding:0 6px 0 0;font-size:20px;line-height:1;color:var(--mute);cursor:pointer;vertical-align:-2px}.fav.on{color:#e0a800}
+.ii{display:inline-block;margin-left:5px;font-size:13px;font-weight:600;color:var(--accent);cursor:pointer;text-transform:none;letter-spacing:0;vertical-align:1px}
 .lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
 </style></head>
 <body>
@@ -707,7 +708,7 @@ function openCard(k, src) {
    <div class="panel"><p class="ph">SAR <b>merdiveni</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${cfg.set} + SAR Ort.</span></p><table class="lad">${lad}</table>
      <p class="note">Değer o dönemin canlı noktasıdır (TradingView'daki gibi dönem içinde sabit kalır). "yana" = değer önceki dönemle aynı, "temas" = bu dönemde temas edip taraf değiştirdi, "taze" = yeni oluştu, "iğne" = %1'den yakın geçti.</p></div>
    <div class="panel"><p class="ph">Zaman dilimi <b>tablosu</b></p>${grid}<p class="note">Yeşil = var (son 2 bar), kırmızı = olumsuz durum. TSI hücresindeki sayı, rengin kaç bardır sürdüğü.</p></div>
-   ${r.med ? `<div class="panel"><p class="ph">Medyan ve <b>ortalama</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· son 50 kapanış</span></p><div class="kv">${['G', 'H', 'A'].filter(t => r.med[t]).map(t => { const x = r.med[t]; return `<span>${TFN[t]} medyan</span><b class="${x.ust ? 'pos' : 'neg'}">${fmt(x.v)} · ${x.ust ? 'üstünde' : 'altında'} (${pct(x.dist)})</b><span>${TFN[t]} ortalama · fark</span><b>${fmt(x.ort)} · %${fmt(x.fark, 1)}</b>`; }).join('')}</div><p class="note">Sistem sahibi medyanı kendisi hesapladığını, indikatörlerin onun rakamlarıyla tutmayacağını söylüyor; burada standart hesap kullanılır (son 50 kapanışın medyanı). En önemlisi haftalık.</p></div>` : ''}
+   ${r.med ? `<div class="panel"><p class="ph">Medyan ve <b>ortalama</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· son 50 kapanış</span></p><div class="kv">${['G', 'H', 'A'].filter(t => r.med[t]).map(t => { const x = r.med[t]; return `<span>${TFN[t]} medyan</span><b class="${x.ust ? 'pos' : 'neg'}">${fmt(x.v)} · fiyat ${x.ust ? 'üstünde' : 'altında'}</b><span>${TFN[t]} ortalama · fark</span><b>${fmt(x.ort)} · %${fmt(x.fark, 1)}</b>`; }).join('')}</div><p class="note">Sistem sahibi medyanı kendisi hesapladığını, indikatörlerin onun rakamlarıyla tutmayacağını söylüyor; burada standart hesap kullanılır (son 50 kapanışın medyanı). En önemlisi haftalık.</p></div>` : ''}
    <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
    ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
   window.scrollTo({ top: 0 });
@@ -742,6 +743,62 @@ function drawRehber() {
 /* ---------- bilgi penceresi ---------- */
 function sheet(eye, title, html) { $('#seye').textContent = eye; $('#stitle').textContent = title; $('#sbody').innerHTML = html; $('#sheet').hidden = false; }
 $('#sclose').onclick = $('#sbg').onclick = () => { $('#sheet').hidden = true; };
+
+
+/* ---------- ⓘ açıklamalar: başlık metnine göre her yere otomatik eklenir ---------- */
+const INFO = {
+  'piyasa özeti': ['Piyasa özeti', 'Endekslerin ya da ana enstrümanların SAR görünümü. Tek tek hisse/coin kararından önce genel yöne bakılır.'],
+  'sar filtreleri': ['SAR filtreleri', 'Seçtiğin sinyallerin hepsini aynı anda taşıyanlar listelenir. Yeşil çerçeveli olanlar olumlu, kırmızılar olumsuz sinyaller. Sinyalin ne olduğunu kartta sinyale dokunarak okuyabilirsin.'],
+  'durum': ['Durum', 'Olumlu/Nötr/Olumsuz, SAR puanına göre: olumlu sinyaller +1, olumsuzlar −1. +2 ve üstü olumlu, −2 ve altı olumsuz.'],
+  'lrc uzaklığı': ['LRC uzaklığı', 'Fiyatın seçtiğin LRC bandına yüzde uzaklığı. Kural: bandın altına çok düşen çok çıkar, üstüne çok çıkan çok düşer; bant içinde sıkışma olur.'],
+  'sar döngüsü': ['SAR döngüsü', 'BIST\'in o dönemde hangi zaman dilimindeki SAR\'lara uyduğu. Örn. seçim öncesi aylık, sonrası 3 aylık, Temmuz–Aralık 6 aylık. Uzun vadede "ilk SAR" bu seçime göre okunur.'],
+  'makro grubu': ['Makro grubu', 'Makro enstrümanları gruplar: madenler, emtia, dolar ve pariteler, faizler, endeksler, kripto, rasyolar.'],
+  'kısa vade': ['Kısa vade', 'Günlük SAR ve günlük LRC/kesişme; kriptoda 15 dk yana atan SAR. Günler–haftalar.'],
+  'orta vade': ['Orta vade', 'Haftalık ve aylık SAR, haftalık LRC bandı. Haftalar–aylar. Hocanın en çok önemsediği haftalık.'],
+  'uzun vade': ['Uzun vade', '3, 6 ve 12 aylık SAR. Aylar–yıllar. 6 aylık SAR hissenin dibi sayılır.'],
+  'otomatik yorum': ['Otomatik yorum', 'Hesaplanan değerlerin sistemin kurallarıyla yazıya dökülmüş hali. Rakamlar hesaptan gelir, cümleler kural kalıbıdır.'],
+  'basit anlatım': ['Basit anlatım', 'Hiç bilmeyen için: fiyat hangi seviyeye değerse ne olur, değmezse ne olur. En alttaki "Kısaca" satırı özetin özetidir.'],
+  'sar merdiveni': ['SAR merdiveni', 'Tüm SAR seviyeleri yukarıdan aşağı. Mavi satır fiyat: üstündekiler direnç, altındakiler destek. "yana" = değer sabit kaldı, "temas" = bu dönemde değildi ve taraf değişti, "taze" = yeni oluştu, "iğne" = çok yaklaştı, "≈n bar" = fiyat yatay kalırsa temasa kalan süre.'],
+  'zaman dilimi tablosu': ['Zaman dilimi tablosu', 'Her sütun bir zaman dilimi (G günlük, H haftalık, A aylık, 3A/6A 3 ve 6 aylık). Yeşil = o durum son 2 barda var, kırmızı = olumsuz durum var, nokta = yok.'],
+  'medyan ve ortalama': ['Medyan ve ortalama', 'Medyan: son 50 kapanışın ortadaki değeri. Fiyat medyanın üstündeyse olumlu (yeşil), altındaysa olumsuz/sıkışma. Medyan ile ortalama arasındaki fark %10\'u geçerse derin düzeltme riski. Parantezdeki yüzde, medyanın fiyata uzaklığıdır.'],
+  'lrc ve kesişme': ['LRC ve kesişme', 'LRC: son 300 barın yüksek ve düşük fiyatlarına çizilen regresyon kanalı. Kesişme: iki orta çizginin kesişmesi. Yeşil = birikim başlıyor, turuncu = hareket başlıyor. Hedef %10–15.'],
+  'grafik': ['Grafik', 'Mumlar, SAR\'lar (+ işaretleri), üst zaman dilimi SAR ortalamaları (noktalar), medyan (mor), LRC (mavi/kırmızı) ve uyarı çizgileri. Dokununca tam ekran açılır.'],
+  'sinyal geçmişi': ['Sinyal geçmişi', 'Bu sitenin kendi ölçümü: bu sinyal geçmişte verildikten 10 ve 30 gün sonra fiyat ortalama ne yaptı, yüzde kaçı kazandırdı.'],
+  'sistem sahibinin seviyeleri': ['Sistem sahibinin seviyeleri', 'Hocanın sohbetinde verdiği seviyeler, tarihli referans. 60 gün sonra otomatik gizlenir; güncel karar için kural tabanlı alanlara bak.'],
+  '15 dk yana atan sar': ['15 dk yana atan SAR', 'En çok yükselen 5 coinin 15 dakikalık grafiği. Alttan yana atan SAR yükseliş, üstten yana atan düşüş işareti. Kaldıraçlı ve çok riskli bir yöntemdir.'],
+  'alttan yana': ['Alttan yana', 'Fiyatın altındaki SAR değeri sabit kaldı: destek. Temas etmedikçe yükseliş sürer.'],
+  'üstten yana': ['Üstten yana', 'Fiyatın üstündeki SAR değeri sabit kaldı: direnç. Temas edilmezse düşüş sürer.'],
+  'tek sar': ['TEK SAR', 'Yükselişte SAR tek bar için fiyatın üstüne çıkıp hemen geri döndü: başarısız dönüş, yükseliş işareti.'],
+  'birleşme': ['Birleşme', 'Parabolic, Triple Moderate ve Triple Fast aynı değerde. Genelde dönem başında görülür.'],
+  'temas': ['Temas', 'Bu dönemde fiyat SAR\'a değdi ve SAR taraf değiştirdi. Destekse iptal oldu, dirençse aşıldı.'],
+  'fiyat > ema5': ['Fiyat > EMA5', 'Fiyat 5 barlık üstel ortalamanın üstünde: çok kısa vadeli yön yukarı.'],
+  'fiyat > ema21': ['Fiyat > EMA21', 'Fiyat 21 barlık üstel ortalamanın üstünde. Aylık SAR tepki taramasında 21 EMA kullanılır.'],
+  'linear tsi': ['Linear TSI', 'Momentum göstergesi (TSI 3/9) üzerine 10 barlık regresyon. Yeşil = momentum artıyor, kırmızı = azalıyor; kırmızıyken yakındaki SAR\'a temas beklenir. Sayı, rengin kaç bardır sürdüğü.'],
+  'şu an': ['Şu an', 'Genel SAR puanına göre tablonun yönü.'], 'alttaki destek': ['Alttaki destek', 'Fiyatın altındaki en yakın SAR. Değip değmemesine göre senaryo yazılır.'],
+  'üstteki direnç': ['Üstteki direnç', 'Fiyatın üstündeki en yakın SAR. Üstteki noktaya değmek iyidir; üstünde kalırsa yükseliş uzar.'],
+  'düşüş olursa': ['Düşüş olursa', 'İlk SAR kuralı: ilk SAR\'a değmeden alttakilere gidilmez; değerse %80 alttakilere sarkar; en alttaki ikisine genelde inilmez.'],
+  'çekim': ['Çekim', 'SAR her bar fiyata yaklaşır. Fiyat yatay kalırsa kaç barda değeceği, SAR\'ların kümelenmesi ve TSI rengiyle fiyatı en çok hangi SAR\'ın çektiği hesaplanır. Temas edince çekim biter.'],
+  'medyan': ['Medyan', 'Fiyat medyanın üstündeyse olumlu. Kriptoda medyan altı düşüş, BIST\'te sıkışma demek. Kırılan medyan direnç olur.'],
+  'ana bant': ['Ana bant', 'Alt sınır: alttaki en yakın 3/6 aylık SAR. Üst sınır: üstteki en yakın aylık SAR. Geniş bant kırılmadıkça yön tartışılmaz.'],
+  'ocak etkisi': ['Ocak etkisi', 'Dönem başında yeni 3 ve 6 aylık SAR\'lar hesaplanır. Alttaki 3 aylık SAR\'lar test edilmezse yana atıp birleşir ve güçlü destek olur.'],
+  'momentum': ['Momentum', 'Linear TSI rengine göre güç artıyor mu azalıyor mu.'], 'kesişme': ['Kesişme', 'LRC orta çizgilerinin kesişmesi. Kesişme tek başına yetmez: TSI ve dolar/BTC teyidi aranır.'],
+  'takvim': ['Takvim', 'Hocanın son 3 yılın desenine dayanan BIST takvimi.'], 'kısaca': ['Kısaca', 'Tek cümlelik özet: hangi seviyenin üstü olumlu, hangisinin altı olumsuz.'],
+  'ucuz bölge': ['Ucuz bölge', 'Fiyat LRC alt bandının altında: bandın içine tepki beklenir.'], 'bant üstü': ['Bant üstü', 'Haftalık LRC üst bandının üstü: uzak dur, bandın içine sert gelir.'],
+  'derin düzeltme sınırı': ['Derin düzeltme sınırı', 'Sert düşüşte orta vadeli hedef: haftalık LRC alt bandı.'],
+  'medyan (50)': ['Medyan (50)', 'Son 50 barın medyanı; fiyat üstündeyse olumlu.'], 'lrc 300': ['LRC 300', 'Son 300 barın regresyon kanalı: kanal üst/alt ve iki orta çizgi.'],
+  'üst dilim sar ort.': ['Üst dilim SAR Ort.', 'Daha büyük zaman dilimlerinin SAR ortalaması (Linear+Parabolic+Lucid)/3. Grafikteki büyük noktalar.'],
+};
+const NRM = t => (t || '').replace(/ⓘ/g, '').replace(/·.*$/, '').replace(/\s+\d+$/, '').trim().toLocaleLowerCase('tr-TR').replace(/ı/g, 'i');
+const INFOK = Object.fromEntries(Object.keys(INFO).map(k => [NRM(k), k]));
+function infoKey(t) { return INFOK[NRM(t)] || null; }
+function addInfo(root) {
+  root.querySelectorAll('.ph, .bt, .grid .lb, .ro-h, #vade [data-v]').forEach(el => {
+    if (el.dataset.ii) return; const k = infoKey(el.childNodes.length ? [...el.childNodes].filter(n => n.nodeType === 3 || (n.tagName === 'B')).map(n => n.textContent).join('') : el.textContent) || infoKey(el.textContent);
+    if (!k) return; el.dataset.ii = 1; const b = document.createElement('span'); b.className = 'ii'; b.dataset.ik = k; b.textContent = 'ⓘ'; b.setAttribute('role', 'button'); b.setAttribute('aria-label', 'Açıklama'); el.appendChild(b);
+  });
+}
+document.addEventListener('click', e => { const b = e.target.closest('.ii'); if (!b) return; e.stopPropagation(); e.preventDefault(); const x = INFO[b.dataset.ik]; sheet('Açıklama', x[0], `<div class="sh-sec"><p>${esc(x[1])}</p></div>`); }, true);
+new MutationObserver(() => addInfo(document.body)).observe(document.body, { childList: true, subtree: true });
 
 /* ---------- gezinme ---------- */
 function setTab(t) { for (const x of ['tara', 'kart', 'rehber']) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#view-' + x).hidden = x !== t; } if (t === 'rehber') drawRehber(); }
