@@ -227,15 +227,15 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 const LS = { get: (k, d) => { try { const v = localStorage.getItem('sr_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem('sr_' + k, JSON.stringify(v)); } catch (e) {} } };
 
 /* ---------- sabitler ---------- */
-const TFN = { G: 'Günlük', H: 'Haftalık', A: 'Aylık', '3A': '3 aylık', '6A': '6 aylık', '12A': '12 aylık' };
-const TFK = { G: 'G', H: 'H', A: 'A', '3A': '3A', '6A': '6A', '12A': '12A' };
+const TFN = { '3G': '3 günlük', '5G': '5 günlük', '2H': '2 haftalık', G: 'Günlük', H: 'Haftalık', A: 'Aylık', '3A': '3 aylık', '6A': '6 aylık', '12A': '12 aylık' };
+const TFK = { '3G': '3G', '5G': '5G', '2H': '2H', G: 'G', H: 'H', A: 'A', '3A': '3A', '6A': '6A', '12A': '12A' };
 const SN = { psar: 'Parabolic', lin: 'Linear', luc: 'Lucid', slow: 'Triple Slow', mod: 'Triple Moderate', fast: 'Triple Fast', ort: 'SAR Ort.' };
 const MK = {
-  borsa: { ad: 'Borsa', birim: 'hisse', tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], aktif: ['luc', 'psar', 'fast', 'mod'], ilk: 'fast', ph: 'Ara: THYAO',
+  borsa: { ad: 'Borsa', birim: 'hisse', tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], ana: ['H', '2H', 'A', '3A', '6A'], aktif: ['luc', 'psar', 'fast', 'mod'], ilk: 'fast', ph: 'Ara: THYAO',
     set: 'Lucid, Parabolic, Triple Fast, Triple Moderate', taraf: 'Fiyatın altındaki SAR\'lar (destek) daha etkili; en etkilisi Triple Moderate. En iyi zaman dilimi 3 ve 6 aylık.' },
-  kripto: { ad: 'Kripto', birim: 'coin', tfs: ['G', 'H', 'A', '3A', '6A'], ana: ['H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: SOL',
+  kripto: { ad: 'Kripto', birim: 'coin', tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A'], ana: ['H', '2H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: SOL',
     set: 'Triple Slow ve Linear (son iki SAR)', taraf: 'Fiyatın üstündeki SAR\'lar (direnç) daha etkili. Haftalık ve üstü zaman dilimleri; kesişmede en etkilisi günlük. USDT paritesi, normal ölçek.' },
-  makro: { ad: 'Makro', birim: 'enstrüman', tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: ALTIN, DXY, US10Y',
+  makro: { ad: 'Makro', birim: 'enstrüman', tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], ana: ['H', '2H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: ALTIN, DXY, US10Y',
     set: 'Triple Slow ve Linear (son iki SAR)', taraf: 'Onslar için sistemin kendi çalışması: yalnız Triple Slow, fiyatın üstündeki SAR\'lar daha etkili, haftalık ve üstü zaman dilimleri; altın ve gümüş platin/paladyumdan daha tutarlı. Diğer makro enstrümanlarda da aynı set kullanılır. VIX çıkışında gümüş-platin, Nasdaq, BTC/ETH ve gelişmekte olan ülke paraları olumsuz; altın ve BIST az; DXY ve altın rasyoları olumlu etkilenir (sistem sahibinin değerlendirmesi).' },
 };
 const GRP = { hepsi: 'Tümü', maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto', rasyo: 'Rasyolar' };
@@ -282,17 +282,17 @@ TFN['15m'] = '15 dk'; TFN['4S'] = '4 saatlik'; TFK['15m'] = '15dk'; TFK['4S'] = 
 // Vade profilleri (notlardan): hangi zaman dilimlerine bakılacağı
 const PROF = {
   borsa: {
-    kisa: { med: 'G', ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar ve günlük LRC/kesişme. Yükselen hisse günlük SAR\'a kadar düzeltme yapabilir; son günlük SAR\'ın altında kalırsa haftalık SAR\'ın çekimine girer. Düzeltmede alttaki günlük SAR\'a bakılır.' },
-    orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı. Haftalık SAR\'a temas olunca fiyat bir süre oyalanır; fiyat 3–6 aylık SAR\'a gitmeden haftalık/aylık SAR\'larda zig-zag yapar.' },
+    kisa: { med: 'G', ana: ['G', '3G', '5G', 'H'], lv: ['G', '3G', '5G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar ve günlük LRC/kesişme. Yükselen hisse günlük SAR\'a kadar düzeltme yapabilir; son günlük SAR\'ın altında kalırsa haftalık SAR\'ın çekimine girer. Düzeltmede alttaki günlük SAR\'a bakılır.' },
+    orta: { med: 'H', ana: ['H', '2H', 'A'], lv: ['5G', 'H', '2H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı. Haftalık SAR\'a temas olunca fiyat bir süre oyalanır; fiyat 3–6 aylık SAR\'a gitmeden haftalık/aylık SAR\'larda zig-zag yapar.' },
     uzun: { med: 'A', ana: ['3A', '6A', '12A'], lv: ['A', '3A', '6A', '12A'], ilk: 'dongu', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: 3 ve 6 aylık SAR\'lar (BIST\'te en etkilisi, en etkili SAR Triple Moderate). 6 aylık SAR hissenin dibi olur. SAR döngüsüne göre aylık/3 aylık/6 aylık seç.' } },
   kripto: {
-    kisa: { med: 'G', ana: ['G'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: '15m', not: 'Kısa vade: 15 dk yana atan SAR (Binance\'te en çok yükselen 4–5 coin; alttan yana atıyorsa yükselir, üstten düşer; 15–30 dk\'lık kaldıraçlı pozisyon, stop SAR noktasına, SAR yana attıktan 1–2 mum sonra kapat) ve günlük kesişme (kriptoda en etkilisi).' },
-    orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
+    kisa: { med: 'G', ana: ['G', '3G', '5G'], lv: ['G', '3G', '5G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: '15m', not: 'Kısa vade: 15 dk yana atan SAR (Binance\'te en çok yükselen 4–5 coin; alttan yana atıyorsa yükselir, üstten düşer; 15–30 dk\'lık kaldıraçlı pozisyon, stop SAR noktasına, SAR yana attıktan 1–2 mum sonra kapat) ve günlük kesişme (kriptoda en etkilisi).' },
+    orta: { med: 'H', ana: ['H', '2H', 'A'], lv: ['5G', 'H', '2H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar (kriptoda haftalık ve üstü daha etkili, üstteki SAR\'lar önemli), günlük kesişme ve haftalık LRC bandı.' },
     uzun: { med: 'A', ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Kriptoda 6 aylık SAR\'a temas coinin %90–95 düştüğünü gösterir: alım fırsatı.' } },
 };
 PROF.makro = {
-  kisa: { med: 'G', ana: ['G', 'H'], lv: ['G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar, günlük LRC ve kesişme. Düzeltmede kısa vadeci alttaki günlük SAR\'lara bakar.' },
-  orta: { med: 'H', ana: ['H', 'A'], lv: ['G', 'H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı (orta vadeci haftalık LRC\'yi izler). Onslarda haftalık SAR\'a temas olunca fiyat oyalanır; ilk SAR\'a temas olmadan diğerlerine gidilmez.' },
+  kisa: { med: 'G', ana: ['G', '3G', '5G', 'H'], lv: ['G', '3G', '5G', 'H'], ilk: 'G', kes: 'G', lrcAlt: 'G', tsi: ['G'], chart: 'G', not: 'Kısa vade: günlük SAR\'lar, günlük LRC ve kesişme. Düzeltmede kısa vadeci alttaki günlük SAR\'lara bakar.' },
+  orta: { med: 'H', ana: ['H', '2H', 'A'], lv: ['5G', 'H', '2H', 'A'], ilk: 'H', kes: 'G', lrcAlt: 'H', tsi: ['G', 'H'], chart: 'H', not: 'Orta vade: haftalık ve aylık SAR\'lar, haftalık LRC bandı (orta vadeci haftalık LRC\'yi izler). Onslarda haftalık SAR\'a temas olunca fiyat oyalanır; ilk SAR\'a temas olmadan diğerlerine gidilmez.' },
   uzun: { med: 'A', ana: ['A', '3A', '6A'], lv: ['H', 'A', '3A', '6A', '12A'], ilk: 'A', kes: 'H', lrcAlt: 'H', tsi: ['H', 'A'], chart: 'A', not: 'Uzun vade: aylık, 3 ve 6 aylık SAR\'lar. Yana atan aylık/3 aylık SAR temassız kaldıkça o süre güvenli bölge; 3 ve 6 aylık SAR\'ların üst üste binmesi en sağlam destektir.' } };
 let V = LS.get('vade', 'orta'); if (!PROF.borsa[V]) V = 'orta';
 const PR = () => { const p = PROF[M][V]; return { ...p, ilk: p.ilk === 'dongu' ? ST.borsa.dongu : p.ilk, vade: V }; };
@@ -759,7 +759,7 @@ const INFO = {
   'otomatik yorum': ['Otomatik yorum', 'Hesaplanan değerlerin sistemin kurallarıyla yazıya dökülmüş hali. Rakamlar hesaptan gelir, cümleler kural kalıbıdır.'],
   'basit anlatım': ['Basit anlatım', 'Hiç bilmeyen için: fiyat hangi seviyeye değerse ne olur, değmezse ne olur. En alttaki "Kısaca" satırı özetin özetidir.'],
   'sar merdiveni': ['SAR merdiveni', 'Tüm SAR seviyeleri yukarıdan aşağı. Mavi satır fiyat: üstündekiler direnç, altındakiler destek. "yana" = değer sabit kaldı, "temas" = bu dönemde değildi ve taraf değişti, "taze" = yeni oluştu, "iğne" = çok yaklaştı, "≈n bar" = fiyat yatay kalırsa temasa kalan süre.'],
-  'zaman dilimi tablosu': ['Zaman dilimi tablosu', 'Her sütun bir zaman dilimi (G günlük, H haftalık, A aylık, 3A/6A 3 ve 6 aylık). Yeşil = o durum son 2 barda var, kırmızı = olumsuz durum var, nokta = yok.'],
+  'zaman dilimi tablosu': ['Zaman dilimi tablosu', 'Her sütun bir zaman dilimi (G günlük, 3G/5G 3 ve 5 günlük, H haftalık, 2H 2 haftalık, A aylık, 3A/6A 3 ve 6 aylık). Yeşil = o durum son 2 barda var, kırmızı = olumsuz durum var, nokta = yok.'],
   'medyan ve ortalama': ['Medyan ve ortalama', 'Medyan: son 50 kapanışın ortadaki değeri. Fiyat medyanın üstündeyse olumlu (yeşil), altındaysa olumsuz/sıkışma. Medyan ile ortalama arasındaki fark %10\'u geçerse derin düzeltme riski. Parantezdeki yüzde, medyanın fiyata uzaklığıdır.'],
   'lrc ve kesişme': ['LRC ve kesişme', 'LRC: son 300 barın yüksek ve düşük fiyatlarına çizilen regresyon kanalı. Kesişme: iki orta çizginin kesişmesi. Yeşil = birikim başlıyor, turuncu = hareket başlıyor. Hedef %10–15.'],
   'grafik': ['Grafik', 'Mumlar, SAR\'lar (+ işaretleri), üst zaman dilimi SAR ortalamaları (noktalar), medyan (mor), LRC (mavi/kırmızı) ve uyarı çizgileri. Dokununca tam ekran açılır.'],
@@ -948,8 +948,18 @@ function adjustSplits(d) {
 // Günlük barları takvim dönemlerine toplar (TradingView gibi: hafta pazartesi, 3A ocak-nisan-temmuz-ekim, 6A ocak-temmuz, 12A ocak).
 function resample(d, tf, tz = 0) {
   if (tf === 'G') return d;
+  if (tf === '3G' || tf === '5G') { // işlem günü sayısıyla grupla (TradingView gibi, ilk bardan itibaren)
+    const N = tf === '3G' ? 3 : 5, o = { t: [], o: [], h: [], l: [], c: [], v: [] };
+    for (let i = 0; i < d.t.length; i++) {
+      if (i % N === 0) { o.t.push(d.t[i]); o.o.push(d.o[i]); o.h.push(d.h[i]); o.l.push(d.l[i]); o.c.push(d.c[i]); o.v.push(d.v ? d.v[i] || 0 : 0); }
+      else { const j = o.t.length - 1; o.h[j] = Math.max(o.h[j], d.h[i]); o.l[j] = Math.min(o.l[j], d.l[i]); o.c[j] = d.c[i]; o.v[j] += d.v ? d.v[i] || 0 : 0; }
+    }
+    return o;
+  }
   const key = t => {
     const x = new Date(t + tz * 3600e3), y = x.getUTCFullYear(), m = x.getUTCMonth();
+    if (tf === '3G' || tf === '5G') { const N = tf === '3G' ? 3 : 5; return Math.floor(Math.floor((t + tz * 3600e3) / 864e5) / N); }
+    if (tf === '2H') { const day = (x.getUTCDay() + 6) % 7, wk = Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5 / 7); return Math.floor((wk + 0) / 2); }
     if (tf === 'H') { const day = (x.getUTCDay() + 6) % 7; return Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5); }
     if (tf === 'A') return y * 12 + m;
     if (tf === '3A') return y * 4 + Math.floor(m / 3);
@@ -1173,8 +1183,8 @@ function makroBuild(def, S) {
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
 const CH = { view: 120, key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
-const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
-const NBAR = { '15m': 600, '4S': 600, G: 700, H: 400, A: 200 };
+const OCOL = { '3G': '#ec4899', '5G': '#f43f5e', '2H': '#475569', G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
+const NBAR = { '15m': 600, '4S': 600, G: 700, '3G': 500, '5G': 450, H: 400, '2H': 300, A: 200 };
 const INTRA = { '15m': '15m', '4S': '4h' };
 const TZ = () => (M === 'borsa' ? 3 : 0);
 
@@ -1220,6 +1230,8 @@ async function chartData(k) {
 function pkey(t, tf, tz) {
   const x = new Date(t + tz * 3600e3), y = x.getUTCFullYear(), m = x.getUTCMonth();
   if (tf === 'G') return Math.floor((t + tz * 3600e3) / 864e5);
+  if (tf === '3G' || tf === '5G') { const N = tf === '3G' ? 3 : 5; return Math.floor(Math.floor((t + tz * 3600e3) / 864e5) / N); }
+  if (tf === '2H') { const day = (x.getUTCDay() + 6) % 7, wk = Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5 / 7); return Math.floor((wk + 0) / 2); }
   if (tf === 'H') { const day = (x.getUTCDay() + 6) % 7; return Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5); }
   if (tf === 'A') return y * 12 + m; if (tf === '3A') return y * 4 + Math.floor(m / 3); if (tf === '6A') return y * 2 + Math.floor(m / 6); return y;
 }
@@ -1229,7 +1241,7 @@ function chartModel(daily, tf, intra) {
   const S = sarSet(b), cfg = MK[M];
   const sars = [...cfg.aktif, 'ort'].map(k => ({ k, v: S[k].s.slice(from) }));
   // üst zaman dilimi SAR Ort. (Pine: request.security, lookahead kapalı → o dönemin canlı değeri)
-  const order = ['15m', '4S', 'G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x]).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
+  const order = ['15m', '4S', 'G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x] && x !== '3G' && x !== '5G' && (x !== '2H' || tf === 'H')).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
   const orts = up.map(ht => {
     const hb = resample(daily, ht, tz), hs = sarSet(hb).ort.s, mp = new Map(); hb.t.forEach((t, i) => mp.set(pkey(t, ht, tz), hs[i]));
     return { tf: ht, v: b.t.slice(from).map(t => mp.get(pkey(t, ht, tz)) ?? null) };
@@ -1362,7 +1374,7 @@ function readout(m, i) {
 
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
-    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
+    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', '3G', '5G', 'H', '2H', 'A'] : ['G', '3G', '5G', 'H', '2H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['med', 'Medyan'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><button class="btn small" id="chbig" style="position:absolute;left:6px;bottom:24px;z-index:2;opacity:.9">⤢ Büyüt</button><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>

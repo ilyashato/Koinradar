@@ -2,8 +2,8 @@
 // sar_engine.mjs içindeki fonksiyonları kullanır (build_sar.mjs sayfaya gömer).
 const CH = { view: 120, key: null, daily: null, tf: 'G', on: Object.assign({ med: true, sar: true, ort: true, lrc: true, kes: true, uyari: true }, LS.get('ch_on', {})), pick: null };
 const SCOL = { psar: '#2962FF', lin: '#22c55e', luc: '#b821f3', slow: '#8b1a1a', mod: '#16a34a', fast: '#ef4444', ort: '#f97316' };
-const OCOL = { G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
-const NBAR = { '15m': 600, '4S': 600, G: 700, H: 400, A: 200 };
+const OCOL = { '3G': '#ec4899', '5G': '#f43f5e', '2H': '#475569', G: '#a855f7', H: '#64748b', A: '#0d9488', '3A': '#06b6d4', '6A': '#f59e0b', '12A': '#dc2626' };
+const NBAR = { '15m': 600, '4S': 600, G: 700, '3G': 500, '5G': 450, H: 400, '2H': 300, A: 200 };
 const INTRA = { '15m': '15m', '4S': '4h' };
 const TZ = () => (M === 'borsa' ? 3 : 0);
 
@@ -49,6 +49,8 @@ async function chartData(k) {
 function pkey(t, tf, tz) {
   const x = new Date(t + tz * 3600e3), y = x.getUTCFullYear(), m = x.getUTCMonth();
   if (tf === 'G') return Math.floor((t + tz * 3600e3) / 864e5);
+  if (tf === '3G' || tf === '5G') { const N = tf === '3G' ? 3 : 5; return Math.floor(Math.floor((t + tz * 3600e3) / 864e5) / N); }
+  if (tf === '2H') { const day = (x.getUTCDay() + 6) % 7, wk = Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5 / 7); return Math.floor((wk + 0) / 2); }
   if (tf === 'H') { const day = (x.getUTCDay() + 6) % 7; return Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5); }
   if (tf === 'A') return y * 12 + m; if (tf === '3A') return y * 4 + Math.floor(m / 3); if (tf === '6A') return y * 2 + Math.floor(m / 6); return y;
 }
@@ -58,7 +60,7 @@ function chartModel(daily, tf, intra) {
   const S = sarSet(b), cfg = MK[M];
   const sars = [...cfg.aktif, 'ort'].map(k => ({ k, v: S[k].s.slice(from) }));
   // üst zaman dilimi SAR Ort. (Pine: request.security, lookahead kapalı → o dönemin canlı değeri)
-  const order = ['15m', '4S', 'G', 'H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x]).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
+  const order = ['15m', '4S', 'G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], up = order.slice(order.indexOf(tf) + 1).filter(x => !INTRA[x] && x !== '3G' && x !== '5G' && (x !== '2H' || tf === 'H')).filter(x => !intra || ['G', 'H', 'A'].includes(x)).filter(x => (M === 'borsa' || x !== '12A'));
   const orts = up.map(ht => {
     const hb = resample(daily, ht, tz), hs = sarSet(hb).ort.s, mp = new Map(); hb.t.forEach((t, i) => mp.set(pkey(t, ht, tz), hs[i]));
     return { tf: ht, v: b.t.slice(from).map(t => mp.get(pkey(t, ht, tz)) ?? null) };
@@ -191,7 +193,7 @@ function readout(m, i) {
 
 function chartPanel() {
   return `<div class="panel" id="chpanel"><p class="ph">Grafik · <b>SAR ve LRC</b></p>
-    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', 'H', 'A'] : ['G', 'H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
+    <div class="chips" id="chtf">${(M === 'kripto' ? ['15m', '4S', 'G', '3G', '5G', 'H', '2H', 'A'] : ['G', '3G', '5G', 'H', '2H', 'A']).map(t => `<button class="chip" data-tf="${t}" aria-pressed="${CH.tf === t}">${TFN[t]}</button>`).join('')}</div>
     <div class="chips" id="chon" style="margin-top:6px">${[['uyari', 'Uyarılar'], ['med', 'Medyan'], ['sar', 'SAR\'lar'], ['ort', 'Üst dilim SAR Ort.'], ['lrc', 'LRC kanal'], ['kes', 'Kesişme']].map(([k, t]) => `<button class="chip" data-on="${k}" aria-pressed="${!!CH.on[k]}">${t}</button>`).join('')}</div>
     <div class="sigs" id="chstrip" style="margin-top:10px"></div>
     <div style="position:relative;margin-top:8px"><button class="btn small" id="chbig" style="position:absolute;left:6px;bottom:24px;z-index:2;opacity:.9">⤢ Büyüt</button><canvas id="sarcv" style="display:block;width:100%;touch-action:pan-y"></canvas><div id="chmsg" class="note" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">Grafik yükleniyor…</div></div>

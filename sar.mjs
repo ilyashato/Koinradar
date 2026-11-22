@@ -22,11 +22,11 @@ const ENDEKS = ['XU100', 'XU030', 'XBANK'];
 
 /* ---------------- piyasa ayarları (Borsa ve Kripto birbirinden bağımsız) ---------------- */
 export const CFG = {
-  borsa: { tz: 3, tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
+  borsa: { tz: 3, tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], ana: ['H', '2H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
     aktif: ['luc', 'psar', 'fast', 'mod'], derin: -70 },
-  kripto: { tz: 0, tfs: ['G', 'H', 'A', '3A', '6A'], ana: ['H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
+  kripto: { tz: 0, tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A'], ana: ['H', '2H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
     aktif: ['slow', 'lin'], derin: -85 },
-  makro: { tz: 0, tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
+  makro: { tz: 0, tfs: ['G', '3G', '5G', 'H', '2H', 'A', '3A', '6A', '12A'], ana: ['H', '2H', 'A', '3A', '6A'], lrcTfs: ['G', 'H'], tsiTfs: ['G', 'H', 'A'],
     aktif: ['slow', 'lin'], derin: -60 },
 };
 

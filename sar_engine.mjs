@@ -100,8 +100,18 @@ export function adjustSplits(d) {
 // Günlük barları takvim dönemlerine toplar (TradingView gibi: hafta pazartesi, 3A ocak-nisan-temmuz-ekim, 6A ocak-temmuz, 12A ocak).
 export function resample(d, tf, tz = 0) {
   if (tf === 'G') return d;
+  if (tf === '3G' || tf === '5G') { // işlem günü sayısıyla grupla (TradingView gibi, ilk bardan itibaren)
+    const N = tf === '3G' ? 3 : 5, o = { t: [], o: [], h: [], l: [], c: [], v: [] };
+    for (let i = 0; i < d.t.length; i++) {
+      if (i % N === 0) { o.t.push(d.t[i]); o.o.push(d.o[i]); o.h.push(d.h[i]); o.l.push(d.l[i]); o.c.push(d.c[i]); o.v.push(d.v ? d.v[i] || 0 : 0); }
+      else { const j = o.t.length - 1; o.h[j] = Math.max(o.h[j], d.h[i]); o.l[j] = Math.min(o.l[j], d.l[i]); o.c[j] = d.c[i]; o.v[j] += d.v ? d.v[i] || 0 : 0; }
+    }
+    return o;
+  }
   const key = t => {
     const x = new Date(t + tz * 3600e3), y = x.getUTCFullYear(), m = x.getUTCMonth();
+    if (tf === '3G' || tf === '5G') { const N = tf === '3G' ? 3 : 5; return Math.floor(Math.floor((t + tz * 3600e3) / 864e5) / N); }
+    if (tf === '2H') { const day = (x.getUTCDay() + 6) % 7, wk = Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5 / 7); return Math.floor((wk + 0) / 2); }
     if (tf === 'H') { const day = (x.getUTCDay() + 6) % 7; return Math.floor((Date.UTC(y, m, x.getUTCDate()) - day * 864e5) / 864e5); }
     if (tf === 'A') return y * 12 + m;
     if (tf === '3A') return y * 4 + Math.floor(m / 3);
