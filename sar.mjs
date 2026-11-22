@@ -38,7 +38,7 @@ async function getJson(url, tries = 3) {
 async function yahoo(sym) {
   for (const host of ['query1', 'query2']) {
     try {
-      const j = await getJson(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?range=max&interval=1d`, 2);
+      const j = await getJson(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?period1=946684800&period2=${Math.floor(Date.now() / 1000)}&interval=1d&includePrePost=false`, 2);
       const q = j.chart && j.chart.result && j.chart.result[0]; if (!q || !q.timestamp) return null;
       const z = q.indicators.quote[0], d = { t: [], o: [], h: [], l: [], c: [], v: [] }, seen = new Set();
       for (let k = 0; k < q.timestamp.length; k++) {
@@ -49,6 +49,7 @@ async function yahoo(sym) {
         seen.add(dk);
         d.t.push(t); d.o.push(o); d.h.push(Math.max(h, o, c)); d.l.push(Math.min(l, o, c)); d.c.push(c); d.v.push(z.volume[k] || 0);
       }
+      if (d.t.length > 20) { const g = []; for (let k = d.t.length - 20; k < d.t.length; k++) g.push(d.t[k] - d.t[k - 1]); g.sort((a, b) => a - b); if (g[10] > 4 * 864e5) { console.warn('günlük değil:', sym); continue; } }
       return d.c.length ? d : null;
     } catch (e) {}
   }
