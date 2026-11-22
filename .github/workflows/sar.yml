@@ -1,0 +1,39 @@
+name: SAR veri
+# SAR Radar sayfasının verisi: BIST (Yahoo) + Kripto (Binance) → data/sar_borsa.json, data/sar_kripto.json, data/sar_log.json
+# Elle: Actions → "SAR veri" → Run workflow. Otomatik: her gün 18:50 (TR, ikisi) ve 03:20 (TR, kripto günlük kapanışı sonrası).
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'borsa, kripto ya da boş (ikisi)'
+        default: ''
+  schedule:
+    - cron: '50 15 * * *'
+    - cron: '20 0 * * *'
+permissions:
+  contents: write
+concurrency:
+  group: sar-veri
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Veriyi çek ve analiz et
+        run: |
+          ONLY="${{ github.event.inputs.only }}"
+          if [ "${{ github.event.schedule }}" = "20 0 * * *" ]; then ONLY=kripto; fi
+          if [ -n "$ONLY" ]; then node sar.mjs --only "$ONLY"; else node sar.mjs; fi
+      - name: Kaydet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898341+github-actions[bot]@users.noreply.github.com"
+          git add data/sar_*.json
+          git commit -m "SAR veri güncellendi: $(date -u +%Y-%m-%dT%H:%MZ)" || echo "değişiklik yok"
+          git pull --rebase origin ${GITHUB_REF_NAME} || true
+          git push

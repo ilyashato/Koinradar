@@ -1,0 +1,483 @@
+<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>SAR Radar · hatofinancial</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Düzen: tek sütun; üstte dönem senaryosu ve öne çıkanlar, altında filtre ve kart listesi. Yatay kaydırma yok. */
+:root{
+  --bg:#f1f3f7; --panel:#ffffff; --ink:#141c2f; --ink2:#4a556c; --mute:#7d879b; --line:#dde2ea; --line2:#eceff4;
+  --accent:#2c56c9; --accent-soft:#e4ebfb; --good:#16845a; --good-soft:#dff2e8; --bad:#c43c2c; --bad-soft:#f9e3df; --warn:#a56a07; --warn-soft:#f7ecd5;
+  --f-body:"Schibsted Grotesk",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace; --r:14px;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0d1320; --panel:#161e30; --ink:#e8edf7; --ink2:#aeb8cb; --mute:#7f8aa0; --line:#283349; --line2:#1f293d;
+  --accent:#88a6ff; --accent-soft:#1f2b4d; --good:#41c78d; --good-soft:#15342a; --bad:#f2786a; --bad-soft:#3b1e1b; --warn:#e4ab43; --warn-soft:#3a2d13; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;margin:0}
+.wrap{max-width:820px;margin:0 auto;padding:16px max(16px,env(safe-area-inset-right,0px)) 60px max(16px,env(safe-area-inset-left,0px))}
+button,input,select{font:inherit;color:inherit} button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hf{display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;margin:2px 0 14px}
+.hfm{flex:none;filter:drop-shadow(0 4px 10px rgba(47,107,255,.28))}
+.hft{display:flex;flex-direction:column;line-height:1.05}
+.hfw{font-size:26px;letter-spacing:-.04em;color:var(--accent);font-weight:400} .hfw b{font-weight:800;color:var(--ink)}
+.hfs{font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);margin-top:4px;font-weight:600}
+.mkt{display:flex;gap:4px;background:var(--line2);padding:3px;border-radius:12px;margin:10px 0 2px;width:max-content;max-width:100%;flex-wrap:wrap}
+.mkt a{padding:6px 14px;border-radius:9px;font-weight:700;font-size:14px;color:var(--ink2);text-decoration:none}
+.mkt a.lo{margin-left:6px;font-weight:600;font-size:13px}
+.mkt a[aria-current="page"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+h1{font-weight:800;font-size:24px;letter-spacing:-.02em;margin:0;line-height:1.1}
+.top{margin:14px 0}
+.status{font-size:13px;color:var(--ink2);margin-top:3px}
+.mut{color:var(--mute)} .pos{color:var(--good)} .neg{color:var(--bad)}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px;margin-bottom:14px;background:var(--line2);padding:4px;border-radius:12px}
+.tab{flex:1;background:none;border:0;border-radius:9px;padding:9px 6px;font-weight:700;font-size:14px;color:var(--ink2)}
+.tab[aria-selected="true"]{background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.ph{margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)} .ph b{color:var(--accent)}
+.note{font-size:12.5px;color:var(--ink2);margin:10px 0 0;line-height:1.5}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 13px;font-weight:600;font-size:14px}
+.btn.small{padding:4px 10px;font-size:12.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--panel);white-space:nowrap}
+button.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.chip.gold{color:var(--accent);border-color:var(--accent)} .chip.good{color:var(--good);border-color:var(--good)} .chip.bad{color:var(--bad);border-color:var(--bad)}
+input[type=search],input[type=number]{width:100%;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:15px}
+.search{margin-bottom:12px}
+.filters{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.filters label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--mute)}
+.filters label.fxl{grid-column:1/-1;flex-direction:row;align-items:center;gap:8px;font-size:13.5px;text-transform:none;letter-spacing:0;color:var(--ink);font-weight:500}
+.filters label.fxl input{width:18px;height:18px;padding:0}
+.filters .note{grid-column:1/-1;margin:0}
+.sortrow{display:flex;gap:8px;margin:2px 0 10px}
+select{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 10px;font-weight:600}
+.sc{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 13px;margin-bottom:10px;cursor:pointer}
+.sc:hover{border-color:var(--accent)}
+.sc .t{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.sc .kod{font:700 15px var(--f-num);color:var(--accent)} .sc .ad{display:block;font-size:12.5px;color:var(--mute)}
+.sc .px{text-align:right;font:700 17px var(--f-num)} .sc .px small{display:block;font-size:12px}
+.sc .mini{display:grid;grid-template-columns:repeat(4,1fr);gap:8px 6px;margin-top:11px;padding-top:10px;border-top:1px solid var(--line2)}
+.sc .mini div{display:flex;flex-direction:column}
+.sc .mini span{font-size:10px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}
+.sc .mini b{font:600 14px var(--f-num)} .sc .mini .on b{color:var(--accent)}
+.krow{display:block;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--line2);padding:9px 0}
+.krow .t{display:flex;justify-content:space-between;gap:8px;font-size:14px} .krow .t em{font-style:normal;color:var(--mute);font-size:12.5px;text-align:right}
+.kbar{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--line);margin-top:6px} .kbar i{display:block;height:100%}
+.hero{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.hero .row1{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.hero .eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.hero .nm{margin:4px 0 8px;font-size:21px;font-weight:800;line-height:1.15}
+.hero .ringbox{text-align:center;flex:none;cursor:pointer} .hero .ringbox small{display:block;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--mute)}
+.hero .row2{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;margin-top:12px}
+.hero .price{font:700 32px/1 var(--f-num)}
+.hero .acts{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+button.kpi{appearance:none;text-align:left;background:var(--line2);border:1px solid var(--line);border-radius:11px;padding:10px 11px;position:relative;width:100%}
+.kpi span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--mute)}
+.kpi b{display:block;font:700 19px/1.2 var(--f-num);margin-top:3px} .kpi small{display:block;font-size:11px;color:var(--mute);margin-top:1px}
+.kpi::after{content:'ⓘ';position:absolute;top:8px;right:10px;font-size:12px;color:var(--mute)}
+.dim{display:grid;grid-template-columns:104px 1fr 34px;gap:8px;align-items:center;font-size:13.5px;margin:8px 0;cursor:pointer}
+.dim .track{height:8px;border-radius:4px;background:var(--line);overflow:hidden} .dim i{display:block;height:100%;background:var(--accent);border-radius:4px}
+.dim em{font:600 12.5px var(--f-num);font-style:normal;text-align:right}
+.subtabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px}
+@media (min-width:640px){.subtabs{grid-template-columns:repeat(5,1fr)}}
+.stab{background:var(--panel);color:var(--ink2);border:1px solid var(--line);border-radius:10px;padding:9px 4px;font-weight:700;font-size:12.5px;text-align:center;line-height:1.25}
+.stab small{display:block;font:500 10.5px var(--f-num);color:var(--mute)}
+.stab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:#fff} .stab[aria-selected="true"] small{color:#fff}
+.ksum{display:flex;gap:14px;align-items:center;margin-bottom:6px} .ksum .txt{font-size:13px;color:var(--ink2);line-height:1.5} .ksum .txt b{color:var(--ink);font-size:18px}
+.kr{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:11px 0 11px 11px;border-top:1px solid var(--line2);border-left:3px solid var(--line);margin-left:-14px;cursor:pointer}
+.kr.pos{border-left-color:var(--good)} .kr.neg{border-left-color:var(--bad)}
+.kr b{font-weight:700;font-size:14px} .kr small{display:block;font-size:11.5px;color:var(--mute);line-height:1.4}
+.kr .rt{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:5px} .kr .val{font:700 18px/1 var(--f-num)}
+.sheet{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center} .sheet[hidden]{display:none}
+.sh-bg{position:absolute;inset:0;background:rgba(3,8,18,.55)}
+.sh-box{position:relative;width:100%;max-width:820px;max-height:84vh;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:18px 18px 0 0;padding:16px 16px 30px}
+.sh-head{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;position:sticky;top:-16px;z-index:2;margin:-16px -16px 6px;padding:16px 16px 8px;background:var(--panel)}
+.sh-head h3{margin:3px 0 0;font-size:20px;font-weight:800} .sh-head .eyebrow{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.iconbtn{border:1px solid var(--line);background:var(--panel);border-radius:999px;width:38px;height:38px;font-size:16px}
+.sh-val{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font:700 30px/1 var(--f-num);margin:6px 0 4px}
+.sh-sec{margin-top:14px} .sh-sec h4{margin:0 0 6px;font-size:11.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--accent)}
+.sh-sec p,.sh-sec li{font-size:14px;line-height:1.55;margin:0} .sh-sec ul{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px}
+.fm{font:500 13px/1.5 var(--f-num);background:var(--line2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.inp div{padding:7px 0;border-top:1px solid var(--line2);font-size:13px} .inp div:first-child{border-top:0}
+.inp div.i3{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:baseline}
+.inp span{color:var(--mute)} .inp b{font:500 13px var(--f-num);text-align:right;white-space:nowrap}
+.inp div.hd b{color:var(--mute);font-size:11px}
+.err{border:1px solid var(--bad);color:var(--bad);border-radius:10px;padding:10px 12px;font-size:13.5px;background:var(--panel)}
+footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
+.seg{display:flex;gap:4px;background:var(--line2);padding:4px;border-radius:12px;margin-bottom:12px}
+.seg button{flex:1;background:none;border:0;border-radius:9px;padding:10px 6px;font-weight:800;font-size:15px;color:var(--ink2)}
+.seg button[aria-selected="true"]{background:var(--accent);color:#fff}
+.badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;white-space:nowrap}
+.b-olumlu{background:var(--good-soft);color:var(--good)} .b-olumsuz{background:var(--bad-soft);color:var(--bad)} .b-notr{background:var(--line2);color:var(--ink2)}
+.sigs{display:flex;gap:5px;flex-wrap:wrap;margin-top:9px}
+.sg{font-size:11.5px;font-weight:600;border-radius:7px;padding:2px 7px;border:1px solid var(--line);color:var(--ink2);background:var(--panel)}
+.sg.pos{color:var(--good);border-color:var(--good)} .sg.neg{color:var(--bad);border-color:var(--bad)}
+.yorum p{margin:0 0 9px;font-size:14.5px;line-height:1.6} .yorum p:last-child{margin-bottom:0} .yorum b{font-weight:700}
+.lad{width:100%;border-collapse:collapse;font-size:13px}
+.lad td{padding:6px 4px;border-top:1px solid var(--line2);vertical-align:middle}
+.lad td.v{font:600 13px var(--f-num);text-align:right;white-space:nowrap}
+.lad tr.px td{background:var(--accent-soft);font-weight:800;color:var(--accent)}
+.st{font-size:10.5px;font-weight:700;border-radius:6px;padding:1px 6px;white-space:nowrap}
+.st.yana{background:var(--warn-soft);color:var(--warn)} .st.taze{background:var(--accent-soft);color:var(--accent)} .st.temas{background:var(--bad-soft);color:var(--bad)} .st.igne{background:var(--good-soft);color:var(--good)}
+.grid{display:grid;gap:3px;font-size:11.5px;text-align:center}
+.grid div{padding:5px 2px;border-radius:6px;background:var(--line2);color:var(--mute);font-weight:600}
+.grid .hd{background:none;font-weight:700;color:var(--mute);text-transform:uppercase;font-size:10.5px}
+.grid .lb{background:none;text-align:left;color:var(--ink2);font-weight:600}
+.grid .on{background:var(--good);color:#fff} .grid .off2{background:var(--bad);color:#fff}
+.kv{display:grid;grid-template-columns:1fr auto;gap:6px 12px;font-size:13.5px} .kv span{color:var(--ink2)} .kv b{font:600 13.5px var(--f-num);text-align:right}
+.kes{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.kes span{font-size:11.5px;font-weight:700;border-radius:6px;padding:2px 7px;color:#fff}
+.kes .yesil{background:#16a34a} .kes .turuncu{background:#ea8a0c}
+.lnk{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;font-size:inherit}
+</style></head>
+<body>
+<div class="wrap">
+  <a class="hf" href="/" aria-label="hatofinancial">
+    <svg class="hfm" width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><defs><linearGradient id="hfg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#16213f"/><stop offset="1" stop-color="#2f6bff"/></linearGradient></defs><rect width="40" height="40" rx="11" fill="url(#hfg)"/><path d="M9 28 L16 19.5 L22 24 L31 11.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M25 11.5 H31 V17.5" fill="none" stroke="#7ce6b0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="hft"><span class="hfw"><b>hato</b>financial</span><span class="hfs">kişisel piyasa radarı</span></span>
+  </a>
+  <nav class="mkt" aria-label="Piyasa"><a href="kripto.html" data-m="kripto">Kripto</a><a href="borsa.html" data-m="borsa">Borsa Teknik</a><a href="temel.html" data-m="temel">Borsa Temel</a><a href="sar.html" data-m="sar" aria-current="page">SAR Radar</a><a href="#" id="logout" class="lo" hidden>Çıkış</a></nav>
+  <div class="top"><h1>SAR Radar</h1><div class="status" id="status">Veri yükleniyor…</div></div>
+
+  <div class="seg" role="tablist" aria-label="Piyasa seçimi">
+    <button id="m-borsa" role="tab" aria-selected="true">Borsa (BIST)</button>
+    <button id="m-kripto" role="tab" aria-selected="false">Kripto</button>
+  </div>
+
+  <input class="search" id="q" type="search" placeholder="Ara: THYAO" autocomplete="off" aria-label="Ara">
+  <div class="tabs" role="tablist">
+    <button class="tab" id="tab-tara" role="tab" aria-selected="true">Tarama</button>
+    <button class="tab" id="tab-kart" role="tab" aria-selected="false">Kart</button>
+    <button class="tab" id="tab-rehber" role="tab" aria-selected="false">Kurallar</button>
+  </div>
+
+  <section id="view-tara">
+    <div class="panel" id="ozet"></div>
+    <div class="panel">
+      <p class="ph">SAR <b>filtreleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· seçtiklerinin hepsi aynı anda</span></p>
+      <div class="chips" id="chips"></div>
+      <p class="ph" style="margin-top:14px">Durum</p>
+      <div class="chips" id="durum"></div>
+      <div id="dongu-box">
+        <p class="ph" style="margin-top:14px">SAR <b>döngüsü</b></p>
+        <div class="chips" id="dongu"></div>
+        <p class="note" id="dongu-note"></p>
+      </div>
+      <div class="sortrow" style="margin-top:12px">
+        <select id="sort" aria-label="Sıralama">
+          <option value="puan">Sırala: SAR puanı</option>
+          <option value="chg">Sırala: Günlük değişim</option>
+          <option value="sup">Sırala: Desteğe en yakın</option>
+          <option value="lrc">Sırala: LRC alt banda en yakın</option>
+          <option value="kod">Sırala: Kod</option>
+        </select>
+        <button class="btn small" id="clear">Temizle</button>
+      </div>
+    </div>
+    <div id="count" class="status" style="margin:0 2px 8px"></div>
+    <div id="list"></div>
+    <button class="btn" id="more" hidden style="width:100%">Daha fazla göster</button>
+  </section>
+
+  <section id="view-kart" hidden><div id="kart"><div class="panel note">Listeden bir satıra dokun.</div></div></section>
+  <section id="view-rehber" hidden><div id="rehber"></div></section>
+
+  <p class="note" style="margin-top:18px">Kurallar @emrah_ulu_dag (ULUDAĞ) paylaşımlarından ve ULUDAĞ SAR, Linear TSI, LRC Kesişme Tarama kodlarından alınmıştır; oranlar onun beyanıdır, sinyal günlüğü bu sitenin kendi ölçümüdür. Yatırım tavsiyesi değildir.</p>
+</div>
+<div class="sheet" id="sheet" hidden><div class="sh-bg" id="sbg"></div><div class="sh-box"><div class="sh-head"><div><div class="eyebrow" id="seye"></div><h3 id="stitle"></h3></div><button class="iconbtn" id="sclose" aria-label="Kapat">✕</button></div><div id="sbody"></div></div></div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const LS = { get: (k, d) => { try { const v = localStorage.getItem('sr_' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set: (k, v) => { try { localStorage.setItem('sr_' + k, JSON.stringify(v)); } catch (e) {} } };
+
+/* ---------- sabitler ---------- */
+const TFN = { G: 'Günlük', H: 'Haftalık', A: 'Aylık', '3A': '3 aylık', '6A': '6 aylık', '12A': '12 aylık' };
+const TFK = { G: 'G', H: 'H', A: 'A', '3A': '3A', '6A': '6A', '12A': '12A' };
+const SN = { psar: 'Parabolic', lin: 'Linear', luc: 'Lucid', slow: 'Triple Slow', mod: 'Triple Moderate', fast: 'Triple Fast', ort: 'SAR Ort.' };
+const MK = {
+  borsa: { ad: 'Borsa', birim: 'hisse', tfs: ['G', 'H', 'A', '3A', '6A', '12A'], ana: ['H', 'A', '3A', '6A'], aktif: ['luc', 'psar', 'fast', 'mod'], ilk: 'fast', ph: 'Ara: THYAO',
+    set: 'Lucid, Parabolic, Triple Fast, Triple Moderate', taraf: 'Fiyatın altındaki SAR\'lar (destek) daha etkili; en etkilisi Triple Moderate. En iyi zaman dilimi 3 ve 6 aylık.' },
+  kripto: { ad: 'Kripto', birim: 'coin', tfs: ['G', 'H', 'A', '3A', '6A'], ana: ['H', 'A', '3A', '6A'], aktif: ['slow', 'lin'], ilk: null, ph: 'Ara: SOL',
+    set: 'Triple Slow ve Linear (son iki SAR)', taraf: 'Fiyatın üstündeki SAR\'lar (direnç) daha etkili. Haftalık ve üstü zaman dilimleri; kesişmede en etkilisi günlük. USDT paritesi, normal ölçek.' },
+};
+// sinyal: etiket, ton, açıklama (kural kaynağı)
+const SIG = {
+  alt_yana: ['Alttan yana atan SAR', 'pos', 'SAR fiyatın altında yatay kaldı (değeri önceki barla aynı). Destek; temas etmedikçe yükseliş beklenir. Sistemin verisi: 100 grafiğin 92\'sinde yana atan SAR\'a temas olmadan dönüş.'],
+  ust_yana: ['Üstten yana atan SAR', 'neg', 'SAR fiyatın üstünde yatay kaldı. Direnç; temas edilmedikçe düşüş sürer.'],
+  tek: ['TEK SAR', 'pos', 'Yükselişte SAR tek bar için fiyatın üstüne çıkıp hemen geri döndü (başarısız dönüş). Pine koşulu: SAR[1] > kapanış[1], tepe > SAR[1], SAR < kapanış, SAR[2] < kapanış[2]. "Tek nokta üstte ise yükseliş".'],
+  birlesme: ['SAR birleşmesi', 'pos', 'Parabolic, Triple Moderate ve Triple Fast aynı değerde (üçü aynı dibe sabitlendi). Birleşmeler genelde dönem başında görülür; önceden tahmin edilmesi gerekir.'],
+  igne: ['SAR\'a iğne', '', 'Fiyat bu barda SAR\'a %1\'den fazla yaklaşıp değmeden döndü. Sistem: "SAR\'a iğne gelince %90 yana atar".'],
+  direnc_asildi: ['Direnç SAR\'ı aşıldı', 'pos', 'Üstteki SAR\'a temas edildi ve SAR fiyatın altına geçti. Üstteki noktaya temas etmesi, etmemesinden iyidir.'],
+  destek_kayip: ['Destek SAR\'ı kaybedildi', 'neg', 'Alttaki SAR\'a temas edildi; o SAR iptal oldu, desteğini çekti. Bir alttaki daha uzun vadeli SAR\'a bakılır. Aynı SAR\'dan ikinci tepki beklenmez.'],
+  cakisma: ['3A+6A SAR çakışması', 'pos', '3 aylık ve 6 aylık SAR\'lar aynı bölgede (%3 içinde) üst üste binmiş: çok katmanlı, güçlü destek (Kural 3).'],
+  dip6a: ['6 aylık SAR yakın', 'pos', 'Fiyat 6 aylık SAR desteğine %5\'ten yakın. 6 aylık SAR\'lar hissenin dibi olur; kriptoda temas genelde %90–95 düşüş demektir.'],
+  aylik_tepki: ['Aylık SAR tepki adayı', 'pos', 'İki şart birlikte: yukarıdan inip fiyata yaklaşmış aylık SAR\'lar ve bunların en az 3\'ü günlük 21 EMA\'nın altında. Geçmişte %70–80 tepki örnekleri (02.08.2026).'],
+  trend_bozuk: ['Günlük SAR\'lar üstte', 'neg', 'Fiyat aktif günlük SAR\'ların hepsinin altında. Son günlük SAR altında kalan, alttaki haftalık SAR\'ın çekimine girer.'],
+  lrc_alt: ['LRC alt bandın altı', '', 'Fiyat 300 barlık regresyon kanalının alt bandının altında: ucuz bölge, sistem fiyatı bandın içine atmak için tepki üretir.'],
+  lrc_pahali: ['LRC 2 katı (pahalı)', 'neg', 'Fiyat haftalık LRC orta seviyesinin 2 katı üstünde: pahalı/zirve. 3–4 katı balon.'],
+  kes_yesil: ['Yeşil kesişme', '', 'Son 20 barda LRC orta üst çizgisi (yüksekler) orta altın (düşükler) altına indi: mum aralıkları daralıyor, birikim başlangıcı. Sonrasında 1–2 ay ve test düşüşü olabilir.'],
+  kes_turuncu: ['Turuncu kesişme', 'pos', 'Son 20 barda orta üst çizgi yeniden orta altın üstüne çıktı: aralık genişliyor, hareket başlıyor. Turuncu yeşilden etkilidir.'],
+  kes_ideal: ['İdeal kesişme', 'pos', 'Yeşil → test düşüşü → turuncu sırası, arada mesafe var ve orta bant yukarı dönmüş (V formasyonu).'],
+  kes_risk: ['Riskli kesişme', 'neg', 'Arka arkaya yeşil+turuncu (vur-kaç), çoklu kesişme, yeni oluşan bant, düzeltmesiz hızlı yükseliş ya da kesişmeden sonra %20+ kaçmış fiyat.'],
+  kes_usd: ['Dolar bazlı kesişme', 'pos', 'Hissenin dolar fiyatında (TL/USDTRY) da son 20 barda kesişme var.'],
+  kes_btc: ['BTC paritesinde kesişme', 'pos', 'Coinin BTC paritesinde de son 20 barda kesişme var: tutma oranı artar.'],
+  tsi_yesil: ['Linear TSI yeşil (G+H)', 'pos', 'Günlük ve haftalık Linear TSI yeşil: TSI regresyon eğimi artıyor (momentum hızlanıyor). Kırmızı = yavaşlıyor, yakındaki SAR\'a temas beklenir.'],
+  derin: ['Derin düşüş', '', 'Son 300 barın zirvesinden hissede %70+, kriptoda %85+ düşmüş. İdeal kesişme bu tür grafiklerde aranır.'],
+};
+const ORDER = ['alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali'];
+const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'den fazla kaçmış, sinyal bitmiş sayılır', arka_arkaya: 'yeşil ve turuncu arka arkaya geldi: vur-kaç, en hızlı yükseliş ya da düşüşün habercisi', ideal: 'yeşil → test düşüşü → turuncu sırası ve orta bant yukarı: ideal kesişme', tehlikeli: 'bant aşağı giderken düzeltmesiz gelen kesişme: tehlikeli, sonraki turuncu görmezden gelinmeli', coklu: 'son 60 barda 4+ kesişme: çoklu kesişme, iptal riski yüksek', yeni_bant: 'bant yeni oluştu (300 barlık geçmiş yeni doldu): o an görmezden gelinir' };
+
+/* ---------- durum ---------- */
+let M = LS.get('m', 'borsa'); if (!MK[M]) M = 'borsa';
+const DATA = {}, ST = { borsa: { chips: LS.get('chips_borsa', []), durum: 'hepsi', sort: 'puan', dongu: LS.get('dongu', '3A') }, kripto: { chips: LS.get('chips_kripto', []), durum: 'hepsi', sort: 'puan' } };
+let shown = 60, curKod = null;
+
+const fmt = (x, d) => { if (x == null || !isFinite(x)) return '—'; const a = Math.abs(x); const dd = d != null ? d : a >= 1000 ? 0 : a >= 100 ? 1 : a >= 1 ? 2 : a >= 0.01 ? 4 : 6; return (+x).toLocaleString('tr-TR', { minimumFractionDigits: dd, maximumFractionDigits: dd }); };
+const pct = x => (x == null ? '—' : (x > 0 ? '+' : '') + fmt(x, 1) + '%');
+const sgn = x => (x == null ? '' : x > 0 ? 'pos' : x < 0 ? 'neg' : '');
+
+/* ---------- yardımcı: seviye merdiveni ---------- */
+function levels(r, opts = {}) {
+  const cfg = MK[M], out = [];
+  for (const tf of cfg.tfs) { const row = r.tf && r.tf[tf]; if (!row) continue; if (opts.noG && tf === 'G') continue;
+    for (const k of [...cfg.aktif, 'ort']) { const x = row.s[k]; if (!x || x.v == null) continue; if (opts.noOrt && k === 'ort') continue; out.push({ ...x, tf, k }); } }
+  return out;
+}
+const lvName = x => `${TFN[x.tf]} ${SN[x.k]}`;
+function nearest(r, side, opts) { const L = levels(r, opts).filter(x => x.side === side); if (!L.length) return null; return L.sort((a, b) => side === 'alt' ? b.v - a.v : a.v - b.v)[0]; }
+
+/* ---------- otomatik yorum ---------- */
+function yorum(r) {
+  const cfg = MK[M], P = r.price, out = [], tsi = r.tsi || {}, has = k => (r.sig || []).includes(k);
+  // 1) genel durum
+  const dLbl = { olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' }[r.durum];
+  let g = `SAR görünümü <b>${dLbl}</b> (puan ${r.puan > 0 ? '+' : ''}${r.puan}).`;
+  const ts = ['G', 'H', 'A'].filter(t => tsi[t]).map(t => `${TFN[t].toLowerCase()} ${tsi[t].renk === 'yesil' ? 'yeşil' : 'kırmızı'}${tsi[t].sure > 1 ? ` (${tsi[t].sure} bardır)` : ''}`);
+  if (ts.length) g += ` Linear TSI: ${ts.join(', ')}.`;
+  if (tsi.H && tsi.H.renk === 'kirmizi') g += ' Haftalık momentum yavaşlıyor; yakındaki SAR\'a temas ihtimali artar.';
+  if (tsi.G && tsi.G.deger != null && Math.abs(tsi.G.deger) >= 0.8) g += tsi.G.deger > 0 ? ' Günlük TSI +0,8 üstünde (aşırı alım bölgesi).' : ' Günlük TSI −0,8 altında (aşırı satım bölgesi).';
+  if (M === 'kripto') { const b = DATA.kripto && DATA.kripto.piyasaOzet && DATA.kripto.piyasaOzet.BTCUSDT; if (b && r.k !== 'BTC') g += ` BTC görünümü ${({ olumlu: 'olumlu', olumsuz: 'olumsuz', notr: 'nötr' })[b.durum]}; coin kararında BTC trendi gözetilmeli.`; }
+  else { const d = ST.borsa.dongu; g += ` Seçili SAR döngüsü: ${TFN[d].toLowerCase()}.`; }
+  out.push(g);
+
+  // 2) SAR merdiveni ve yana atmalar
+  const s2 = [];
+  const yanAlt = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flatRecent && x.side === 'alt').sort((a, b) => b.v - a.v);
+  const yanUst = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flatRecent && x.side === 'ust').sort((a, b) => a.v - b.v);
+  if (yanAlt.length) { const x = yanAlt[0]; s2.push(`<b>${lvName(x)} ${fmt(x.v)}'de alttan yana attı</b> (fiyata %${fmt(Math.abs(x.dist), 1)} uzakta${x.flat > 1 ? `, ${x.flat} bardır sabit` : ''}). Temas etmedikçe destek sürer; bu seviyeye kesinlikle temas etmemeli, ederse düşüş derinleşir.`); }
+  if (yanUst.length) { const x = yanUst[0]; s2.push(`<b>${lvName(x)} ${fmt(x.v)}'de üstten yana attı</b> (%${fmt(Math.abs(x.dist), 1)} yukarıda): direnç. Temas edilmezse düşüş eğilimi sürer; üstteki noktaya temas etmesi etmemesinden iyidir.`); }
+  const ig = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.igne);
+  if (ig.length) s2.push(`${ig.map(lvName).join(', ')} SAR'ına iğne atıldı: sistem bu durumda %90 yana atma bekliyor. Vakit kaybetmeden temas olmazsa dönem kapanışında yana atar.`);
+  const fl = levels(r, { noOrt: true }).filter(x => cfg.ana.includes(x.tf) && x.flipped);
+  fl.forEach(x => s2.push(x.side === 'ust' ? `${lvName(x)} desteğine temas edildi: bu SAR iptal oldu, desteğini çekti. Bir alttaki daha uzun vadeli SAR devreye girer.` : `${lvName(x)} direncine temas edildi ve SAR fiyatın altına geçti (olumlu).`));
+  if (has('tek')) s2.push('TEK SAR var: yükselişte tek barlık başarısız dönüş, yükseliş işareti.');
+  if (has('birlesme')) s2.push('SAR birleşmesi var (Parabolic = Moderate = Fast).');
+  // ilk SAR kuralı (döngü zaman diliminde)
+  const dtf = M === 'borsa' ? ST.borsa.dongu : 'H', row = r.tf && r.tf[dtf];
+  if (row) {
+    const alt = cfg.aktif.map(k => row.s[k] && { ...row.s[k], k, tf: dtf }).filter(x => x && x.side === 'alt').sort((a, b) => b.v - a.v);
+    const ust = cfg.aktif.map(k => row.s[k] && { ...row.s[k], k, tf: dtf }).filter(x => x && x.side === 'ust').sort((a, b) => a.v - b.v);
+    if (alt.length) {
+      const ilk = alt[0]; let t = `${TFN[dtf]} merdivende ilk destek <b>${SN[ilk.k]} ${fmt(ilk.v)}</b> (%${fmt(Math.abs(ilk.dist), 1)} aşağıda).`;
+      if (alt.length >= 3) t += ` Bu ilk SAR'a temas olmadan diğerlerine gidilmez; temas olursa sistem %80 ihtimalle alttakilere sarkma bekler. Son iki SAR'a genelde temas olmaz: kademeli alımda ${fmt(alt[alt.length - 3].v)} seviyesi sınır kabul edilir.`;
+      else if (alt.length === 2) t += ` Altında ${SN[alt[1].k]} ${fmt(alt[1].v)} var.`;
+      s2.push(t);
+    }
+    if (ust.length) { const u = ust[0]; s2.push(`${TFN[dtf]} merdivende ilk direnç <b>${SN[u.k]} ${fmt(u.v)}</b> (%${fmt(u.dist, 1)} yukarıda)${u.age <= 1 ? ', yeni oluşmuş (taze SAR: temas olasılığı yüksek)' : ''}. İlk SAR'a temas olmazsa üstteki SAR'lar yana atar ve düşüş uzar.`); }
+  }
+  const k = (r.kume || []).filter(x => x.side === 'alt' && x.dist > -30).sort((a, b) => b.lo - a.lo)[0];
+  if (k) s2.push(`${fmt(k.lo)}–${fmt(k.hi)} bandında ${k.n} SAR üst üste (${k.tfs.map(t => TFN[t].toLowerCase()).join(', ')}): çekim gücü yüksek, ağır alım bölgesi.`);
+  if (has('aylik_tepki')) s2.push('Aylık SAR tepki adayı: yukarıdan inen aylık SAR\'lar fiyata yaklaşmış ve en az 3\'ü günlük 21 EMA\'nın altında.');
+  if (s2.length) out.push(s2.join(' '));
+
+  // 3) LRC ve kesişme
+  const s3 = [];
+  for (const tf of ['G', 'H']) { const L = r.lrc && r.lrc[tf]; if (!L) continue;
+    if (L.yok) { s3.push(`${TFN[tf]} LRC için 300 bar gerekiyor, geçmiş yetersiz.`); continue; }
+    const kon = { alt: 'alt bandın altında (ucuz bölge, tepki beklenir)', ust: 'üst bandın üstünde (güçlü, sert hareket alanı)', ic: 'bandın içinde (sıkışma)' }[L.konum];
+    let t = `${TFN[tf]} LRC: fiyat ${kon}, orta bant ${L.egim === 'yukari' ? 'yukarı' : 'aşağı'} eğimli.`;
+    const e = (L.kesisme || []).at(-1);
+    if (e && e.ago <= 60) { t += ` Son kesişme <b>${e.tip === 'yesil' ? 'yeşil' : 'turuncu'}</b>, ${e.ago} bar önce${e.teyit ? ' (298 ile teyitli)' : ''}; o günden beri ${pct(e.fark)}.`; const y = (L.yorum || []).filter(x => x !== 'taze').map(x => YOR[x]); if (y.length) t += ' ' + y.join('; ') + '.'; }
+    if (tf === 'H' && L.ortaKat >= 2) t += ` Fiyat orta seviyenin ${fmt(L.ortaKat, 1)} katı: pahalı bölge.`;
+    s3.push(t); }
+  if (M === 'borsa' && r.usdKes && r.usdKes.ago <= 20) s3.push(`Dolar bazında da ${r.usdKes.tip === 'yesil' ? 'yeşil' : 'turuncu'} kesişme var (${r.usdKes.ago} bar önce).`);
+  if (M === 'kripto' && r.btcKes && r.btcKes.ago <= 20) s3.push(`BTC paritesinde de ${r.btcKes.tip === 'yesil' ? 'yeşil' : 'turuncu'} kesişme var: tutma oranı artar.`);
+  if (s3.length) out.push(s3.join(' '));
+
+  // 4) seviyeler
+  const gs = nearest(r, 'alt', {}), gd = nearest(r, 'ust', {});
+  const gG = (() => { const row = r.tf && r.tf.G; if (!row) return null; return cfg.aktif.map(k => row.s[k]).filter(x => x && x.side === 'alt').sort((a, b) => b.v - a.v)[0]; })();
+  const LH = r.lrc && r.lrc.H;
+  const s4 = [];
+  if (gs) s4.push(`En yakın destek ${lvName(gs)} ${fmt(gs.v)} (%${fmt(Math.abs(gs.dist), 1)})`);
+  if (gd) s4.push(`en yakın direnç ${lvName(gd)} ${fmt(gd.v)} (%${fmt(gd.dist, 1)})`);
+  let t4 = s4.length ? s4.join(', ') + '.' : '';
+  const hd = [];
+  if (gG) hd.push(`kısa vadede günlük SAR ${fmt(gG.v)}`);
+  if (LH && !LH.yok) hd.push(`orta vadede haftalık LRC alt bandı ${fmt(LH.alt)}`);
+  if (hd.length) t4 += ` Düzeltme gelirse hedefler: ${hd.join(', ')} (fiyat inerken bu seviyeler yukarı çıkar, sonra buluşur).`;
+  const boz = (yanAlt.length && Math.abs(yanAlt[0].dist) <= 20) ? yanAlt[0] : gs;
+  if (boz) t4 += ` Bozulma: ${fmt(boz.v)} altında ${TFN[boz.tf].toLowerCase()} kapanış.`;
+  if (t4) out.push(t4.trim());
+  out.push('<span class="mut">Medyan, denge ve gerçek değer sistem sahibi tarafından paylaşılmadığı için hesaplanamadı. Kesişmede hedef %10–15; fiyat kesişme noktasının altına inerse stop. Yatırım tavsiyesi değildir.</span>');
+  return out;
+}
+
+/* ---------- tarama ---------- */
+function rows() { const d = DATA[M]; return d ? d.rows : []; }
+function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Math.abs(x.dist) : 999; }
+function filtered() {
+  const s = ST[M], q = $('#q').value.trim().toLocaleUpperCase('tr-TR');
+  let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || r.durum === s.durum));
+  const by = { puan: (a, b) => b.puan - a.puan || (b.chg || 0) - (a.chg || 0), chg: (a, b) => (b.chg || 0) - (a.chg || 0), kod: (a, b) => a.k.localeCompare(b.k, 'tr'),
+    sup: (a, b) => supDist(a) - supDist(b), lrc: (a, b) => ((a.lrc.G && a.lrc.G.altUzak) ?? 999) - ((b.lrc.G && b.lrc.G.altUzak) ?? 999) }[s.sort];
+  return L.sort(by);
+}
+function sigChips(r, max = 6) {
+  const L = ORDER.filter(k => r.sig.includes(k)).slice(0, max);
+  return L.map(k => `<span class="sg ${SIG[k][1]}">${esc(SIG[k][0])}</span>`).join('') + (r.sig.length > max ? `<span class="sg">+${r.sig.length - max}</span>` : '');
+}
+function drawChips() {
+  const s = ST[M], cnt = k => rows().filter(r => r.sig.includes(k)).length;
+  $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
+  $('#durum').innerHTML = [['hepsi', 'Tümü'], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
+  $('#dongu-box').hidden = M !== 'borsa';
+  if (M === 'borsa') {
+    $('#dongu').innerHTML = ['A', '3A', '6A'].map(t => `<button class="chip" data-g="${t}" aria-pressed="${ST.borsa.dongu === t}">${TFN[t]}</button>`).join('');
+    $('#dongu-note').textContent = 'BIST\'in hangi SAR döngüsündeyse o zaman dilimine bakmak avantajlı (ör. seçim öncesi aylık, sonrası 3 aylık, Temmuz–Aralık 6 aylık). Yorumdaki "ilk SAR" ve kademeli alım seviyesi bu seçime göre yazılır.';
+  }
+  $('#sort').value = s.sort;
+}
+function drawOzet() {
+  const d = DATA[M]; if (!d) return; const P = d.piyasaOzet || {};
+  const keys = M === 'borsa' ? ['XU100', 'XU030', 'XBANK'] : ['BTCUSDT', 'ETHUSDT'];
+  const it = keys.filter(k => P[k]).map(k => { const r = P[k]; return `<button class="krow" data-oz="${k}"><div class="t"><b>${k.replace('USDT', '')}</b><em><span class="num">${fmt(r.price)}</span> <span class="${sgn(r.chg)}">${pct(r.chg)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></em></div><div class="sigs">${sigChips(r, 5)}</div></button>`; }).join('');
+  $('#ozet').innerHTML = `<p class="ph">Piyasa <b>özeti</b></p>${it || '<p class="note">Özet verisi yok.</p>'}<p class="note">Aktif SAR seti: ${MK[M].set}. ${MK[M].taraf}</p>`;
+}
+function drawList() {
+  const L = filtered(), cfg = MK[M];
+  $('#count').textContent = `${L.length} ${cfg.birim} · ${rows().length} içinden`;
+  $('#list').innerHTML = L.slice(0, shown).map(r => {
+    const sp = nearest(r, 'alt', { noG: true }), rs = nearest(r, 'ust', { noG: true }), L2 = r.lrc && r.lrc.G, e = L2 && (L2.kesisme || []).at(-1);
+    return `<div class="sc" data-k="${esc(r.k)}"><div class="t"><div><span class="kod">${esc(r.k)}</span> <span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]}</span></div><div class="px num">${fmt(r.price)}<small class="${sgn(r.chg)}">${pct(r.chg)}</small></div></div>
+      <div class="mini"><div><span>Destek</span><b>${sp ? fmt(sp.v) : '—'}</b></div><div><span>Uzaklık</span><b>${sp ? pct(sp.dist) : '—'}</b></div><div><span>Direnç</span><b>${rs ? fmt(rs.v) : '—'}</b></div><div><span>Kesişme</span><b>${e && e.ago <= 60 ? (e.tip === 'yesil' ? 'Yeşil' : 'Turuncu') + ' ' + e.ago + 'b' : '—'}</b></div></div>
+      <div class="sigs">${sigChips(r)}</div></div>`; }).join('') || `<div class="panel note">Filtreye uyan ${cfg.birim} yok.</div>`;
+  $('#more').hidden = L.length <= shown;
+}
+
+/* ---------- kart ---------- */
+function stChip(x) {
+  const a = [];
+  if (x.flipped) a.push('<span class="st temas">temas</span>');
+  if (x.flatRecent) a.push(`<span class="st yana">yana${x.flat > 1 ? ' ' + x.flat : ''}</span>`);
+  if (x.igne) a.push('<span class="st igne">iğne</span>');
+  if (!x.flipped && x.age <= 1) a.push('<span class="st taze">taze</span>');
+  if (x.tek) a.push('<span class="st igne">tek</span>');
+  return a.join(' ');
+}
+function openCard(k, src) {
+  const r = src || rows().find(x => x.k === k); if (!r) return;
+  curKod = k; setTab('kart');
+  const cfg = MK[M], L = levels(r).sort((a, b) => b.v - a.v), P = r.price;
+  let lad = '', put = false;
+  for (const x of L) { if (!put && x.v < P) { lad += `<tr class="px"><td colspan="3">Fiyat</td><td class="v">${fmt(P)}</td></tr>`; put = true; }
+    lad += `<tr><td>${TFN[x.tf]}</td><td>${SN[x.k]}</td><td>${stChip(x)}</td><td class="v">${fmt(x.v)} <span class="mut">${pct(x.dist)}</span></td></tr>`; }
+  if (!put) lad += `<tr class="px"><td colspan="3">Fiyat</td><td class="v">${fmt(P)}</td></tr>`;
+  // tablo
+  const tfs = cfg.tfs, cell = (on, bad) => `<div class="${on ? (bad ? 'off2' : 'on') : ''}">${on ? '●' : '·'}</div>`;
+  const anyS = (tf, f) => { const row = r.tf[tf]; return row ? cfg.aktif.some(k => row.s[k] && f(row.s[k])) : false; };
+  const rowsG = [
+    ['Alttan yana', tf => cell(anyS(tf, x => x.flatRecent && x.side === 'alt'))],
+    ['Üstten yana', tf => cell(anyS(tf, x => x.flatRecent && x.side === 'ust'), true)],
+    ['TEK SAR', tf => cell(anyS(tf, x => x.tek))],
+    ['Birleşme', tf => cell(r.tf[tf] && r.tf[tf].birlesme)],
+    ['Temas', tf => cell(anyS(tf, x => x.flipped), true)],
+    ['Fiyat > EMA5', tf => cell(r.tf[tf] && r.tf[tf].ust5)],
+    ['Fiyat > EMA21', tf => cell(r.tf[tf] && r.tf[tf].ust21)],
+    ['Linear TSI', tf => { const t = r.tsi[tf]; return t ? `<div class="${t.renk === 'yesil' ? 'on' : 'off2'}">${t.sure}</div>` : '<div>·</div>'; }],
+  ];
+  const grid = `<div class="grid" style="grid-template-columns:96px repeat(${tfs.length},1fr)"><div class="hd lb"></div>${tfs.map(t => `<div class="hd">${TFK[t]}</div>`).join('')}${rowsG.map(([n, f]) => `<div class="lb">${n}</div>${tfs.map(f).join('')}`).join('')}</div>`;
+  const lrcBox = ['G', 'H'].map(tf => { const x = r.lrc[tf]; if (!x) return ''; if (x.yok) return `<p class="note"><b>${TFN[tf]}:</b> 300 bar gerekiyor (${x.bars} bar var).</p>`;
+    return `<p class="ph" style="margin-top:10px">${TFN[tf]} LRC (300)</p><div class="kv"><span>Kanal üst / alt</span><b>${fmt(x.ust)} / ${fmt(x.alt)}</b><span>Orta üst / orta alt</span><b>${fmt(x.ortaUst)} / ${fmt(x.ortaAlt)}</b><span>Konum</span><b>${({ alt: 'Alt bandın altı', ust: 'Üst bandın üstü', ic: 'Bant içi' })[x.konum]}</b><span>Alt banda uzaklık</span><b>${pct(x.altUzak)}</b><span>Orta seviyeye oran</span><b>${fmt(x.ortaKat, 2)}×</b><span>300 bar zirvesinden</span><b>${pct(x.dusus)}</b></div>
+      <div class="kes">${(x.kesisme || []).map(e => `<span class="${e.tip}">${e.tip === 'yesil' ? 'Yeşil' : 'Turuncu'} · ${e.ago} bar önce · ${pct(e.fark)}${e.teyit ? ' · teyitli' : ''}</span>`).join('') || '<span class="mut" style="color:var(--mute)">Son 160 barda kesişme yok</span>'}</div>`; }).join('');
+  const ek = M === 'borsa' ? (r.usdKes ? `<p class="note">Dolar bazlı son kesişme: ${r.usdKes.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${r.usdKes.ago} bar önce.</p>` : '') :
+    [['BTC', r.btcKes], ['ETH', r.ethKes]].filter(z => z[1]).map(([n, e]) => `<p class="note">${n} paritesinde son kesişme: ${e.tip === 'yesil' ? 'yeşil' : 'turuncu'}, ${e.ago} bar önce.</p>`).join('');
+  const stats = DATA[M].stats || {}, stTxt = r.sig.map(k => { const s = stats[k]; const g = s && (s.g30 || s.g10); return g ? `<li>${esc(SIG[k][0])}: ${s.g30 ? '30' : '10'} günde ort. ${pct(g.ort)}, kazanma %${g.kaz} (${g.n} sinyal)</li>` : ''; }).join('');
+  $('#kart').innerHTML = `<div class="hero"><div class="row1"><div><div class="eyebrow">${cfg.ad} · SAR</div><div class="nm">${esc(r.k)}</div><span class="badge b-${r.durum}">${({ olumlu: 'Olumlu', olumsuz: 'Olumsuz', notr: 'Nötr' })[r.durum]} · puan ${r.puan > 0 ? '+' : ''}${r.puan}</span></div></div>
+     <div class="row2"><div class="price num">${fmt(P)}</div><div class="num ${sgn(r.chg)}">${pct(r.chg)}</div></div><div class="sigs">${ORDER.filter(k => r.sig.includes(k)).map(k => `<button class="sg ${SIG[k][1]}" data-info="${k}">${esc(SIG[k][0])} ⓘ</button>`).join('')}</div></div>
+   <div class="panel yorum"><p class="ph">Otomatik <b>yorum</b></p>${yorum(r).map(p => `<p>${p}</p>`).join('')}</div>
+   <div class="panel"><p class="ph">SAR <b>merdiveni</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${cfg.set} + SAR Ort.</span></p><table class="lad">${lad}</table>
+     <p class="note">Değer o dönemin canlı noktasıdır (TradingView'daki gibi dönem içinde sabit kalır). "yana" = değer önceki dönemle aynı, "temas" = bu dönemde temas edip taraf değiştirdi, "taze" = yeni oluştu, "iğne" = %1'den yakın geçti.</p></div>
+   <div class="panel"><p class="ph">Zaman dilimi <b>tablosu</b></p>${grid}<p class="note">Yeşil = var (son 2 bar), kırmızı = olumsuz durum. TSI hücresindeki sayı, rengin kaç bardır sürdüğü.</p></div>
+   <div class="panel"><p class="ph">LRC ve <b>kesişme</b></p>${lrcBox}${ek}</div>
+   ${stTxt ? `<div class="panel"><p class="ph">Sinyal <b>geçmişi</b> (bu site)</p><ul class="note" style="padding-left:18px">${stTxt}</ul></div>` : ''}`;
+  window.scrollTo({ top: 0 });
+}
+
+/* ---------- kurallar ---------- */
+function drawRehber() {
+  const cfg = MK[M];
+  $('#rehber').innerHTML = `<div class="panel"><p class="ph">${cfg.ad} <b>ayarları</b></p><p class="note" style="margin-top:0">Aktif SAR'lar: ${cfg.set}. ${cfg.taraf}</p>
+   <p class="note">SAR parametreleri (ULUDAĞ SAR kodu): Parabolic 0,02/0,02/0,2 · Linear 0,02/0,01/0,1 · Lucid 0,02/0,02/0,2 · Triple Slow 0,01/0,01/0,2 · Moderate 0,01/0,02/0,2 · Fast 0,01/0,03/0,2 · SAR Ort. = (Linear + Parabolic + Lucid)/3. LRC uzunluk 300 (sağlama 298). Linear TSI: TSI(3,9) üzerine 10 barlık regresyon; eğim artıyorsa yeşil.</p></div>
+   <div class="panel"><p class="ph">Sinyaller</p>${ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<div class="krow" style="cursor:default"><div class="t"><b class="${SIG[k][1]}">${esc(SIG[k][0])}</b></div><p class="note" style="margin:4px 0 0">${esc(SIG[k][2])}</p></div>`).join('')}</div>
+   <div class="panel"><p class="ph">Temel <b>kurallar</b></p><ul class="note" style="padding-left:18px;display:flex;flex-direction:column;gap:6px;margin:0">
+    <li>Asıl yükseliş SAR'dan düzeltme yapıp tekrar yükselince, asıl düşüş SAR'dan tepki alıp tekrar düşünce olur.</li>
+    <li>İlk SAR'a temas olmazsa üstteki SAR'lar yana atar ve uzun düşüş gelir; temas olursa %80 ihtimalle son iki SAR'a kadar gider. İlk ve son SAR'ın yana atma olasılığı yüksek.</li>
+    <li>Alttaki noktaya temas etmemesi, üstteki noktaya temas etmesi iyidir. Temas = tepki/düzeltme, temassızlık = yükseliş/düşüş.</li>
+    <li>Yana atan noktaya ilk gün temas olursa ani hareket gelir, hareket SAR'ın olduğu yöne olur.</li>
+    <li>Temas edilen SAR iptal olur; altındaki daha uzun vadeli SAR fiyatı sert tepkiyle geri atar. Aynı SAR'dan ikinci tepki beklenmez.</li>
+    <li>Fiyat 3–6 aylık SAR'a doğrudan gitmez; yolundaki haftalık ve aylık SAR'larda tepki-düzeltme (zig-zag) yaparak ilerler. Düzeltmelerde genelde son iki SAR'a temas olmaz.</li>
+    <li>Kademeli alım: son iki SAR atlanır, alım sondan üçüncüde tamamlanır; SAR'ların kümelendiği yere ağır alım; emir ilk SAR'ın biraz önüne. Satış üstteki haftalık/aylık SAR'lar.</li>
+    <li>Kesişmede hedef %10–15. Kesişmeyi anında yakala, paylaşılmış kesişmeden uzak dur, BTC trendini gözet (kripto).</li>
+    <li>Düzeltme seviyesi: kısa vadede alttaki günlük SAR, orta vadede haftalık LRC bandı.</li></ul></div>`;
+}
+
+/* ---------- bilgi penceresi ---------- */
+function sheet(eye, title, html) { $('#seye').textContent = eye; $('#stitle').textContent = title; $('#sbody').innerHTML = html; $('#sheet').hidden = false; }
+$('#sclose').onclick = $('#sbg').onclick = () => { $('#sheet').hidden = true; };
+
+/* ---------- gezinme ---------- */
+function setTab(t) { for (const x of ['tara', 'kart', 'rehber']) { $('#tab-' + x).setAttribute('aria-selected', x === t); $('#view-' + x).hidden = x !== t; } if (t === 'rehber') drawRehber(); }
+$('#tab-tara').onclick = () => setTab('tara'); $('#tab-kart').onclick = () => { setTab('kart'); }; $('#tab-rehber').onclick = () => setTab('rehber');
+$('#list').onclick = e => { const c = e.target.closest('.sc'); if (c) openCard(c.dataset.k); };
+$('#ozet').onclick = e => { const c = e.target.closest('[data-oz]'); if (!c) return; const r = DATA[M].piyasaOzet[c.dataset.oz]; openCard(c.dataset.oz, { ...r, k: c.dataset.oz.replace('USDT', '') }); };
+$('#kart').onclick = e => { const b = e.target.closest('[data-info]'); if (b) { const s = SIG[b.dataset.info]; sheet('Sinyal', s[0], `<div class="sh-sec"><p>${esc(s[2])}</p></div>`); } };
+$('#chips').onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; const s = ST[M], k = b.dataset.c; s.chips = s.chips.includes(k) ? s.chips.filter(x => x !== k) : [...s.chips, k]; LS.set('chips_' + M, s.chips); shown = 60; drawChips(); drawList(); };
+$('#durum').onclick = e => { const b = e.target.closest('[data-d]'); if (!b) return; ST[M].durum = b.dataset.d; shown = 60; drawChips(); drawList(); };
+$('#dongu').onclick = e => { const b = e.target.closest('[data-g]'); if (!b) return; ST.borsa.dongu = b.dataset.g; LS.set('dongu', b.dataset.g); drawChips(); };
+$('#sort').onchange = e => { ST[M].sort = e.target.value; drawList(); };
+$('#clear').onclick = () => { ST[M].chips = []; ST[M].durum = 'hepsi'; LS.set('chips_' + M, []); $('#q').value = ''; drawChips(); drawList(); };
+$('#q').oninput = () => { shown = 60; drawList(); };
+$('#more').onclick = () => { shown += 60; drawList(); };
+$('#m-borsa').onclick = () => setM('borsa'); $('#m-kripto').onclick = () => setM('kripto');
+
+async function load(m) {
+  if (DATA[m]) return DATA[m];
+  const r = await fetch(`data/sar_${m}.json`, { cache: 'no-cache' }); if (!r.ok) throw new Error(r.status);
+  return (DATA[m] = await r.json());
+}
+async function setM(m) {
+  M = m; LS.set('m', m); shown = 60; curKod = null;
+  $('#m-borsa').setAttribute('aria-selected', m === 'borsa'); $('#m-kripto').setAttribute('aria-selected', m === 'kripto');
+  $('#q').placeholder = MK[m].ph; $('#q').value = ''; $('#kart').innerHTML = '<div class="panel note">Listeden bir satıra dokun.</div>';
+  $('#list').innerHTML = ''; $('#ozet').innerHTML = ''; $('#status').textContent = 'Veri yükleniyor…'; setTab('tara');
+  try {
+    const d = await load(m); if (M !== m) return;
+    const t = new Date(d.generated);
+    $('#status').textContent = `${d.rows.length} ${MK[m].birim} · veri: ${t.toLocaleDateString('tr-TR')} ${t.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${m === 'borsa' ? 'Yahoo Finance günlük' : 'Binance günlük'}`;
+    drawOzet(); drawChips(); drawList();
+  } catch (e) {
+    $('#status').textContent = '';
+    $('#list').innerHTML = `<div class="err">${MK[m].ad} SAR verisi henüz yok. GitHub → Actions → <b>SAR veri</b> → Run workflow ile üretilir (hafta içi her akşam otomatik).</div>`;
+  }
+}
+
+fetch('/api/login', { method: 'OPTIONS' }).then(r => { if (r.status !== 404 && r.status !== 503) $('#logout').hidden = false; }).catch(() => {});
+$('#logout').addEventListener('click', e => { e.preventDefault(); fetch('/api/logout').finally(() => { location.href = '/login.html'; }); });
+setM(M);
+
+</script>
+</body></html>

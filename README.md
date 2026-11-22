@@ -60,3 +60,12 @@ Yatırım tavsiyesi değildir.
 - İlk kurulumda `debug` alanına `THYAO` yazıp çalıştırın; ham kalemleri ve eşlenen değerleri gösterir. Alan eşlemesi canlı doğrulanmadı, gerekirse `temel.mjs` içindeki kalem adları düzeltilir.
 - Piyasa değeri fiyat × ödenmiş sermaye olarak yaklaşık hesaplanır. Sektör ve döviz işaretleri genel bilgiye dayanan başlangıç listesidir.
 - Yerelde: `node temel.mjs --only THYAO,ASELS`
+
+## SAR Radar (sar.html)
+@emrah_ulu_dag (ULUDAĞ) SAR sisteminin kuralları: ULUDAĞ SAR, Linear TSI ve BIST LRC Kesişme Tarama Pine kodlarının birebir JS karşılığı (`sar_engine.mjs`).
+- İki ayrı bölüm, birbirine karışmaz: **Borsa** (Lucid, Parabolic, Triple Fast, Triple Moderate; alttaki SAR'lar; 3/6 aylık; SAR döngüsü seçici; dolar bazlı kesişme) ve **Kripto** (Triple Slow + Linear; üstteki SAR'lar; USDT, BTC/ETH paritesinde kesişme teyidi).
+- Zaman dilimleri: günlük, haftalık, aylık, 3/6/12 aylık (TradingView gibi takvim dönemleri; değer dönem içinde canlı). 4 saatlik veri yok.
+- Sinyaller: alttan/üstten yana atan SAR, TEK SAR, birleşme, iğne, temas (iptal), 3A+6A çakışması, 6 aylık SAR yakın, aylık SAR tepki adayı (aylık SAR'lar + 21 EMA), LRC alt bant/2 katı, yeşil/turuncu/ideal/riskli kesişme, Linear TSI.
+- Her satır için otomatik yorum (kural metinleri sabit kalıptan, rakamlar hesaptan). Medyan/denge/gerçek değer sistem sahibi paylaşmadığı için yok.
+- Veri: `sar.mjs` → GitHub → Actions → **SAR veri** → Run workflow. Her gün otomatik çalışır. `data/sar_log.json` sinyal günlüğüdür; 10/30 günlük sonuçlar sayfada "Sinyal geçmişi" olarak görünür.
+- Yerelde: `node sar.mjs --only borsa --list THYAO,ASELS` · `node sar.mjs --only kripto --top 50`
