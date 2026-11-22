@@ -239,6 +239,8 @@ const MK = {
 const GRP = { hepsi: 'Tümü', maden: 'Değerli madenler', emtia: 'Emtia', fx: 'Dolar ve pariteler', faiz: 'Faizler', endeks: 'Endeksler', kripto: 'Kripto', rasyo: 'Rasyolar' };
 // sinyal: etiket, ton, açıklama (kural kaynağı)
 const SIG = {
+  igneli: ['İğneli temas', 'pos', 'Destek SAR\'ına bar içinde temas edildi ama kapanış SAR\'ın üstünde kaldı. Hoca: SAR iğnelenirse tepki daha uzun sürer ve aynı yere geri dönülmez; sert iğne dibin oluştuğuna dair daha güvenilir sinyaldir.'],
+  h_tukendi: ['Haftalık SAR desteği tükendi', 'neg', 'Aynı haftada birden çok haftalık SAR\'a iğnesiz temas edildi: ara destekler bir anda tükendi. Hoca: buradan gelen tepki ara tepkidir, asıl sıkıntı geride değil; iyi dönüş için fiyatın tükenen seviyenin üstüne hızla atması gerekir.'],
   lrc_ust: ['Haftalık LRC üstünde', 'neg', 'Fiyat haftalık LRC üst bandının üstünde. Sistem: bant üstündeki enstrümandan uzak durulur; 1, 2 ya da 3 ayda bandın içine genelde sert gelir. Bandın üstüne çok çıkan çok düşer.'],
   kes_teyitli: ['Teyitli kesişme', 'pos', 'Kesişme tek başına yetmez: turuncu/ideal kesişme + Linear TSI yeşil + dolar bazlı (BIST) ya da BTC paritesinde (kripto) teyit birlikte var.'],
   cekim_alt: ['Güçlü çekim aşağıda', 'neg', 'Fiyatı alttaki bir SAR güçlü çekiyor (yakın, kümelenmiş ve/veya TSI kırmızı): önce o seviyeye düzeltme beklenir.'],
@@ -269,7 +271,7 @@ const SIG = {
   tsi_yesil: ['Linear TSI yeşil (G+H)', 'pos', 'Günlük ve haftalık Linear TSI yeşil: TSI regresyon eğimi artıyor (momentum hızlanıyor). Kırmızı = yavaşlıyor, yakındaki SAR\'a temas beklenir.'],
   derin: ['Derin düşüş', '', 'Son 300 barın zirvesinden hissede %70+, kriptoda %85+ düşmüş. İdeal kesişme bu tür grafiklerde aranır.'],
 };
-const ORDER = ['kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test', 'cekim_ust', 'cekim_alt', 'lrc_ust'];
+const ORDER = ['igneli', 'kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test', 'cekim_ust', 'cekim_alt', 'lrc_ust', 'h_tukendi'];
 const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'den fazla kaçmış, sinyal bitmiş sayılır', arka_arkaya: 'yeşil ve turuncu arka arkaya geldi: vur-kaç, en hızlı yükseliş ya da düşüşün habercisi', ideal: 'yeşil → test düşüşü → turuncu sırası ve orta bant yukarı: ideal kesişme', tehlikeli: 'bant aşağı giderken düzeltmesiz gelen kesişme: tehlikeli, sonraki turuncu görmezden gelinmeli', coklu: 'son 60 barda 4+ kesişme: çoklu kesişme, iptal riski yüksek', yeni_bant: 'bant yeni oluştu (300 barlık geçmiş yeni doldu): o an görmezden gelinir' };
 
 /* ---------- durum ---------- */
@@ -335,11 +337,12 @@ const NOTLAR = {
     ALTINGUMUS: { d: [], r: [100], not: 'Rasyoda 100 hedefi gelecek yıl (altın 4.300–4.400, gümüş 44–45). Rasyo gümüşün daha çok düşmesiyle yükselir.' },
     BTC: { d: [61300, 57000], r: [73000, 87000], not: 'Bant 57.000–87.000; 61.300 kuvvetli destek.' }, ETH: { d: [1506], r: [2050], not: '1.506 temas etmemeli; 2.050 altında yorum yok.' } },
 };
-const notOf = r => (NOTLAR[M] || {})[r.k] || null;
+const NOT_GUN = Math.floor((Date.now() - Date.UTC(2026, 10, 22)) / 864e5);
+const notOf = r => (NOT_GUN <= 60 ? (NOTLAR[M] || {})[r.k] : null) || null;
 function notPanel(r) {
   const n = notOf(r); if (!n) return ''; const P = r.price;
   const lv = (arr, t) => arr.map(v => `<span>${t}</span><b>${fmt(v)} <span class="mut">${pct((v / P - 1) * 100)}</span></b>`).join('');
-  return `<div class="panel" style="border-color:#c8a24a"><p class="ph">Sistem sahibinin <b>seviyeleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${NOT_T}</span></p><div class="kv">${lv(n.d, 'Kritik destek')}${lv(n.r, 'Direnç / eşik')}</div><p class="note">${n.not}</p></div>`;
+  return `<div class="panel" style="border-color:#c8a24a"><p class="ph">Sistem sahibinin <b>seviyeleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· ${NOT_T} · ${NOT_GUN} gün önce, referans</span></p><div class="kv">${lv(n.d, 'Kritik destek')}${lv(n.r, 'Direnç / eşik')}</div><p class="note">${n.not}</p></div>`;
 }
 const TAKVIM = () => { const d = new Date(), m = d.getMonth(), g = d.getDate();
   if (m >= 7 && (m < 11 || (m === 11 && g < 15))) return 'Ağustos–Aralık: kesişme birikimi, tepki–düzeltme dönemi. Hareketin Aralık ortasında başlaması bekleniyor.';
@@ -407,6 +410,16 @@ function basit(r) {
   else if (LH && !LH.yok && LH.alt < P) out.push(['Derin düzeltme sınırı', `Sert bir düşüşte orta vadeli hedef haftalık LRC alt bandı <b>${fmt(LH.alt)}</b> (${pct((LH.alt / P - 1) * 100)}).`]);
   if (LH && !LH.yok && LH.konum === 'ust') out.push(['Bant üstü', `Fiyat haftalık LRC üst bandının (<b>${fmt(LH.ust)}</b>) üstünde. Sistem: bant üstündeki enstrümandan uzak durulur; 1–3 ay içinde bandın içine genelde sert gelir.`]);
   if (LH && !LH.yok && LH.ortaKat >= 2) out.push(['Dikkat', 'Fiyat haftalık LRC ortalamasının 2 katından fazla: pahalı bölge, kâr almayı düşünmek gerekir.']);
+  // ana bant (kural: alt sınır = altta en yakın 3/6 aylık SAR, üst sınır = üstte en yakın aylık SAR, tercihen yana atan)
+  const AL = levels(r, { all: true, noOrt: true });
+  const bAlt = AL.filter(x => (x.tf === '3A' || x.tf === '6A') && x.side === 'alt').sort((a, b) => b.v - a.v)[0];
+  const ustA = AL.filter(x => x.tf === 'A' && x.side === 'ust').sort((a, b) => a.v - b.v), bUst = ustA.find(x => x.flatRecent) || ustA[0];
+  if (bAlt && bUst) { const yer = (P - bAlt.v) / (bUst.v - bAlt.v) * 100;
+    out.push(['Ana bant', `<b>${fmt(bAlt.v)} – ${fmt(bUst.v)}</b> (alt: ${lvName(bAlt)}, üst: ${lvName(bUst)}${bUst.flatRecent ? ', yana atmış' : ''}). Fiyat bandın %${fmt(yer, 0)}'inde. Kural: geniş bant kırılmadıkça yön tartışılmaz; bant içinde fiyat ne çok çıkar ne çok düşer, yatay oyalanır.`]); }
+  if (has('h_tukendi')) out.push(['Ara destek tükendi', 'Bu hafta birden çok haftalık SAR\'a iğnesiz temas edildi. Buradan gelecek tepki ara tepkidir; iyi bir dönüş için fiyatın tükenen seviyelerin üstüne hızla atması gerekir.']);
+  if (has('igneli')) out.push(['İğneli temas', 'Destek SAR\'ına iğne atıldı, kapanış üstte kaldı. Tepki uzun sürer ve aynı yere geri dönülmez: olumlu.']);
+  { const mo = new Date().getMonth(); const u3 = AL.filter(x => x.tf === '3A' && x.side === 'alt' && !x.flipped).sort((a, b) => b.v - a.v);
+    if ((mo === 10 || mo === 11) && u3.length) out.push(['Ocak etkisi', `Alttaki 3 aylık SAR'lar (${u3.slice(0, 2).map(x => fmt(x.v)).join(', ')}) Ocak'a kadar test edilmezse yeni dönemde yana atıp birleşir: gelecek yıl için sağlam destek zemini.`]); }
   // sistem sahibinin seviyeleri
   const nt = notOf(r);
   if (nt) {
@@ -537,7 +550,7 @@ function clustersP(levels, price) {
   }
   return out;
 }
-const POSP = ['kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'], NEGP = ['lrc_ust', 'med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
+const POSP = ['igneli', 'kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'], NEGP = ['h_tukendi', 'lrc_ust', 'med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
 function profSig(r) {
   if (r.sig0 == null) r.sig0 = r.sig || [];
   const p = PR(), act = MK[M].aktif, s = new Set(), P = r.price;
@@ -563,6 +576,8 @@ function profSig(r) {
   for (const k of ['kes_usd', 'kes_btc', 'derin']) if (r.sig0.includes(k)) s.add(k);
   if (p.tsi.every(t => r.tsi && r.tsi[t] && r.tsi[t].renk === 'yesil')) s.add('tsi_yesil');
   if (((r.lrc || {}).H || {}).konum === 'ust') s.add('lrc_ust');
+  each(p.lv, x => { if (x.igneli) s.add('igneli'); });
+  { const w = r.tf && r.tf.H; if (w && act.filter(k => w.s[k] && w.s[k].flipped && w.s[k].side === 'ust' && !w.s[k].igneli).length >= 2) s.add('h_tukendi'); }
   if ((s.has('kes_turuncu') || s.has('kes_ideal')) && s.has('tsi_yesil') && (M === 'makro' || r.sig0.includes('kes_usd') || r.sig0.includes('kes_btc'))) s.add('kes_teyitli');
   { const ck = cekim(r); if (ck && ck.kuvvet === 'güçlü') s.add(ck.side === 'alt' ? 'cekim_alt' : 'cekim_ust'); }
   const MD = r.med && r.med[p.med]; if (MD) { s.add(MD.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MD.fark) >= 10) s.add('med_fark'); if (Math.abs(MD.dist) <= 2) s.add('med_test'); }
@@ -934,8 +949,11 @@ function sarState(s, b, nextVal, st) {
   // iğne: bar içinde SAR'a %1'den yakın geldi ama aşmadı
   const near = side === 'alt' ? (b.l[i] - v) / v : (v - b.h[i]) / v;
   const igne = !flipped && near >= 0 && near <= 0.01;
+  // İğneli temas (Hoca): destek SAR'ına bar içinde temas edildi ama kapanış SAR'ın üstünde kaldı → tepki uzun sürer, aynı yere dönülmez
+  const igneli = flipped && side === 'ust' && s[i - 1] != null && b.c[i] > s[i - 1];
+  const igneliD = flipped && side === 'alt' && s[i - 1] != null && b.c[i] < s[i - 1];
   const eta = st && st.below != null && (st.below === (side === 'alt')) ? etaOf(st, v, b) : null;
-  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
+  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, igneli, igneliD, prev: rnd(s[i - 1]), next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
 }
 
 /* ---------------- LRC kanal ve kesişme ---------------- */

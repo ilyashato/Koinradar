@@ -92,10 +92,10 @@ export const SIG = {
   direnc_asildi: 'Direnç SAR\'ı aşıldı', destek_kayip: 'Destek SAR\'ı kaybedildi', cakisma: '3A+6A SAR çakışması', dip6a: '6 aylık SAR yakın',
   aylik_tepki: 'Aylık SAR tepki adayı', trend_bozuk: "Günlük SAR'lar üstte", lrc_alt: 'LRC alt bandın altı', lrc_pahali: 'LRC 2 katı (pahalı)',
   kes_yesil: 'Yeşil kesişme', kes_turuncu: 'Turuncu kesişme', kes_ideal: 'İdeal kesişme', kes_risk: 'Riskli kesişme', kes_usd: 'Dolar bazlı kesişme',
-  kes_btc: 'BTC paritesinde kesişme', lrc_ust: 'Haftalık LRC üst bandının üstü', kes_teyitli: 'Teyitli kesişme', med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', med_test: 'Haftalık medyana yakın', tsi_yesil: 'Linear TSI yeşil (G+H)', derin: 'Derin düşüş',
+  kes_btc: 'BTC paritesinde kesişme', igneli: 'İğneli temas (destek)', h_tukendi: 'Haftalık SAR desteği tükendi', lrc_ust: 'Haftalık LRC üst bandının üstü', kes_teyitli: 'Teyitli kesişme', med_ust: 'Haftalık medyan üstünde', med_alt: 'Haftalık medyan altında', med_fark: 'Medyan–ortalama farkı %10+', med_test: 'Haftalık medyana yakın', tsi_yesil: 'Linear TSI yeşil (G+H)', derin: 'Derin düşüş',
 };
-const POS = ['kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'];
-const NEG = ['lrc_ust', 'med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
+const POS = ['igneli', 'kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'dip6a', 'aylik_tepki', 'kes_ideal', 'tsi_yesil'];
+const NEG = ['h_tukendi', 'lrc_ust', 'med_alt', 'med_fark', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'lrc_pahali', 'kes_risk'];
 
 function clusters(levels, price) {
   // aynı taraftaki seviyeler: %3 içinde en az 3 SAR → küme
@@ -135,6 +135,8 @@ export function signals(a, cfg, extra = {}) {
   if (extra.kesUsd) s.add('kes_usd'); if (extra.kesBtc) s.add('kes_btc');
   if (a.tsi.G && a.tsi.H && a.tsi.G.renk === 'yesil' && a.tsi.H.renk === 'yesil') s.add('tsi_yesil');
   if (LH.konum === 'ust') s.add('lrc_ust');
+  each(cfg.tfs, x => { if (x.igneli) s.add('igneli'); });
+  { const w = a.tf.H; if (w) { const t = act.filter(k => w.s[k] && w.s[k].flipped && w.s[k].side === 'ust' && !w.s[k].igneli).length; if (t >= 2) s.add('h_tukendi'); } }
   if (s.has('kes_turuncu') || s.has('kes_ideal')) { if (s.has('tsi_yesil') && (extra.kesUsd || extra.kesBtc || cfg === CFG.makro)) s.add('kes_teyitli'); }
   const MH = a.med && a.med.H; if (MH) { s.add(MH.ust ? 'med_ust' : 'med_alt'); if (Math.abs(MH.fark) >= 10) s.add('med_fark'); if (Math.abs(MH.dist) <= 2) s.add('med_test'); }
   if (L.dusus != null && L.dusus <= cfg.derin) s.add('derin');
@@ -147,7 +149,7 @@ function compact(a, cfg) {
   const keep = new Set([...cfg.aktif, 'ort']);
   for (const tf of Object.keys(a.tf)) {
     const r = a.tf[tf]; delete r.bars; delete r.ema5; delete r.ema21; if (!r.birlesme) delete r.birlesme;
-    for (const k of Object.keys(r.s)) { if (!keep.has(k)) { delete r.s[k]; continue; } const x = r.s[k]; for (const f of Object.keys(x)) if (x[f] === false || x[f] === null || (f === 'flat' && x[f] === 0) || (f === 'af')) delete x[f]; }
+    for (const k of Object.keys(r.s)) { if (!keep.has(k)) { delete r.s[k]; continue; } const x = r.s[k]; for (const f of Object.keys(x)) if (x[f] === false || x[f] === null || (f === 'flat' && x[f] === 0) || (f === 'af') || (f === 'prev' && !x.flipped)) delete x[f]; }
   }
   return a;
 }

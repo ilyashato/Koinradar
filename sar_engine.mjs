@@ -164,8 +164,11 @@ function sarState(s, b, nextVal, st) {
   // iğne: bar içinde SAR'a %1'den yakın geldi ama aşmadı
   const near = side === 'alt' ? (b.l[i] - v) / v : (v - b.h[i]) / v;
   const igne = !flipped && near >= 0 && near <= 0.01;
+  // İğneli temas (Hoca): destek SAR'ına bar içinde temas edildi ama kapanış SAR'ın üstünde kaldı → tepki uzun sürer, aynı yere dönülmez
+  const igneli = flipped && side === 'ust' && s[i - 1] != null && b.c[i] > s[i - 1];
+  const igneliD = flipped && side === 'alt' && s[i - 1] != null && b.c[i] < s[i - 1];
   const eta = st && st.below != null && (st.below === (side === 'alt')) ? etaOf(st, v, b) : null;
-  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
+  return { v: rnd(v), side, dist: rnd((v / b.c[i] - 1) * 100, 2), age, flat, flatRecent, flipped, tek, igne, igneli, igneliD, prev: rnd(s[i - 1]), next: rnd(nextVal), eta, af: st && st.acc != null ? +st.acc.toFixed(3) : null };
 }
 
 /* ---------------- LRC kanal ve kesişme ---------------- */
