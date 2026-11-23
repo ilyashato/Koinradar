@@ -1,0 +1,46 @@
+name: Telegram bildirimi
+# Her saat taranır; bildirim.json'daki sinyallerden YENİ çıkanlar Telegram'a gider.
+# Elle: Actions → "Telegram bildirimi" → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      kuru:
+        description: 'evet = Telegram’a gönderme, sadece çıktıyı göster'
+        default: 'hayir'
+  schedule:
+    - cron: '12 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: bildir
+  cancel-in-progress: false
+jobs:
+  tara:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Araçları kur
+        run: |
+          npm i --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Tara ve bildir
+        env:
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          TG_CHAT: ${{ secrets.TG_CHAT }}
+          KURU: ${{ github.event.inputs.kuru }}
+        run: |
+          FLAG=""; if [ "$KURU" = "evet" ]; then FLAG="--kuru"; fi
+          node bildir.mjs kripto $FLAG || echo "kripto taraması başarısız"
+          node bildir.mjs borsa $FLAG || echo "borsa taraması başarısız"
+      - name: Durumu kaydet
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898341+github-actions[bot]@users.noreply.github.com"
+          git add data/bildirim_durum.json
+          git commit -m "Bildirim durumu: $(date -u +%Y-%m-%dT%H:%MZ)" || echo "değişiklik yok"
+          git pull --rebase origin ${GITHUB_REF_NAME} || true
+          git push
