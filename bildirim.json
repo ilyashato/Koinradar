@@ -1,9 +1,31 @@
 {
   "_aciklama": "Telegram bildirim ayarları. Değişiklik için Claude'a yaz; ya da bu dosyayı GitHub'da düzenle.",
-  "piyasalar": ["kripto", "borsa"],
-  "zaman": ["1d", "1w"],
-  "sinyaller": ["refD", "refT", "divB", "divT", "ma920", "kirilim", "ma200", "kes_teyitli", "aylik_tepki"],
-  "kripto": { "ilk_n": 300, "liste": "hepsi" },
-  "borsa": { "liste": "hepsi" },
+  "piyasalar": [
+    "kripto",
+    "borsa"
+  ],
+  "zaman": [
+    "1d",
+    "1w"
+  ],
+  "sinyaller": [
+    "refD",
+    "refT",
+    "divB",
+    "divT",
+    "ma920",
+    "kirilim",
+    "ma200",
+    "sar:kes_teyitli",
+    "sar:aylik_tepki",
+    "sar:igneli"
+  ],
+  "kripto": {
+    "ilk_n": 300,
+    "liste": "hepsi"
+  },
+  "borsa": {
+    "liste": "hepsi"
+  },
   "max_satir": 40
 }

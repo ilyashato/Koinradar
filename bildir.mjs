@@ -8,7 +8,7 @@ import { extname, join } from 'node:path';
 const piyasa = process.argv[2] === 'borsa' ? 'borsa' : 'kripto', kuru = process.argv.includes('--kuru');
 const cfg = JSON.parse(readFileSync('bildirim.json', 'utf8'));
 if (!(cfg.piyasalar || []).includes(piyasa)) { console.log(piyasa + ' kapalı (bildirim.json).'); process.exit(0); }
-const TFN = { '1d': 'Günlük', '1w': 'Haftalık', '1m': 'Aylık', '4h': '4 saatlik' }, SITE = 'https://hatofinancial.netlify.app/';
+const TFN = { sar: 'SAR Radar', '1d': 'Günlük', '1w': 'Haftalık', '1m': 'Aylık', '4h': '4 saatlik' }, SITE = 'https://hatofinancial.netlify.app/';
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json' };
 const srv = createServer((q, s) => { const p = join(process.cwd(), decodeURIComponent(q.url.split('?')[0])); if (!existsSync(p) || p.endsWith('/')) { s.writeHead(404); return s.end(); } s.writeHead(200, { 'content-type': MIME[extname(p)] || 'application/octet-stream' }); s.end(readFileSync(p)); }).listen(8139);
 
@@ -23,19 +23,20 @@ const liste = (cfg[piyasa] && cfg[piyasa].liste) || 'hepsi', izin = Array.isArra
 const aktif = await pg.evaluate(([tfs, keys, izin]) => {
   const { S, SIGS, sigOk } = window.__CR, out = [];
   for (const x of S.coins) { const ad = x.sym.replace(/USDT$/, ''); if (izin && !izin.includes(ad)) continue;
-    for (const tf of tfs) for (const k of keys) { if (!SIGS[k]) continue; let ok = false; try { ok = sigOk(x, k, tf); } catch (e) {} if (ok) out.push({ id: `${x.sym}|${tf}|${k}`, ad, tf, k, ks: SIGS[k][0], puan: x.res ? Math.round(x.res.score) : null }); } }
+    for (const k of keys) { if (!SIGS[k]) continue; for (const tf of (k.startsWith('sar:') ? ['sar'] : tfs)) { let ok = false; try { ok = sigOk(x, k, tf === 'sar' ? '1d' : tf); } catch (e) {} if (ok) out.push({ id: `${x.sym}|${tf}|${k}`, ad, tf, k, ks: SIGS[k][0], puan: x.res ? Math.round(x.res.score) : null }); } } }
   return out;
 }, [cfg.zaman || ['1d'], cfg.sinyaller || [], izin]);
 await b.close(); srv.close();
 
 mkdirSync('data', { recursive: true });
 const SF = 'data/bildirim_durum.json', st = existsSync(SF) ? JSON.parse(readFileSync(SF, 'utf8')) : {};
-const onceki = st[piyasa] ? new Set(st[piyasa]) : null, yeni = onceki ? aktif.filter(a => !onceki.has(a.id)) : [];
-console.log(`${piyasa}: ${aktif.length} aktif, ${yeni.length} yeni${onceki ? '' : ' (ilk çalışma, referans alındı)'}`);
+const imza = JSON.stringify([cfg.sinyaller, cfg.zaman, liste]), imzaDegisti = st[piyasa + '_ayar'] !== imza;
+const onceki = st[piyasa] && !imzaDegisti ? new Set(st[piyasa]) : null, yeni = onceki ? aktif.filter(a => !onceki.has(a.id)) : [];
+console.log(`${piyasa}: ${aktif.length} aktif, ${yeni.length} yeni${onceki ? '' : ' (ilk çalışma ya da ayar değişti, referans alındı)'}`);
 
 const baslik = piyasa === 'borsa' ? 'Borsa Radarı' : 'Coin Radarı';
 let msg = null;
-if (!onceki) msg = `✅ ${baslik} bildirimi kuruldu.\nŞu an ${aktif.length} aktif sinyal izleniyor; bundan sonra sadece YENİ çıkanlar gelecek.\nSeçili sinyaller: ${(cfg.sinyaller || []).join(', ')}`;
+if (!onceki) msg = `✅ ${baslik} bildirimi ${st[piyasa] ? 'ayarları güncellendi' : 'kuruldu'}.\nŞu an ${aktif.length} aktif sinyal izleniyor; bundan sonra sadece YENİ çıkanlar gelecek.\nSeçili sinyaller: ${(cfg.sinyaller || []).join(', ')}`;
 else if (yeni.length) {
   const gr = {}; for (const a of yeni) (gr[`${a.ks} · ${TFN[a.tf] || a.tf}`] = gr[`${a.ks} · ${TFN[a.tf] || a.tf}`] || []).push(a);
   const max = cfg.max_satir || 40; let n = 0, fazla = 0, body = '';
@@ -47,4 +48,4 @@ if (msg) {
   if (kuru || !tok || !chat) console.log('--- (gönderilmedi) ---\n' + msg);
   else for (let i = 0; i < msg.length; i += 3900) { const r = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ chat_id: chat, text: msg.slice(i, i + 3900), disable_web_page_preview: true }) }); if (!r.ok) throw new Error('Telegram hatası: ' + r.status + ' ' + (await r.text())); }
 }
-if (!kuru) { st[piyasa] = aktif.map(a => a.id); writeFileSync(SF, JSON.stringify(st)); }
+if (!kuru) { st[piyasa] = aktif.map(a => a.id); st[piyasa + '_ayar'] = imza; writeFileSync(SF, JSON.stringify(st)); }
