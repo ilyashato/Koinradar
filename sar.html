@@ -181,8 +181,8 @@ footer{margin:16px 0 4px;color:var(--mute);font-size:12px;line-height:1.55}
     <div class="panel" id="scalp" hidden></div>
     <div class="panel">
       <div id="grp-box" hidden><p class="ph">Makro <b>grubu</b></p><div class="chips" id="grp"></div><p class="ph" style="margin-top:14px"></p></div>
-      <p class="ph">SAR <b>filtreleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· seçtiklerinin hepsi aynı anda</span></p>
-      <div class="chips" id="chips"></div>
+      <p class="ph">SAR <b>filtreleri</b> <span class="mut" style="text-transform:none;letter-spacing:0;font-weight:500">· seçtiklerinin hepsi aynı anda; “Herhangi biri” gruptan en az biriyle eşleşir</span></p>
+      <div id="chips"></div>
       <p class="ph" style="margin-top:14px">Durum</p>
       <div class="chips" id="durum"></div>
       <p class="ph" style="margin-top:14px">LRC <b>uzaklığı</b></p>
@@ -274,6 +274,14 @@ const SIG = {
   derin: ['Derin düşüş', '', 'Son 300 barın zirvesinden hissede %70+, kriptoda %85+ düşmüş. İdeal kesişme bu tür grafiklerde aranır.'],
 };
 const ORDER = ['igneli', 'kes_teyitli', 'med_ust', 'alt_yana', 'tek', 'direnc_asildi', 'cakisma', 'aylik_tepki', 'dip6a', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'birlesme', 'igne', 'lrc_alt', 'derin', 'ust_yana', 'destek_kayip', 'trend_bozuk', 'kes_risk', 'lrc_pahali', 'med_alt', 'med_fark', 'med_test', 'cekim_ust', 'cekim_alt', 'lrc_ust', 'h_tukendi'];
+// Yön bazlı gruplar: Long giriş / Long onay / Kâr al / Short. '@' ile başlayan düğme grubun üyelerinden en az birini arar.
+const GRPS = [
+  ['@giris', '🟢 Long · giriş (dip / destek tepkisi)', ['alt_yana', 'igneli', 'cakisma', 'dip6a', 'aylik_tepki', 'lrc_alt', 'derin', 'birlesme', 'tek', 'igne'], 'Long için ucuz giriş aranan yerler: SAR desteği, destekten tepki, ucuz LRC bölgesi.'],
+  ['@onay', '🟢 Long · onay (kesişme / momentum)', ['kes_teyitli', 'kes_ideal', 'kes_turuncu', 'kes_yesil', 'kes_usd', 'kes_btc', 'tsi_yesil', 'med_ust', 'cekim_ust', 'direnc_asildi'], 'Hareket başlamış: LRC kesişmeleri, TSI yeşil, medyan üstü, direnç aşımı. Geç ama daha güvenli katılım.'],
+  ['@kar', '🟡 Kâr al / dikkat', ['lrc_ust', 'lrc_pahali', 'h_tukendi', 'med_fark', 'kes_risk'], 'Yorulma ve pahalı bölge: eldekiler için kâr alma, yeni long için bekleme yeri.'],
+  ['@short', '🔴 Short / uzak dur', ['ust_yana', 'destek_kayip', 'trend_bozuk', 'med_alt', 'cekim_alt'], 'Zayıflık: direnç SAR\'ı, kaybedilen destek, SAR ve medyan altı. Long için uzak dur, short için aday bölge.']
+];
+const chipOk = (r, c) => { if (c[0] !== '@') return r.sig.includes(c); const g = GRPS.find(x => x[0] === c); return !!g && g[2].some(k => r.sig.includes(k)); };
 const YOR = { taze: 'taze (son 20 bar)', kacti: 'fiyat kesişmeden sonra %20\'den fazla kaçmış, sinyal bitmiş sayılır', arka_arkaya: 'yeşil ve turuncu arka arkaya geldi: vur-kaç, en hızlı yükseliş ya da düşüşün habercisi', ideal: 'yeşil → test düşüşü → turuncu sırası ve orta bant yukarı: ideal kesişme', tehlikeli: 'bant aşağı giderken düzeltmesiz gelen kesişme: tehlikeli, sonraki turuncu görmezden gelinmeli', coklu: 'son 60 barda 4+ kesişme: çoklu kesişme, iptal riski yüksek', yeni_bant: 'bant yeni oluştu (300 barlık geçmiş yeni doldu): o an görmezden gelinir' };
 
 /* ---------- durum ---------- */
@@ -610,7 +618,7 @@ function rows() { const d = DATA[M]; return d ? d.rows : []; }
 function supDist(r) { const x = nearest(r, 'alt', { noG: true }); return x ? Math.abs(x.dist) : 999; }
 function filtered() {
   const s = ST[M], q = $('#q').value.trim().toLocaleUpperCase('tr-TR');
-  let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => r.sig.includes(c)) && (s.durum === 'hepsi' || (s.durum === 'fav' ? isFav(r.k) : r.durum === s.durum)));
+  let L = rows().filter(r => (!q || r.k.includes(q)) && s.chips.every(c => chipOk(r, c)) && (s.durum === 'hepsi' || (s.durum === 'fav' ? isFav(r.k) : r.durum === s.durum)));
   if (M === 'makro' && s.grp !== 'hepsi') L = L.filter(r => r.grp === s.grp);
   if (LF.p != null) L = L.filter(r => { const d = lrcDist(r); if (d == null) return false; return LF.yon === 'alt' ? d <= -LF.p : d >= LF.p; });
   const by = { puan: (a, b) => b.puan - a.puan || (b.chg || 0) - (a.chg || 0), chg: (a, b) => (b.chg || 0) - (a.chg || 0), kod: (a, b) => a.k.localeCompare(b.k, 'tr'),
@@ -624,7 +632,13 @@ function sigChips(r, max = 6) {
 }
 function drawChips() {
   const s = ST[M], cnt = k => rows().filter(r => r.sig.includes(k)).length;
-  $('#chips').innerHTML = ORDER.filter(k => M === 'borsa' ? k !== 'kes_btc' : M === 'makro' ? k !== 'kes_btc' && k !== 'kes_usd' : k !== 'kes_usd' && k !== 'aylik_tepki').map(k => `<button class="chip" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${esc(SIG[k][0])} <span class="mut">${cnt(k)}</span></button>`).join('');
+  const okK = k => SIG[k] && (M === 'borsa' ? k !== 'kes_btc' : M === 'makro' ? k !== 'kes_btc' && k !== 'kes_usd' : k !== 'kes_usd' && k !== 'aylik_tepki');
+  const chipBtn = (k, t, n, cls) => `<button class="chip${cls || ''}" data-c="${k}" aria-pressed="${s.chips.includes(k)}">${t} <span class="mut">${n}</span></button>`;
+  const used = new Set(GRPS.flatMap(g => g[2]));
+  const blocks = GRPS.map(([id, t, ks, tip]) => { const L = ks.filter(okK); return `<p class="ph" style="margin:12px 0 6px;text-transform:none;letter-spacing:0">${t}</p><p class="note" style="margin:0 0 6px">${tip}</p><div class="chips">${chipBtn(id, '<b>Herhangi biri</b>', rows().filter(r => chipOk(r, id)).length, ' gold')}${L.map(k => chipBtn(k, esc(SIG[k][0]), cnt(k))).join('')}</div>`; });
+  const rest = ORDER.filter(k => okK(k) && !used.has(k));
+  if (rest.length) blocks.push(`<p class="ph" style="margin:12px 0 6px;text-transform:none;letter-spacing:0">⚪ Diğer</p><div class="chips">${rest.map(k => chipBtn(k, esc(SIG[k][0]), cnt(k))).join('')}</div>`);
+  $('#chips').innerHTML = blocks.join('');
   $('#durum').innerHTML = [['hepsi', 'Tümü'], ['fav', `★ Favoriler ${FAV[M].length}`], ['olumlu', 'Olumlu'], ['notr', 'Nötr'], ['olumsuz', 'Olumsuz']].map(([k, t]) => `<button class="chip" data-d="${k}" aria-pressed="${s.durum === k}">${t}</button>`).join('');
   const BN = { alt: 'Alt bant', orta: 'Orta', ust: 'Üst bant' };
   $('#lrc-tf').innerHTML = ['G', 'H'].map(t => `<button class="chip" data-lt="${t}" aria-pressed="${LF.tf === t}">${TFN[t]} LRC</button>`).join('');
